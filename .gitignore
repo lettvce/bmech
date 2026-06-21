@@ -1,0 +1,12 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Blender temp files
+*.blend1
+
+# Packed zip (built artifact, not source)
+*.zip
+
+# Claude Code local settings
+.claude/

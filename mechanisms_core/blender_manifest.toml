@@ -1,0 +1,18 @@
+schema_version = "1.0.0"
+
+id = "mechanisms_core"
+version = "1.0.0"
+name = "Mechanisms Core"
+tagline = "Adds a unified Mechanisms submenu to the Shift-A Add menu"
+# Swap in your real name/email before you ever package this for distribution.
+maintainer = "Blake <blake@example.com>"
+type = "add-on"
+
+blender_version_min = "5.1.0"
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+# Matches your suite's existing category convention per spec §2.1.
+category = "Add Mesh"
