@@ -1,47 +1,39 @@
 import importlib
 
 from . import menu
-from . import hairspring
-from . import serpentine_spring
-from . import ratchet_pawl
-from . import internal_ratchet
-from . import press_fit_pin
-from . import involute_gear_rack
-from . import ball_bearing
+from . import gears
+from . import fasteners
+from . import bearings
+from . import springs
+from . import ratchets
 
 if "bpy" in locals():
-    importlib.reload(hairspring)
-    importlib.reload(serpentine_spring)
-    importlib.reload(ratchet_pawl)
-    importlib.reload(internal_ratchet)
-    importlib.reload(press_fit_pin)
-    importlib.reload(involute_gear_rack)
-    importlib.reload(ball_bearing)
+    importlib.reload(gears)
+    importlib.reload(fasteners)
+    importlib.reload(bearings)
+    importlib.reload(springs)
+    importlib.reload(ratchets)
     importlib.reload(menu)
 
 import bpy
 
 
 def register():
-    hairspring.register()
-    serpentine_spring.register()
-    ratchet_pawl.register()
-    internal_ratchet.register()
-    press_fit_pin.register()
-    involute_gear_rack.register()
-    ball_bearing.register()
+    springs.register()
+    ratchets.register()
+    fasteners.register()
+    gears.register()
+    bearings.register()
     menu.register()
 
 
 def unregister():
     menu.unregister()
-    ball_bearing.unregister()
-    involute_gear_rack.unregister()
-    press_fit_pin.unregister()
-    internal_ratchet.unregister()
-    ratchet_pawl.unregister()
-    serpentine_spring.unregister()
-    hairspring.unregister()
+    bearings.unregister()
+    gears.unregister()
+    fasteners.unregister()
+    ratchets.unregister()
+    springs.unregister()
 
 
 if __name__ == "__main__":

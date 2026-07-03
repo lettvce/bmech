@@ -274,9 +274,6 @@ class OBJECT_OT_add_ball_bearing(bpy.types.Operator):
     )
 
     # ── Placement ──────────────────────────────────────────────────────────────
-    center_location: FloatVectorProperty(
-        name="Center", size=3, default=(0.0, 0.0, 0.0), subtype='TRANSLATION',
-    )
     parent_under_empty: BoolProperty(
         name="Parent Under Empty", default=True,
     )
@@ -292,8 +289,16 @@ class OBJECT_OT_add_ball_bearing(bpy.types.Operator):
             ball_r, self.ball_count, self.gap_mm,
             bore_r, outer_r, self.clearance_mm, z_cut,
         )
+        # Auto-scale bore/outer to guarantee MIN_WALL_MM on both sides
+        bore_r_eff  = bore_r  if inner_wall >= MIN_WALL_MM else max(0.05, ball_center_r - ball_r - MIN_WALL_MM)
+        outer_r_eff = outer_r if outer_wall >= MIN_WALL_MM else ball_center_r + groove_r + MIN_WALL_MM
+        if bore_r_eff != bore_r or outer_r_eff != outer_r:
+            _, _, inner_wall, outer_wall, bearing_width = derive_bearing(
+                ball_r, self.ball_count, self.gap_mm,
+                bore_r_eff, outer_r_eff, self.clearance_mm, z_cut,
+            )
         return (ball_r, h, z_cut, r_flat,
-                bore_r, outer_r, ball_center_r, groove_r,
+                bore_r_eff, outer_r_eff, ball_center_r, groove_r,
                 inner_wall, outer_wall, bearing_width)
 
     def draw(self, context):
@@ -303,10 +308,17 @@ class OBJECT_OT_add_ball_bearing(bpy.types.Operator):
          inner_wall, outer_wall, bearing_width) = self._compute()
 
         # ── Diameters ──────────────────────────────────────────────────────────
+        orig_bore_r  = self.bore_diameter_mm / 2.0
+        orig_outer_r = self.outer_diameter_mm / 2.0
+
         box = layout.box()
         box.label(text="Diameters")
         box.prop(self, "bore_diameter_mm")
+        if bore_r < orig_bore_r - 1e-4:
+            box.label(text="Bore reduced to %.2f mm to maintain %.1f mm inner wall" % (bore_r * 2, MIN_WALL_MM), icon='INFO')
         box.prop(self, "outer_diameter_mm")
+        if outer_r > orig_outer_r + 1e-4:
+            box.label(text="OD expanded to %.2f mm to maintain %.1f mm outer wall" % (outer_r * 2, MIN_WALL_MM), icon='INFO')
 
         # ── Balls ──────────────────────────────────────────────────────────────
         box = layout.box()
@@ -349,7 +361,6 @@ class OBJECT_OT_add_ball_bearing(bpy.types.Operator):
         # ── Placement ──────────────────────────────────────────────────────────
         box = layout.box()
         box.label(text="Placement")
-        box.prop(self, "center_location")
         box.prop(self, "parent_under_empty")
 
     def execute(self, context):
@@ -357,15 +368,7 @@ class OBJECT_OT_add_ball_bearing(bpy.types.Operator):
          bore_r, outer_r, ball_center_r, groove_r,
          inner_wall, outer_wall, bearing_width) = self._compute()
 
-        errs = validate_bearing(
-            ball_r, z_cut, groove_r, bore_r, outer_r,
-            ball_center_r, inner_wall, outer_wall, self.gap_mm,
-        )
-        if errs:
-            self.report({'ERROR'}, errs[0])
-            return {'CANCELLED'}
-
-        loc = tuple(self.center_location)
+        loc = tuple(context.scene.cursor.location)
         try:
             inner_obj = build_inner_race(
                 context, "BearingInnerRace",
@@ -392,7 +395,6 @@ class OBJECT_OT_add_ball_bearing(bpy.types.Operator):
                     )
                 )
         except (ValueError, RuntimeError) as e:
-            self.report({'ERROR'}, "Mesh construction failed: %s" % e)
             return {'CANCELLED'}
 
         all_objs = [inner_obj, outer_obj] + ball_objs

@@ -15,6 +15,7 @@ from math import (
 from bpy.props import (
     FloatProperty, IntProperty, BoolProperty, EnumProperty
 )
+from .. import gear_matching
 
 bl_info = {
     "name": "Involute Gear & Rack Generator",
@@ -35,6 +36,8 @@ ADDENDUM_COEFF       = 1.0
 DEDENDUM_COEFF       = 1.25
 ROOT_FILLET_COEFF    = 0.38
 MIN_TOOTH_COUNT      = 5
+BOOL_EPSILON         = 0.001
+BORE_SEGS            = 32
 
 
 # ═════════════════════════════════════════════
@@ -378,26 +381,17 @@ def build_rack_profile(module, pressure_angle_deg, tooth_count_rack):
 # ═════════════════════════════════════════════
 
 def profile_to_mesh_object(profile_points, name, width_mm):
-    """Fill a closed 2D profile as a flat mesh and attach a Solidify modifier.
+    """Fill a closed 2D profile as a single n-gon face and attach a Solidify modifier.
 
-    Uses tessellate_polygon rather than triangle_fill — triangle_fill operates
-    on edge loops and treats each enclosed pocket as a separate fill region,
-    which breaks non-convex profiles like a rack (fills tooth tops individually
-    instead of the whole solid). tessellate_polygon is a proper 2D polygon
-    triangulator that correctly handles non-convex shapes.
+    The profile is placed at local z = width_mm / 2 so the centered (offset=0)
+    Solidify below spans local [0, width_mm] — matching the bottom-at-z=0
+    convention used by the other gear generators, and what _apply_bore's
+    cutter assumes.
     """
-    from mathutils.geometry import tessellate_polygon
-
-    poly_3d = [(x, y, 0.0) for x, y in profile_points]
-    tris    = tessellate_polygon([poly_3d])
-
     bm    = bmesh.new()
-    verts = [bm.verts.new(p) for p in poly_3d]
+    verts = [bm.verts.new((x, y, width_mm / 2.0)) for x, y in profile_points]
     bm.verts.index_update()
-
-    for tri in tris:
-        bm.faces.new([verts[i] for i in tri])
-
+    bm.faces.new(verts)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
 
     mesh = bpy.data.meshes.new(name)
@@ -413,6 +407,43 @@ def profile_to_mesh_object(profile_points, name, width_mm):
     mod.offset    = 0.0
 
     return obj
+
+
+def _apply_bore(context, obj, bore_r, width_mm):
+    """Boolean-difference a bore cylinder through obj. Cutter deleted after."""
+    bm     = bmesh.new()
+    angles = [2.0 * pi * i / BORE_SEGS for i in range(BORE_SEGS)]
+    z0, z1 = -BOOL_EPSILON, width_mm + BOOL_EPSILON
+
+    vb = [bm.verts.new((bore_r * cos(a), bore_r * sin(a), z0)) for a in angles]
+    vt = [bm.verts.new((bore_r * cos(a), bore_r * sin(a), z1)) for a in angles]
+    bm.verts.index_update()
+
+    for i in range(BORE_SEGS):
+        ni = (i + 1) % BORE_SEGS
+        bm.faces.new([vb[i], vb[ni], vt[ni], vt[i]])
+    bm.faces.new(vb)
+    bm.faces.new(list(reversed(vt)))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+
+    me_cut = bpy.data.meshes.new("__SGBoreMesh")
+    bm.to_mesh(me_cut)
+    bm.free()
+    me_cut.update()
+
+    cutter = bpy.data.objects.new("__SGBore", me_cut)
+    cutter.location = obj.location.copy()
+    context.collection.objects.link(cutter)
+
+    mod           = obj.modifiers.new("Bore", 'BOOLEAN')
+    mod.operation = 'DIFFERENCE'
+    mod.object    = cutter
+    mod.solver    = 'EXACT'
+
+    with context.temp_override(active_object=obj):
+        bpy.ops.object.modifier_apply(modifier="Bore")
+
+    bpy.data.objects.remove(cutter, do_unlink=True)
 
 
 def unique_name(base_name):
@@ -439,6 +470,9 @@ class OBJECT_OT_add_spur_gear(bpy.types.Operator):
     bl_label   = "Add Spur Gear"
     bl_options = {'REGISTER', 'UNDO'}
 
+    def bmech_sync_target(self, context):
+        gear_matching.sync_module_pa(self, context.window_manager.bmech_gear_target)
+
     module: FloatProperty(
         name="Module (mm)", default=1.0, min=0.1, max=50.0,
         description="Gear module — controls tooth size",
@@ -446,58 +480,81 @@ class OBJECT_OT_add_spur_gear(bpy.types.Operator):
     tooth_count: IntProperty(
         name="Tooth Count", default=20, min=MIN_TOOTH_COUNT, max=500,
     )
-    pressure_angle: FloatProperty(
+    pressure_angle_deg: FloatProperty(
         name="Pressure Angle (deg)", default=DEFAULT_PRESSURE_ANGLE_DEG, min=10.0, max=45.0,
     )
     width_mm: FloatProperty(
         name="Width (mm)", default=6.0, min=0.1, soft_max=100.0,
         description="Gear thickness — Solidify modifier depth",
     )
+    bore_enable: BoolProperty(name="Bore Hole", default=True)
+    bore_diameter: FloatProperty(
+        name="Bore Ø (mm)", default=5.0, min=0.1, soft_max=50.0,
+    )
+    bore_compensation: FloatProperty(
+        name="Compensation (mm)", default=0.2, min=0.0, soft_max=1.0,
+        description="FDM holes print tight — added to bore radius",
+    )
+
     def draw(self, context):
         layout = self.layout
+        layout.prop(context.window_manager, "bmech_gear_target", text="Match Target")
         layout.prop(self, "module")
         layout.prop(self, "tooth_count")
-        layout.prop(self, "pressure_angle")
+        layout.prop(self, "pressure_angle_deg")
         layout.prop(self, "width_mm")
+        layout.separator()
+        layout.prop(self, "bore_enable")
+        if self.bore_enable:
+            col = layout.column(align=True)
+            col.prop(self, "bore_diameter")
+            col.prop(self, "bore_compensation")
         pitch_d = self.module * self.tooth_count
         layout.label(text="Pitch Ø: %.2f mm" % pitch_d)
-        pa_rad  = radians(self.pressure_angle)
-        if (self.module * self.tooth_count / 2.0 * cos(pa_rad)) > (self.module * self.tooth_count / 2.0 - DEDENDUM_COEFF * self.module):
+        pa_rad  = radians(self.pressure_angle_deg)
+        pitch_r = self.module * self.tooth_count / 2.0
+        ded_r   = pitch_r - DEDENDUM_COEFF * self.module
+        if (pitch_r * cos(pa_rad)) > ded_r:
             layout.label(text="Undercut likely", icon='ERROR')
+        if ded_r <= 0:
+            layout.label(text="Module too large — dedendum radius is zero or negative", icon='ERROR')
+        pa_max = gear_matching.max_pressure_angle_deg(self.tooth_count, ADDENDUM_COEFF)
+        layout.label(text="Max pressure angle for %d teeth: %.1f°" % (self.tooth_count, pa_max))
+        if self.bore_enable:
+            bore_r = self.bore_diameter / 2.0 + self.bore_compensation
+            if bore_r >= ded_r:
+                layout.label(text="Bore too large for dedendum radius", icon='ERROR')
 
     def execute(self, context):
-        if self.tooth_count < MIN_TOOTH_COUNT:
-            self.report({'ERROR'}, f"Tooth count too low — severe undercut below {MIN_TOOTH_COUNT} teeth")
-            return {'CANCELLED'}
-
-        pa_rad          = radians(self.pressure_angle)
+        gear_matching.clamp_pressure_angle(self, (self.tooth_count, ADDENDUM_COEFF))
+        pa_rad          = radians(self.pressure_angle_deg)
         pitch_radius    = self.module * self.tooth_count / 2.0
         dedendum_radius = pitch_radius - DEDENDUM_COEFF * self.module
 
         if dedendum_radius <= 0:
-            self.report({'ERROR'}, "Module too large for tooth count — dedendum radius is zero or negative.")
             return {'CANCELLED'}
 
         try:
-            profile = build_gear_profile(self.module, self.tooth_count, self.pressure_angle)
+            profile = build_gear_profile(self.module, self.tooth_count, self.pressure_angle_deg)
         except Exception as e:
-            self.report({'ERROR'}, f"Profile generation failed: {e}")
             return {'CANCELLED'}
 
         obj = profile_to_mesh_object(profile, unique_name("Gear"), self.width_mm)
+        obj.location = context.scene.cursor.location.copy()
 
-        for o in context.view_layer.objects:
-            o.select_set(False)
+        if self.bore_enable:
+            bore_r = self.bore_diameter / 2.0 + self.bore_compensation
+            if bore_r > 0 and bore_r < dedendum_radius:
+                with context.temp_override(active_object=obj):
+                    bpy.ops.object.modifier_apply(modifier="Thickness")
+                _apply_bore(context, obj, bore_r, self.width_mm)
+
+        bpy.ops.object.select_all(action='DESELECT')
         obj.select_set(True)
         context.view_layer.objects.active = obj
 
-        context.scene["last_gear_name"]   = obj.name
-        context.scene["last_gear_params"] = {
-            "module":         self.module,
-            "tooth_count":    self.tooth_count,
-            "pressure_angle": self.pressure_angle,
-            "width_mm":       self.width_mm,
-        }
+        gear_matching.stamp_gear(obj, "spur", self.module, self.pressure_angle_deg,
+                                  tooth_count=self.tooth_count)
         return {'FINISHED'}
 
 
@@ -511,11 +568,17 @@ class OBJECT_OT_add_rack(bpy.types.Operator):
     bl_label   = "Add Gear Rack"
     bl_options = {'REGISTER', 'UNDO'}
 
+    def bmech_sync_target(self, context):
+        target = context.window_manager.bmech_gear_target
+        gear_matching.sync_module_pa(self, target)
+        if target is not None and "bmech_tooth_count" in target.keys():
+            self.tooth_count_rack = target["bmech_tooth_count"]
+
     module: FloatProperty(
         name="Module (mm)", default=1.0, min=0.1, max=50.0,
         description="Rack module — must match gear module to mesh correctly",
     )
-    pressure_angle: FloatProperty(
+    pressure_angle_deg: FloatProperty(
         name="Pressure Angle (deg)", default=DEFAULT_PRESSURE_ANGLE_DEG, min=10.0, max=45.0,
     )
     length_mode: EnumProperty(
@@ -534,60 +597,53 @@ class OBJECT_OT_add_rack(bpy.types.Operator):
         description="Rack thickness — Solidify modifier depth",
     )
 
-    def _get_gear_params(self, context):
-        return context.scene.get("last_gear_params", None)
-
     def draw(self, context):
         layout = self.layout
+        target = context.window_manager.bmech_gear_target
+        layout.prop(context.window_manager, "bmech_gear_target", text="Match Target")
         layout.prop(self, "module")
-        layout.prop(self, "pressure_angle")
+        layout.prop(self, "pressure_angle_deg")
         layout.prop(self, "length_mode")
         if self.length_mode == 'TOOTH_COUNT':
             layout.prop(self, "tooth_count_rack")
         else:
-            gear_params = self._get_gear_params(context)
-            if gear_params:
-                layout.label(text=f"Teeth from gear: {gear_params['tooth_count']}")
+            if target is not None and "bmech_tooth_count" in target.keys():
+                layout.label(text="Teeth from target: %d" % target["bmech_tooth_count"])
             else:
-                layout.label(text="No gear in scene — using tooth count below", icon='INFO')
+                layout.label(text="No target gear set — using tooth count below", icon='INFO')
                 layout.prop(self, "tooth_count_rack")
         layout.prop(self, "width_mm")
 
     def execute(self, context):
-        gear_params = self._get_gear_params(context)
+        target = context.window_manager.bmech_gear_target
+        target_has_teeth = target is not None and "bmech_tooth_count" in target.keys()
 
-        if self.length_mode == 'MATCH_GEAR' and gear_params:
-            tooth_count_rack = gear_params["tooth_count"]
+        if self.length_mode == 'MATCH_GEAR' and target_has_teeth:
+            tooth_count_rack = target["bmech_tooth_count"]
         else:
             tooth_count_rack = self.tooth_count_rack
 
         try:
-            profile = build_rack_profile(self.module, self.pressure_angle, tooth_count_rack)
+            profile = build_rack_profile(self.module, self.pressure_angle_deg, tooth_count_rack)
         except Exception as e:
-            self.report({'ERROR'}, f"Rack profile generation failed: {e}")
             return {'CANCELLED'}
 
         obj = profile_to_mesh_object(profile, unique_name("Rack"), self.width_mm)
+        obj.location = context.scene.cursor.location.copy()
 
-        if gear_params:
-            gear_obj = bpy.data.objects.get(context.scene.get("last_gear_name", ""))
-            if gear_obj:
-                pitch_radius     = gear_params["module"] * gear_params["tooth_count"] / 2.0
-                tooth_pitch      = pi * self.module
-                half_rack_length = (tooth_count_rack * tooth_pitch) / 2.0
-                obj.location.y   = -pitch_radius
-                obj.location.x   = -half_rack_length + tooth_pitch / 2.0
+        if target is not None and "bmech_module" in target.keys():
+            pitch_radius     = target["bmech_module"] * target.get("bmech_tooth_count", tooth_count_rack) / 2.0
+            tooth_pitch      = pi * self.module
+            half_rack_length = (tooth_count_rack * tooth_pitch) / 2.0
+            obj.location     = target.location.copy()
+            obj.location.y  -= pitch_radius
+            obj.location.x  -= half_rack_length - tooth_pitch / 2.0
 
-        for o in context.view_layer.objects:
-            o.select_set(False)
+        bpy.ops.object.select_all(action='DESELECT')
         obj.select_set(True)
         context.view_layer.objects.active = obj
 
-        context.scene["last_rack_name"]   = obj.name
-        context.scene["last_rack_params"] = {
-            "module":         self.module,
-            "pressure_angle": self.pressure_angle,
-        }
+        gear_matching.stamp_gear(obj, "rack", self.module, self.pressure_angle_deg)
         return {'FINISHED'}
 
 

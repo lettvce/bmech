@@ -351,9 +351,6 @@ class OBJECT_OT_add_internal_ratchet(bpy.types.Operator):
         name="Width (mm)", default=6.0, soft_min=0.5, soft_max=200.0,
         description="Solidify depth — shared by ring, hub, and all pawls",
     )
-    center_location: FloatVectorProperty(
-        name="Center", size=3, default=(0.0, 0.0, 0.0), subtype='TRANSLATION',
-    )
     parent_under_empty: BoolProperty(
         name="Parent Under Empty", default=True,
         description="Group all parts under a FreewheelRatchet empty for easy manipulation",
@@ -417,10 +414,22 @@ class OBJECT_OT_add_internal_ratchet(bpy.types.Operator):
         box.prop(self, "pivot_hole_diameter_mm")
         box.prop(self, "pivot_hole_compensation_mm")
 
+        # Run full validation and show all errors inline
+        _errs = validate_freewheel(
+            ring_outer_r, ring_inner_r, tip_r, tooth_depth_mm, self.tooth_count,
+            hub_outer_r, bore_r, self.clearance_mm,
+            self.pawl_count, arm_length, self.pawl_arm_width_mm,
+            self.pivot_hole_diameter_mm, self.pivot_hole_compensation_mm,
+        )
+        if _errs:
+            err_box = layout.box()
+            err_box.label(text="Issues:", icon='ERROR')
+            for e in _errs:
+                err_box.label(text=e)
+
         box = layout.box()
         box.label(text="Shared")
         box.prop(self, "width_mm")
-        box.prop(self, "center_location")
         box.prop(self, "parent_under_empty")
 
     def execute(self, context):
@@ -433,10 +442,9 @@ class OBJECT_OT_add_internal_ratchet(bpy.types.Operator):
             self.pivot_hole_diameter_mm, self.pivot_hole_compensation_mm,
         )
         if errs:
-            self.report({'ERROR'}, errs[0])
             return {'CANCELLED'}
 
-        loc = tuple(self.center_location)
+        loc = tuple(context.scene.cursor.location)
         try:
             ring_obj = build_ring_object(
                 context, self.tooth_count, ring_outer_r, ring_inner_r, tip_r,
@@ -454,7 +462,6 @@ class OBJECT_OT_add_internal_ratchet(bpy.types.Operator):
                 for i in range(self.pawl_count)
             ]
         except (ValueError, RuntimeError) as e:
-            self.report({'ERROR'}, "Mesh construction failed: %s" % e)
             return {'CANCELLED'}
 
         all_objs = [ring_obj, hub_obj] + pawl_objs

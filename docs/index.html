@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bmech — Blender Mechanism Library</title>
+<meta name="description" content="A free Blender extension for generating gears, springs, ratchets, bearings, and fasteners — parametric and 3D-print ready.">
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  header {
+    padding: 4rem 1.5rem 3rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    font-size: 2.4rem;
+    margin: 0 0 0.5rem;
+  }
+  header p {
+    color: var(--muted);
+    max-width: 560px;
+    margin: 0 auto;
+    font-size: 1.05rem;
+  }
+  .cta {
+    margin-top: 2rem;
+  }
+  .btn {
+    display: inline-block;
+    padding: 0.75rem 1.6rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    margin: 0 0.4rem;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0b0d10;
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem;
+  }
+  section {
+    margin-bottom: 3rem;
+  }
+  h2 {
+    font-size: 1.4rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+  }
+  .card h3 {
+    margin: 0 0 0.4rem;
+    font-size: 1rem;
+    color: var(--accent);
+  }
+  .card p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+  ol, ul {
+    color: var(--muted);
+  }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--text);
+  }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>bmech</h1>
+  <p>A free, open-source Blender extension for generating mechanical parts —
+     gears, springs, ratchets, bearings, and fasteners — parametric and
+     ready to 3D print.</p>
+  <div class="cta">
+    <a class="btn btn-primary" href="https://github.com/YOUR_GITHUB_USERNAME/bmech/releases/latest">Download Latest Release</a>
+    <a class="btn btn-secondary" href="https://github.com/YOUR_GITHUB_USERNAME/bmech">View on GitHub</a>
+  </div>
+</header>
+
+<main>
+
+<section>
+  <h2>What's inside</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Gears</h3>
+      <p>External (spur, helical, herringbone), ring/annulus, planetary sets, bevel — plus PiP clearance built in.</p>
+    </div>
+    <div class="card">
+      <h3>Springs</h3>
+      <p>Hairspring and serpentine spring generators.</p>
+    </div>
+    <div class="card">
+      <h3>Ratchets</h3>
+      <p>External ratchet &amp; pawl, internal freewheel ratchet.</p>
+    </div>
+    <div class="card">
+      <h3>Fasteners &amp; Bearings</h3>
+      <p>Threaded fasteners, press-fit pins, ball bearings.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Install</h2>
+  <ol>
+    <li>Download the latest <code>mechanisms_core.zip</code> from the
+        <a href="https://github.com/YOUR_GITHUB_USERNAME/bmech/releases/latest">Releases page</a>.</li>
+    <li>In Blender 5.1+, open <code>Edit &gt; Preferences &gt; Get Extensions</code>,
+        click the dropdown in the top-right, and choose
+        <code>Install from Disk...</code>.</li>
+    <li>Select the downloaded zip. The addon appears under
+        <code>Shift-A &gt; Mechanisms</code> in the 3D viewport.</li>
+  </ol>
+</section>
+
+<section>
+  <h2>Requirements</h2>
+  <ul>
+    <li>Blender 5.1 or newer</li>
+    <li>No external dependencies — pure Python + bmesh</li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  <p>Open source under GPL-3.0. Issues and contributions welcome on
+     <a href="https://github.com/YOUR_GITHUB_USERNAME/bmech">GitHub</a>.</p>
+  <p>Contact: <a href="mailto:blakewysocki421@gmail.com">blakewysocki421@gmail.com</a></p>
+</footer>
+
+</body>
+</html>

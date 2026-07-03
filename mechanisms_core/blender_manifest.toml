@@ -4,8 +4,7 @@ id = "mechanisms_core"
 version = "1.0.0"
 name = "Mechanisms Core"
 tagline = "Adds a unified Mechanisms submenu to the Shift-A Add menu"
-# Swap in your real name/email before you ever package this for distribution.
-maintainer = "Blake <blake@example.com>"
+maintainer = "Blake Wysocki <blakewysocki421@gmail.com>"
 type = "add-on"
 
 blender_version_min = "5.1.0"

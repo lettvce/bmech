@@ -33,9 +33,11 @@ def compute_press_fit_diameters(nominal_diameter_mm, interference_mm,
 
     Interference is split symmetrically: half added to the pin, half
     subtracted from the hole, then printer-bias compensation on top.
+    FDM parts tend to shrink, so both compensations are ADDED — a positive
+    value enlarges the feature (pin or hole) to counteract undersize.
     """
     half_i           = interference_mm / 2.0
-    pin_diameter_mm  = nominal_diameter_mm + half_i - pin_diameter_compensation_mm
+    pin_diameter_mm  = nominal_diameter_mm + half_i + pin_diameter_compensation_mm
     hole_diameter_mm = nominal_diameter_mm - half_i + hole_diameter_compensation_mm
     return pin_diameter_mm, hole_diameter_mm
 
@@ -211,8 +213,8 @@ class OBJECT_OT_add_press_pin(bpy.types.Operator):
     )
     pin_diameter_compensation_mm: bpy.props.FloatProperty(
         name="Pin Compensation (mm)",
-        description="Subtracted from modeled pin diameter to counteract FDM overextrusion on external features",
-        default=-0.1,
+        description="Added to modeled pin diameter to counteract FDM shrinkage on external features",
+        default=0.1, min=0.0, soft_max=1.0,
     )
     hole_diameter_compensation_mm: bpy.props.FloatProperty(
         name="Hole Compensation (mm)",
@@ -265,6 +267,14 @@ class OBJECT_OT_add_press_pin(bpy.types.Operator):
         )
         tip_diameter_mm = compute_tip_diameter(pin_diameter_mm, self.taper_length_mm, self.taper_angle_deg)
         fit.label(text="Pin Ø: %.3f mm   Hole Ø: %.3f mm" % (pin_diameter_mm, hole_diameter_mm))
+        errs = validate_press_pin_parameters(
+            self.nominal_diameter_mm, self.interference_mm,
+            self.pin_diameter_compensation_mm, self.hole_diameter_compensation_mm,
+            self.pin_length_mm, self.taper_length_mm, self.taper_angle_deg,
+            self.radial_segments,
+        )
+        for e in errs:
+            fit.label(text=e, icon='ERROR')
 
         comp = layout.box()
         comp.label(text="FDM Compensation")
@@ -293,7 +303,6 @@ class OBJECT_OT_add_press_pin(bpy.types.Operator):
             self.radial_segments,
         )
         if errors:
-            self.report({'ERROR'}, errors[0])
             return {'CANCELLED'}
 
         pin_diameter_mm, hole_diameter_mm = compute_press_fit_diameters(
@@ -312,8 +321,10 @@ class OBJECT_OT_add_press_pin(bpy.types.Operator):
                                                    self.hole_extend_margin_mm, self.radial_segments)
             cutter_obj = create_mesh_object_from_bmesh(cutter_bm, "PressPin_HoleCutter", location)
         except Exception as exc:
-            self.report({'ERROR'}, "Failed to build geometry: %s" % exc)
             return {'CANCELLED'}
+
+        pin_obj["bmech_kind"]    = "press_pin"
+        cutter_obj["bmech_kind"] = "press_pin_cutter"
 
         bpy.ops.object.select_all(action='DESELECT')
         pin_obj.select_set(True)
@@ -327,14 +338,92 @@ class OBJECT_OT_add_press_pin(bpy.types.Operator):
 
 
 # ---------------------------------------------------------------------------
+# Operator: align an existing pin/cutter pair to a face (Edit Mode)
+# ---------------------------------------------------------------------------
+
+def _pin_poll(_self, obj):
+    return obj.type == 'MESH' and obj.get("bmech_kind") == "press_pin"
+
+
+def _cutter_poll(_self, obj):
+    return obj.type == 'MESH' and obj.get("bmech_kind") == "press_pin_cutter"
+
+
+class OBJECT_OT_align_press_pin_to_face(bpy.types.Operator):
+    """Align a press-fit pin and/or its hole cutter to the active face in Edit Mode."""
+    bl_idname  = "object.align_press_pin_to_face"
+    bl_label   = "Align Press Pin to Face"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    pin_object: bpy.props.PointerProperty(
+        name="Pin", type=bpy.types.Object, poll=_pin_poll,
+        description="Pin to orient — sticks OUT of the face along its normal",
+    )
+    cutter_object: bpy.props.PointerProperty(
+        name="Cutter", type=bpy.types.Object, poll=_cutter_poll,
+        description="Hole cutter to orient — recesses INTO the face, opposite the pin",
+    )
+    standoff_mm: bpy.props.FloatProperty(
+        name="Standoff (mm)", default=0.001, min=0.0, soft_max=0.1,
+        description="Small overlap so a later boolean doesn't sit on a knife-edge coincident face",
+    )
+
+    @classmethod
+    def poll(cls, context):
+        return (context.mode == 'EDIT_MESH'
+                and context.active_object is not None
+                and context.active_object.type == 'MESH')
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "pin_object")
+        layout.prop(self, "cutter_object")
+        layout.prop(self, "standoff_mm")
+
+    def execute(self, context):
+        obj  = context.active_object
+        bm   = bmesh.from_edit_mesh(obj.data)
+        face = bm.faces.active
+
+        if face is None or not face.select:
+            self.report({'ERROR'}, "No active face — select a face in Edit Mode first")
+            return {'CANCELLED'}
+        if self.pin_object is None and self.cutter_object is None:
+            self.report({'ERROR'}, "Pick a pin and/or cutter object to align")
+            return {'CANCELLED'}
+
+        center_world = obj.matrix_world @ face.calc_center_median()
+
+        normal_matrix = obj.matrix_world.inverted_safe().transposed().to_3x3()
+        normal_world  = (normal_matrix @ face.normal).normalized()
+
+        # Rotation around the normal is unconstrained for a round pin/cutter —
+        # to_track_quat's arbitrary up-axis choice doesn't affect either mesh.
+        if self.pin_object is not None:
+            self.pin_object.rotation_mode       = 'QUATERNION'
+            self.pin_object.rotation_quaternion = normal_world.to_track_quat('Z', 'Y')
+            self.pin_object.location            = center_world - normal_world * self.standoff_mm
+
+        if self.cutter_object is not None:
+            self.cutter_object.rotation_mode       = 'QUATERNION'
+            self.cutter_object.rotation_quaternion = (-normal_world).to_track_quat('Z', 'Y')
+            self.cutter_object.location            = center_world + normal_world * self.standoff_mm
+
+        self.report({'INFO'}, "Aligned to active face")
+        return {'FINISHED'}
+
+
+# ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
 
 def register():
     bpy.utils.register_class(OBJECT_OT_add_press_pin)
+    bpy.utils.register_class(OBJECT_OT_align_press_pin_to_face)
 
 
 def unregister():
+    bpy.utils.unregister_class(OBJECT_OT_align_press_pin_to_face)
     bpy.utils.unregister_class(OBJECT_OT_add_press_pin)
 
 

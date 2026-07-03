@@ -426,13 +426,12 @@ class MESH_OT_add_ratchet_wheel(bpy.types.Operator):
         description="Radial depth of each tooth, tip to root. Only used when Auto Tooth Depth is off.",
     )
     width_mm: FloatProperty(name="Width (mm)", default=6.0, soft_min=0.5, soft_max=200.0)
-    axle_hole_diameter_mm: FloatProperty(name="Axle Hole Diameter (mm)", default=5.0, soft_min=0.0, soft_max=100.0)
+    bore_enable: BoolProperty(name="Bore Hole", default=True)
+    axle_hole_diameter_mm: FloatProperty(name="Bore Ø (mm)", default=5.0, soft_min=0.1, soft_max=100.0)
     axle_hole_compensation_mm: FloatProperty(
-        name="Axle Hole Compensation (mm)", default=0.0, soft_min=-2.0, soft_max=2.0,
+        name="Compensation (mm)", default=0.0, soft_min=-2.0, soft_max=2.0,
         description="Additive FDM hole-diameter compensation, same convention as the press-fit cutter spec.",
     )
-    center_location: FloatVectorProperty(name="Center Location", size=3, default=(0.0, 0.0, 0.0), subtype='TRANSLATION')
-
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "sizing_mode")
@@ -450,29 +449,33 @@ class MESH_OT_add_ratchet_wheel(bpy.types.Operator):
         # values" convention, not as a greyed-out property field.
         layout.label(text="Back Face Angle (derived): %.2f deg" % getattr(self, "computed_back_face_angle_deg", 0.0))
         layout.prop(self, "width_mm")
-        layout.prop(self, "axle_hole_diameter_mm")
-        layout.prop(self, "axle_hole_compensation_mm")
-        layout.prop(self, "center_location")
+        layout.prop(self, "bore_enable")
+        if self.bore_enable:
+            col = layout.column(align=True)
+            col.prop(self, "axle_hole_diameter_mm")
+            col.prop(self, "axle_hole_compensation_mm")
+        axle_d = self.axle_hole_diameter_mm if self.bore_enable else 0.0
+        try:
+            root_r, outer_r, td = solve_wheel_radii(self.sizing_mode, self.tooth_count, self.module,
+                                                      self.outer_diameter_mm, self.tooth_depth_mm, self.tooth_depth_auto)
+            validate_wheel_params(self.tooth_count, root_r, outer_r, td, axle_d)
+        except ValueError as e:
+            layout.label(text=str(e), icon='ERROR')
 
     def execute(self, context):
         try:
             obj, geom = build_wheel_object(
                 context, "RatchetWheel", self.tooth_count, self.sizing_mode, self.module,
                 self.outer_diameter_mm, self.tooth_depth_mm, self.tooth_depth_auto,
-                self.width_mm, self.axle_hole_diameter_mm,
-                self.axle_hole_compensation_mm, self.center_location,
+                self.width_mm,
+                self.axle_hole_diameter_mm if self.bore_enable else 0.0,
+                self.axle_hole_compensation_mm, context.scene.cursor.location,
             )
         except ValueError as e:
-            self.report({'ERROR'}, str(e))
             return {'CANCELLED'}
         except RuntimeError as e:
-            # bmesh ops occasionally throw RuntimeError on truly degenerate
-            # input (e.g. self-intersecting profile from extreme params).
-            self.report({'ERROR'}, "Mesh construction failed: %s" % e)
             return {'CANCELLED'}
 
-        # Plain instance attribute (not a registered bpy property) so it
-        # shows up in draw() for the redo panel without being user-editable.
         self.computed_back_face_angle_deg = geom['back_face_angle_deg']
 
         for o in context.selected_objects:
@@ -513,17 +516,32 @@ class MESH_OT_add_ratchet_pawl(bpy.types.Operator):
     )
     pivot_rotation_deg: FloatProperty(name="Pivot Rotation (deg)", default=0.0, soft_min=-360.0, soft_max=360.0)
 
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "pawl_arm_length_mm")
+        layout.prop(self, "pawl_arm_width_mm")
+        layout.prop(self, "pawl_tip_width_mm")
+        layout.prop(self, "pivot_hole_diameter_mm")
+        layout.prop(self, "pivot_hole_compensation_mm")
+        layout.prop(self, "width_mm")
+        layout.prop(self, "tip_engagement_depth_mm")
+        layout.prop(self, "pivot_location")
+        layout.prop(self, "pivot_rotation_deg")
+        hole_dia = self.pivot_hole_diameter_mm + self.pivot_hole_compensation_mm
+        if self.pawl_arm_length_mm <= hole_dia:
+            layout.label(text="Arm length must exceed pivot hole diameter", icon='ERROR')
+        if hole_dia >= self.pawl_arm_width_mm:
+            layout.label(text="Pivot hole too large for arm width", icon='ERROR')
+
     def execute(self, context):
         # NOTE: pawl_tip_width_mm vs. tooth-valley-width validation is
         # intentionally NOT performed here -- this operator has no wheel
         # geometry to check against (see decision #6 in the module
         # docstring). Use object.add_ratchet_mechanism if you want that check.
         if self.pawl_arm_length_mm <= self.pivot_hole_diameter_mm + self.pivot_hole_compensation_mm:
-            self.report({'ERROR'}, "pawl_arm_length_mm must be greater than the pivot hole diameter (degenerate arm)")
             return {'CANCELLED'}
         hole_dia = self.pivot_hole_diameter_mm + self.pivot_hole_compensation_mm
         if hole_dia >= self.pawl_arm_width_mm:
-            self.report({'ERROR'}, "Pivot hole diameter is too large for the arm width at the pivot end")
             return {'CANCELLED'}
 
         try:
@@ -533,10 +551,8 @@ class MESH_OT_add_ratchet_pawl(bpy.types.Operator):
                 self.width_mm, self.pivot_location, math.radians(self.pivot_rotation_deg),
             )
         except ValueError as e:
-            self.report({'ERROR'}, str(e))
             return {'CANCELLED'}
         except RuntimeError as e:
-            self.report({'ERROR'}, "Mesh construction failed: %s" % e)
             return {'CANCELLED'}
 
         for o in context.selected_objects:
@@ -566,9 +582,9 @@ class OBJECT_OT_add_ratchet_mechanism(bpy.types.Operator):
     outer_diameter_mm: FloatProperty(name="Outer Diameter (mm)", default=40.0, soft_min=2.0, soft_max=500.0)
     tooth_depth_auto: BoolProperty(name="Auto Tooth Depth", default=True)
     tooth_depth_mm: FloatProperty(name="Tooth Depth (mm)", default=1.8, soft_min=0.1, soft_max=50.0)
-    axle_hole_diameter_mm: FloatProperty(name="Axle Hole Diameter (mm)", default=5.0, soft_min=0.0, soft_max=100.0)
-    axle_hole_compensation_mm: FloatProperty(name="Axle Hole Compensation (mm)", default=0.0, soft_min=-2.0, soft_max=2.0)
-    center_location: FloatVectorProperty(name="Wheel Center", size=3, default=(0.0, 0.0, 0.0), subtype='TRANSLATION')
+    bore_enable: BoolProperty(name="Bore Hole", default=True)
+    axle_hole_diameter_mm: FloatProperty(name="Bore Ø (mm)", default=5.0, soft_min=0.1, soft_max=100.0)
+    axle_hole_compensation_mm: FloatProperty(name="Compensation (mm)", default=0.0, soft_min=-2.0, soft_max=2.0)
 
     # --- Shared ---
     width_mm: FloatProperty(
@@ -633,10 +649,11 @@ class OBJECT_OT_add_ratchet_mechanism(bpy.types.Operator):
         sub.enabled = not self.tooth_depth_auto
         sub.prop(self, "tooth_depth_mm")
         box.label(text="Back Face Angle (derived): %.2f deg" % getattr(self, "computed_back_face_angle_deg", 0.0))
-        box.prop(self, "axle_hole_diameter_mm")
-        box.prop(self, "axle_hole_compensation_mm")
-        box.prop(self, "center_location")
-
+        box.prop(self, "bore_enable")
+        if self.bore_enable:
+            sub = box.column(align=True)
+            sub.prop(self, "axle_hole_diameter_mm")
+            sub.prop(self, "axle_hole_compensation_mm")
         box = layout.box()
         box.label(text="Pawl")
         box.prop(self, "pawl_arm_length_mm")
@@ -645,6 +662,26 @@ class OBJECT_OT_add_ratchet_mechanism(bpy.types.Operator):
         box.prop(self, "pivot_hole_diameter_mm")
         box.prop(self, "pivot_hole_compensation_mm")
         box.prop(self, "tip_engagement_depth_mm")
+
+        # Cross-checks
+        try:
+            root_r, outer_r, td = solve_wheel_radii(self.sizing_mode, self.tooth_count, self.module,
+                                                      self.outer_diameter_mm, self.tooth_depth_mm, self.tooth_depth_auto)
+            validate_wheel_params(self.tooth_count, root_r, outer_r, td,
+                                  self.axle_hole_diameter_mm if self.bore_enable else 0.0)
+            sector_a = 2.0 * math.pi / self.tooth_count
+            valley_w = estimate_valley_width_mm(root_r, outer_r, sector_a)
+            pivot_hole_dia = self.pivot_hole_diameter_mm + self.pivot_hole_compensation_mm
+            warn_box = layout.box()
+            warn_box.label(text="Validation")
+            if self.pawl_arm_length_mm <= pivot_hole_dia:
+                warn_box.label(text="Arm length must exceed pivot hole diameter", icon='ERROR')
+            if pivot_hole_dia >= self.pawl_arm_width_mm:
+                warn_box.label(text="Pivot hole too large for arm width", icon='ERROR')
+            if self.pawl_tip_width_mm >= valley_w:
+                warn_box.label(text="Tip too wide for tooth valley (%.2f mm)" % valley_w, icon='ERROR')
+        except ValueError as e:
+            layout.label(text=str(e), icon='ERROR')
 
         box = layout.box()
         box.label(text="Shared / Positioning")
@@ -668,7 +705,6 @@ class OBJECT_OT_add_ratchet_mechanism(bpy.types.Operator):
                                    outer_radius, tooth_depth_mm, self.axle_hole_diameter_mm)
             sector_angle = 2.0 * math.pi / self.tooth_count
         except ValueError as e:
-            self.report({'ERROR'}, str(e))
             return {'CANCELLED'}
 
         # Derived/reported back face angle (v1.1) -- computed early so it's
@@ -679,23 +715,16 @@ class OBJECT_OT_add_ratchet_mechanism(bpy.types.Operator):
         # --- Pawl structural validation ---
         pivot_hole_dia = self.pivot_hole_diameter_mm + self.pivot_hole_compensation_mm
         if self.pawl_arm_length_mm <= pivot_hole_dia:
-            self.report({'ERROR'}, "pawl_arm_length_mm must be greater than the pivot hole diameter (degenerate arm)")
             return {'CANCELLED'}
         if pivot_hole_dia >= self.pawl_arm_width_mm:
-            self.report({'ERROR'}, "Pivot hole diameter is too large for the arm width at the pivot end")
             return {'CANCELLED'}
 
         # --- Cross-part validation: tip width vs. tooth valley (only possible here) ---
         valley_width = estimate_valley_width_mm(root_radius, outer_radius, sector_angle)
         if self.pawl_tip_width_mm >= valley_width:
-            self.report(
-                {'ERROR'},
-                "pawl_tip_width_mm (%.3f) is too wide to seat in a tooth valley "
-                "(valley width approx %.3f mm at mid-depth)" % (self.pawl_tip_width_mm, valley_width)
-            )
             return {'CANCELLED'}
 
-        wheel_center = Vector(self.center_location)
+        wheel_center = Vector(context.scene.cursor.location)
 
         # --- Pivot placement ---
         if self.center_distance_solve_mode == 'AUTO':
@@ -706,12 +735,10 @@ class OBJECT_OT_add_ratchet_mechanism(bpy.types.Operator):
                     self.pawl_arm_length_mm, tooth_depth_mm,
                 )
             except ValueError as e:
-                self.report({'ERROR'}, str(e))
                 return {'CANCELLED'}
         else:  # MANUAL
             pivot_world = Vector(self.pawl_pivot_location)
             if (pivot_world - wheel_center).length <= outer_radius:
-                self.report({'ERROR'}, "pawl_pivot_location is inside the wheel's outer radius -- the parts would intersect")
                 return {'CANCELLED'}
             # Aim the arm at a nominal contact point so it at least visually
             # engages; if pawl_arm_length_mm doesn't match the actual pivot-to-
@@ -737,8 +764,9 @@ class OBJECT_OT_add_ratchet_mechanism(bpy.types.Operator):
             wheel_obj, _geom = build_wheel_object(
                 context, "RatchetWheel", self.tooth_count, self.sizing_mode, self.module,
                 self.outer_diameter_mm, self.tooth_depth_mm, self.tooth_depth_auto,
-                self.width_mm, self.axle_hole_diameter_mm,
-                self.axle_hole_compensation_mm, self.center_location,
+                self.width_mm,
+                self.axle_hole_diameter_mm if self.bore_enable else 0.0,
+                self.axle_hole_compensation_mm, context.scene.cursor.location,
             )
             pawl_obj = build_pawl_object(
                 context, "Pawl", self.pawl_arm_length_mm, self.pawl_arm_width_mm,
@@ -746,10 +774,8 @@ class OBJECT_OT_add_ratchet_mechanism(bpy.types.Operator):
                 self.width_mm, pivot_world, rotation_z,
             )
         except ValueError as e:
-            self.report({'ERROR'}, str(e))
             return {'CANCELLED'}
         except RuntimeError as e:
-            self.report({'ERROR'}, "Mesh construction failed: %s" % e)
             return {'CANCELLED'}
 
         # --- Optional parenting ---

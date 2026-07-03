@@ -144,6 +144,10 @@ class OBJECT_OT_add_hairspring(Operator):
                 if self.turns > 0 and self.r_outer > self.r_inner else 0.0
             )
             spiral.label(text="Coil Gap: %.2f mm" % derived_gap)
+            if self.r_outer <= self.r_inner:
+                spiral.label(text="Outer radius must exceed inner radius", icon='ERROR')
+            elif derived_gap < 0.1:
+                spiral.label(text="Derived gap below 0.1 mm — increase outer radius or reduce turns", icon='ERROR')
 
         strip = layout.box()
         strip.label(text="Strip", icon='MOD_SOLIDIFY')
@@ -162,21 +166,9 @@ class OBJECT_OT_add_hairspring(Operator):
             gap_mm = self.gap
         else:
             if self.r_outer <= r_inner_mm:
-                self.report({'ERROR'}, "Outer radius must be greater than inner radius.")
                 return {'CANCELLED'}
             gap_mm = (self.r_outer - r_inner_mm) / turns
-            if gap_mm < 0.1:
-                self.report({'ERROR'},
-                    "Derived coil gap is below minimum (0.1 mm). "
-                    "Increase outer radius or reduce turns.")
-                return {'CANCELLED'}
-
-        if self.strip_width < 0.4:
-            self.report({'ERROR'}, "Strip width below FDM minimum (0.4 mm).")
-            return {'CANCELLED'}
-        if self.strip_thickness < 0.2:
-            self.report({'ERROR'}, "Strip thickness below FDM minimum (0.2 mm).")
-            return {'CANCELLED'}
+            gap_mm = max(gap_mm, 0.1)
 
         points      = generate_centerline_points(r_inner_mm, gap_mm, turns, self.resolution)
         verts, faces = build_manual_ribbon(points, self.strip_thickness, self.strip_width)
@@ -184,6 +176,7 @@ class OBJECT_OT_add_hairspring(Operator):
         mesh = bpy.data.meshes.new("HairspringMesh")
         obj  = bpy.data.objects.new("Hairspring", mesh)
         context.collection.objects.link(obj)
+        obj.location = context.scene.cursor.location.copy()
         mesh.from_pydata(verts, [], faces)
         mesh.update()
 

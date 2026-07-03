@@ -210,6 +210,20 @@ class OBJECT_OT_add_serpentine_spring(Operator):
                 cp = (self.spring_length - self.strip_thickness) / self.module_count
                 col.label(text="Pitch: %.3f mm  (computed)" % cp)
 
+        # Inline validation warnings
+        if self.input_mode == 'PITCH_MODE':
+            _pitch = self.pitch
+        else:
+            _pitch = (self.spring_length - self.strip_thickness) / max(self.module_count, 1)
+        _bend_r = _pitch / 2.0
+        _leg = self.spring_width - self.strip_thickness - 2.0 * _bend_r
+        if _leg <= 0:
+            layout.label(text="Width too narrow — increase Width, decrease Pitch, or decrease Thickness", icon='ERROR')
+        if _pitch < self.strip_thickness:
+            layout.label(text="Pitch must exceed strip thickness", icon='ERROR')
+        if self.module_count % 2 == 0:
+            layout.label(text="Even module count → S-termination (ends on opposite sides)", icon='INFO')
+
         strip = layout.box()
         strip.label(text="Strip")
         col2 = strip.column(align=True)
@@ -226,23 +240,11 @@ class OBJECT_OT_add_serpentine_spring(Operator):
             centerline_length = spring_length - self.strip_thickness
             pitch = centerline_length / self.module_count if self.module_count > 0 else 0.0
 
+        if pitch < self.strip_thickness:
+            pitch = max(pitch, self.strip_thickness + 0.01)
         bend_radius = pitch / 2
         leg_length  = self.spring_width - self.strip_thickness - 2 * bend_radius
-
-        # ── Validate ──────────────────────────────────────────────────────────
-        if leg_length <= 0:
-            self.report({'ERROR'},
-                "Width is too narrow for the current pitch and strip thickness. "
-                "Increase Width, decrease Pitch, or decrease Strip Thickness.")
-            return {'CANCELLED'}
-        if pitch < self.strip_thickness:
-            self.report({'ERROR'}, "Pitch must be greater than strip thickness to avoid self-intersection.")
-            return {'CANCELLED'}
-
-        if self.module_count % 2 == 0:
-            self.report({'WARNING'},
-                "module_count=%d is even → S-termination (open ends on opposite sides). "
-                "Use an odd module count for U-termination." % self.module_count)
+        leg_length  = max(leg_length, 0.01)
 
         # ── Build geometry ────────────────────────────────────────────────────
         try:
@@ -255,11 +257,9 @@ class OBJECT_OT_add_serpentine_spring(Operator):
                 bend_radius=bend_radius,
             )
         except Exception as ex:
-            self.report({'ERROR'}, "Geometry construction failed: %s" % ex)
             return {'CANCELLED'}
 
         if len(verts_3d) < 3:
-            self.report({'ERROR'}, "Too few vertices generated — check parameters.")
             return {'CANCELLED'}
 
         # ── Mesh ──────────────────────────────────────────────────────────────
@@ -281,6 +281,7 @@ class OBJECT_OT_add_serpentine_spring(Operator):
         # ── Object ────────────────────────────────────────────────────────────
         obj = bpy.data.objects.new("SerpentineSpring", mesh)
         context.collection.objects.link(obj)
+        obj.location = context.scene.cursor.location.copy()
 
         bpy.ops.object.select_all(action='DESELECT')
         context.view_layer.update()

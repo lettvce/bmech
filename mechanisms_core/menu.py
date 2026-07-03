@@ -1,40 +1,22 @@
 # mechanisms_core/menu.py
 #
-# ---------------------------------------------------------------------------
-# ARCHITECTURE DECISION (spec §2.4 / §5): the spec explicitly flagged
-# hardcoded-vs-dynamic-registry as an open question and asked me to confirm
-# before implementing. Per my instructions I'm not allowed to stop and ask,
-# so I went with the spec's own stated recommendation: HARDCODED. You're a
-# one-person shop adding generators a few times a quarter, not shipping this
-# to strangers -- the registry pattern in §2.3 buys you decoupling you don't
-# need yet at the cost of enable-order footguns you definitely don't want.
+# Gear submenu hierarchy:
+#   Mechanisms → Gears → External   (spur, rack, cluster, compound, helical, herringbone)
+#                      → Ring       (annulus, helical annulus, herringbone annulus)
+#                      → Planetary  (spur, helical, herringbone planetary sets)
+#                      → Bevel      (straight bevel — helical/spiral bevel planned)
+#                        Crown Gear
+#                        Sprocket
+#            → Fasteners (hex bolt, hex nut, raw threaded fastener)
 #
-# Practical consequence: every time a new generator graduates to "ready for
-# menu," you add ONE layout.operator(...) line below by hand. That's it.
-# No register_mechanism()/unregister_mechanism() calls needed in any other
-# addon's __init__.py. If this list ever creeps past ~15-20 entries, or you
-# decide to redistribute the suite to other humans, that's your signal to
-# go build the §2.3 registry for real -- don't do it preemptively.
-#
-# OTHER OPEN ASSUMPTIONS FROM THE SPEC I COULDN'T CONFIRM (§5):
-#   1. Menu label "Mechanisms" -- kept as-is, it's a one-string change
-#      (bl_label below) if you want "FDM Parts" or "Parametric" instead.
-#   2. Operator idnames -- the spec never gave me the actual bl_idname for
-#      each generator's operator, so the strings below are my best guess at
-#      your naming convention (object.add_<thing>). VERIFY THESE against
-#      each generator's real operator class before trusting this menu --
-#      a wrong idname just gives Blender a "not found" or quietly does
-#      nothing, it won't break registration of this addon.
-#   3. Shared common.py/utils.py -- spec asks to confirm none already
-#      exists across your generator addons before building this as a new
-#      addon. I have no visibility into your other addons' folders, so
-#      proceeding per spec's literal instruction (build mechanisms_core
-#      fresh). If a shared module already exists, this menu logic could
-#      probably live there instead and you can fold this file in.
-# ---------------------------------------------------------------------------
+# All entries are guarded by hasattr so a missing/unregistered operator is
+# simply invisible — no error on load.  Add one layout.operator() line when a
+# new generator graduates; no other file needs touching.
 
 import bpy
 
+
+# ── Ratchet submenu ───────────────────────────────────────────────────────────
 
 class VIEW3D_MT_mechanisms_ratchet(bpy.types.Menu):
     bl_idname = "VIEW3D_MT_mechanisms_ratchet"
@@ -48,6 +30,128 @@ class VIEW3D_MT_mechanisms_ratchet(bpy.types.Menu):
             layout.operator("object.add_internal_ratchet",  text="Internal Freewheel Ratchet")
 
 
+# ── Gear submenus ─────────────────────────────────────────────────────────────
+
+class VIEW3D_MT_mechanisms_gears_external(bpy.types.Menu):
+    bl_idname = "VIEW3D_MT_mechanisms_gears_external"
+    bl_label  = "External"
+
+    def draw(self, context):
+        layout = self.layout
+        if hasattr(bpy.types, 'OBJECT_OT_add_spur_gear'):
+            layout.operator("object.add_spur_gear",      text="Spur Gear")
+        if hasattr(bpy.types, 'OBJECT_OT_add_rack'):
+            layout.operator("object.add_rack",           text="Gear Rack")
+        if hasattr(bpy.types, 'OBJECT_OT_add_cluster_gear'):
+            layout.operator("object.add_cluster_gear",   text="Cluster Gear")
+        if hasattr(bpy.types, 'OBJECT_OT_add_compound_gear'):
+            layout.operator("object.add_compound_gear",  text="Compound Gear")
+        if hasattr(bpy.types, 'OBJECT_OT_helical_gear') or hasattr(bpy.types, 'OBJECT_OT_herringbone_gear'):
+            layout.separator()
+        if hasattr(bpy.types, 'OBJECT_OT_helical_gear'):
+            layout.operator("object.helical_gear",       text="Helical Gear")
+        if hasattr(bpy.types, 'OBJECT_OT_herringbone_gear'):
+            layout.operator("object.herringbone_gear",   text="Herringbone Gear")
+
+
+class VIEW3D_MT_mechanisms_gears_ring(bpy.types.Menu):
+    bl_idname = "VIEW3D_MT_mechanisms_gears_ring"
+    bl_label  = "Ring"
+
+    def draw(self, context):
+        layout = self.layout
+        if hasattr(bpy.types, 'OBJECT_OT_annulus_gear'):
+            layout.operator("object.annulus_gear",              text="Annulus Gear")
+        if hasattr(bpy.types, 'OBJECT_OT_helical_annulus_gear'):
+            layout.operator("object.helical_annulus_gear",      text="Helical Annulus")
+        if hasattr(bpy.types, 'OBJECT_OT_herringbone_annulus_gear'):
+            layout.operator("object.herringbone_annulus_gear",  text="Herringbone Annulus")
+
+
+class VIEW3D_MT_mechanisms_gears_planetary(bpy.types.Menu):
+    bl_idname = "VIEW3D_MT_mechanisms_gears_planetary"
+    bl_label  = "Planetary"
+
+    def draw(self, context):
+        layout = self.layout
+        if hasattr(bpy.types, 'OBJECT_OT_planetary_gear_set'):
+            layout.operator("object.planetary_gear_set",              text="Planetary Gear Set")
+        if hasattr(bpy.types, 'OBJECT_OT_helical_planetary_gear_set'):
+            layout.operator("object.helical_planetary_gear_set",      text="Helical Planetary")
+        if hasattr(bpy.types, 'OBJECT_OT_herringbone_planetary_gear_set'):
+            layout.operator("object.herringbone_planetary_gear_set",  text="Herringbone Planetary")
+
+
+class VIEW3D_MT_mechanisms_gears_bevel(bpy.types.Menu):
+    bl_idname = "VIEW3D_MT_mechanisms_gears_bevel"
+    bl_label  = "Bevel"
+
+    def draw(self, context):
+        layout = self.layout
+        if hasattr(bpy.types, 'OBJECT_OT_bevel_gear'):
+            layout.operator("object.bevel_gear", text="Bevel Gear")
+
+
+class VIEW3D_MT_mechanisms_gears(bpy.types.Menu):
+    bl_idname = "VIEW3D_MT_mechanisms_gears"
+    bl_label  = "Gears"
+
+    def draw(self, context):
+        layout = self.layout
+
+        external_any = (hasattr(bpy.types, 'OBJECT_OT_add_spur_gear')     or
+                        hasattr(bpy.types, 'OBJECT_OT_add_rack')           or
+                        hasattr(bpy.types, 'OBJECT_OT_add_cluster_gear')   or
+                        hasattr(bpy.types, 'OBJECT_OT_add_compound_gear')  or
+                        hasattr(bpy.types, 'OBJECT_OT_helical_gear')       or
+                        hasattr(bpy.types, 'OBJECT_OT_herringbone_gear'))
+        if external_any:
+            layout.menu(VIEW3D_MT_mechanisms_gears_external.bl_idname)
+
+        ring_any = (hasattr(bpy.types, 'OBJECT_OT_annulus_gear')              or
+                    hasattr(bpy.types, 'OBJECT_OT_helical_annulus_gear')       or
+                    hasattr(bpy.types, 'OBJECT_OT_herringbone_annulus_gear'))
+        if ring_any:
+            layout.menu(VIEW3D_MT_mechanisms_gears_ring.bl_idname)
+
+        planetary_any = (hasattr(bpy.types, 'OBJECT_OT_planetary_gear_set')             or
+                         hasattr(bpy.types, 'OBJECT_OT_helical_planetary_gear_set')     or
+                         hasattr(bpy.types, 'OBJECT_OT_herringbone_planetary_gear_set'))
+        if planetary_any:
+            layout.menu(VIEW3D_MT_mechanisms_gears_planetary.bl_idname)
+
+        bevel_any = hasattr(bpy.types, 'OBJECT_OT_bevel_gear')
+        if bevel_any:
+            layout.menu(VIEW3D_MT_mechanisms_gears_bevel.bl_idname)
+
+        special_any = (hasattr(bpy.types, 'OBJECT_OT_crown_gear') or
+                       hasattr(bpy.types, 'OBJECT_OT_add_sprocket'))
+        if special_any and (external_any or ring_any or planetary_any or bevel_any):
+            layout.separator()
+        if hasattr(bpy.types, 'OBJECT_OT_crown_gear'):
+            layout.operator("object.crown_gear",   text="Crown Gear")
+        if hasattr(bpy.types, 'OBJECT_OT_add_sprocket'):
+            layout.operator("object.add_sprocket", text="Sprocket")
+
+
+# ── Fasteners submenu ─────────────────────────────────────────────────────────
+
+class VIEW3D_MT_mechanisms_fasteners(bpy.types.Menu):
+    bl_idname = "VIEW3D_MT_mechanisms_fasteners"
+    bl_label  = "Fasteners"
+
+    def draw(self, context):
+        layout = self.layout
+        if hasattr(bpy.types, 'OBJECT_OT_hex_bolt'):
+            layout.operator("object.hex_bolt",             text="Hex Bolt")
+        if hasattr(bpy.types, 'OBJECT_OT_hex_nut'):
+            layout.operator("object.hex_nut",               text="Hex Nut")
+        if hasattr(bpy.types, 'OBJECT_OT_add_threaded_fastener'):
+            layout.operator("object.add_threaded_fastener", text="Threaded Fastener (raw)")
+
+
+# ── Top-level Mechanisms menu ─────────────────────────────────────────────────
+
 class VIEW3D_MT_mechanisms_add(bpy.types.Menu):
     bl_idname = "VIEW3D_MT_mechanisms_add"
     bl_label  = "Mechanisms"
@@ -57,7 +161,7 @@ class VIEW3D_MT_mechanisms_add(bpy.types.Menu):
         found_any = False
 
         if hasattr(bpy.types, 'OBJECT_OT_add_hairspring'):
-            layout.operator("object.add_hairspring", text="Hairspring")
+            layout.operator("object.add_hairspring",       text="Hairspring")
             found_any = True
 
         if hasattr(bpy.types, 'OBJECT_OT_add_serpentine_spring'):
@@ -71,21 +175,44 @@ class VIEW3D_MT_mechanisms_add(bpy.types.Menu):
             found_any = True
 
         if hasattr(bpy.types, 'OBJECT_OT_add_press_pin'):
-            layout.operator("object.add_press_pin", text="Press-Fit Pin")
+            layout.operator("object.add_press_pin",        text="Press-Fit Pin")
             found_any = True
 
-        if hasattr(bpy.types, 'OBJECT_OT_add_spur_gear'):
-            layout.operator("object.add_spur_gear", text="Involute Gear")
-            layout.operator("object.add_rack",      text="Gear Rack")
+        gears_any = (hasattr(bpy.types, 'OBJECT_OT_add_spur_gear')                      or
+                     hasattr(bpy.types, 'OBJECT_OT_add_rack')                            or
+                     hasattr(bpy.types, 'OBJECT_OT_add_cluster_gear')                    or
+                     hasattr(bpy.types, 'OBJECT_OT_add_compound_gear')                   or
+                     hasattr(bpy.types, 'OBJECT_OT_helical_gear')                        or
+                     hasattr(bpy.types, 'OBJECT_OT_herringbone_gear')                    or
+                     hasattr(bpy.types, 'OBJECT_OT_annulus_gear')                        or
+                     hasattr(bpy.types, 'OBJECT_OT_helical_annulus_gear')                or
+                     hasattr(bpy.types, 'OBJECT_OT_herringbone_annulus_gear')            or
+                     hasattr(bpy.types, 'OBJECT_OT_planetary_gear_set')                  or
+                     hasattr(bpy.types, 'OBJECT_OT_helical_planetary_gear_set')          or
+                     hasattr(bpy.types, 'OBJECT_OT_herringbone_planetary_gear_set')      or
+                     hasattr(bpy.types, 'OBJECT_OT_bevel_gear')                          or
+                     hasattr(bpy.types, 'OBJECT_OT_crown_gear')                          or
+                     hasattr(bpy.types, 'OBJECT_OT_add_sprocket'))
+        if gears_any:
+            layout.menu(VIEW3D_MT_mechanisms_gears.bl_idname)
             found_any = True
 
         if hasattr(bpy.types, 'OBJECT_OT_add_ball_bearing'):
-            layout.operator("object.add_ball_bearing", text="Ball Bearing")
+            layout.operator("object.add_ball_bearing",     text="Ball Bearing")
+            found_any = True
+
+        fasteners_any = (hasattr(bpy.types, 'OBJECT_OT_hex_bolt')                or
+                         hasattr(bpy.types, 'OBJECT_OT_hex_nut')                 or
+                         hasattr(bpy.types, 'OBJECT_OT_add_threaded_fastener'))
+        if fasteners_any:
+            layout.menu(VIEW3D_MT_mechanisms_fasteners.bl_idname)
             found_any = True
 
         if not found_any:
             layout.label(text="No generators enabled", icon='INFO')
 
+
+# ── Hook into Shift-A ─────────────────────────────────────────────────────────
 
 def menu_draw(self, context):
     self.layout.menu(VIEW3D_MT_mechanisms_add.bl_idname)
@@ -93,6 +220,12 @@ def menu_draw(self, context):
 
 classes = (
     VIEW3D_MT_mechanisms_ratchet,
+    VIEW3D_MT_mechanisms_gears_external,
+    VIEW3D_MT_mechanisms_gears_ring,
+    VIEW3D_MT_mechanisms_gears_planetary,
+    VIEW3D_MT_mechanisms_gears_bevel,
+    VIEW3D_MT_mechanisms_gears,
+    VIEW3D_MT_mechanisms_fasteners,
     VIEW3D_MT_mechanisms_add,
 )
 
@@ -100,15 +233,10 @@ classes = (
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-
-    # Hook into the built-in Shift-A Add menu (top level, alongside Mesh/Curve/Volume).
     bpy.types.VIEW3D_MT_add.prepend(menu_draw)
 
 
 def unregister():
-    # Detach from the Add menu first -- skip this and re-enabling the addon
-    # gives you a delightful stack of duplicate "Mechanisms" entries.
     bpy.types.VIEW3D_MT_add.remove(menu_draw)
-
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)

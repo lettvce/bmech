@@ -1,0 +1,61 @@
+bmech.org — Launch Checklist
+=============================
+
+WHAT'S ALREADY BUILT (in this repo):
+  - docs/index.html               landing page (download button, install steps, feature grid)
+  - docs/CNAME                    set to bmech.org, tells GitHub Pages your custom domain
+  - .github/workflows/release.yml tag a version -> GitHub auto-builds mechanisms_core.zip
+                                   and attaches it to a Release. No manual zipping ever again.
+  - README.md                     repo landing page for GitHub itself
+  - mechanisms_core/blender_manifest.toml   maintainer field filled in
+
+YOUR STEPS, IN ORDER
+=====================
+
+1. Create a GitHub account (if you don't have one) at github.com
+
+2. Create the repo
+     - Name: bmech
+     - Public
+     - Do NOT add a README or .gitignore (you already have both locally)
+
+3. Find/replace placeholder username
+     - Open docs/index.html and README.md
+     - Replace every occurrence of YOUR_GITHUB_USERNAME with your real GitHub username
+     - (3 occurrences total across the 2 files)
+
+4. Push the repo
+     git add -A && git commit -m "Add site, release automation, graduated gears"
+     git remote add origin https://github.com/<you>/bmech.git
+     git push -u origin master
+
+5. Enable GitHub Pages
+     repo Settings -> Pages -> Source: "Deploy from a branch"
+     Branch: master   Folder: /docs
+
+6. Buy bmech.org
+     Porkbun (~$10/yr, free WHOIS privacy, no upsell spam)
+
+7. Add DNS records at Porkbun
+     Four A records on the apex domain (bmech.org), pointing to:
+       185.199.108.153
+       185.199.109.153
+       185.199.110.153
+       185.199.111.153
+
+8. Cut the first release
+     git tag v1.0.0
+     git push origin v1.0.0
+     Check the Actions tab to watch it build, then check Releases for the zip.
+
+9. Verify
+     - Wait for DNS propagation (usually under an hour)
+     - Confirm bmech.org loads the site
+     - In Pages settings, check "Enforce HTTPS" once the domain resolves
+
+NOTES
+=====
+  - Donation button was skipped for launch — add Ko-fi/GitHub Sponsors/BMC later
+    by dropping a link into the footer of docs/index.html.
+  - To release future updates: bump version in blender_manifest.toml, commit,
+    tag (e.g. v1.0.1), and push the tag. The zip builds itself.

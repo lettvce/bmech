@@ -1,0 +1,16 @@
+schema_version = "1.0.0"
+
+id = "mechanisms_reloader"
+version = "1.0.0"
+name = "Mechanisms Reloader"
+tagline = "Dev tool: reload Mechanisms Core from disk without restarting Blender"
+maintainer = "Blake Wysocki <blakewysocki421@gmail.com>"
+type = "add-on"
+
+blender_version_min = "5.1.0"
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+category = "Development"
