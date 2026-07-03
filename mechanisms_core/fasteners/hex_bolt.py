@@ -1,28 +1,51 @@
 """
 Hex Bolt Generator
 
-Additive construction using threaded_fastener.py's own proven "External +
-Additive" mode VERBATIM (_thread_params, _external_profile, _build_helix —
-documented there as "union with a shaft cylinder to make a bolt"):
+Subtractive construction: cut the external thread as a helical groove out
+of a solid blank, rather than union a separate ridge onto an undersized
+core (threaded_fastener.py's "External + Additive" mode, this file's own
+approach before this rewrite).
 
-  1. Build a core stack: [shank] -> thread-core cylinder -> [tip], each
-     segment a fully independent closed solid, stacked touching.
-  2. Union the external thread ridge onto the thread-core segment. The core
-     radius uses a depth-scaled overlap (not a hairline epsilon) so the
-     union has genuine 3D volume in common with the ridge — two nearly-
-     coincident CURVED surfaces running the full length of a helix is
-     numerically fragile for the EXACT solver otherwise, and can read a
-     hairline overlap as a shared boundary and cancel material instead of
-     merging it. Normals are re-verified after the union.
+  1. Build a blank stack: [shank] -> thread blank cylinder (at the FULL
+     major diameter) -> [tip], as one continuous chained revolve.
+  2. Cut the thread by DIFFERENCE-ing a helical groove cutter out of the
+     thread-blank segment. A plain difference against a solid blank is a
+     numerically easy case for the EXACT solver — the cutter naturally
+     overlaps solid material throughout — unlike the old additive path,
+     which needed a depth-scaled core-radius fudge just so the union of two
+     nearly-coincident curved surfaces had genuine volume to merge instead
+     of reading as a hairline touch and cancelling material.
   3. Build the hex head as its own separate solid and union it on last — a
      flush, blocky join, much friendlier for the EXACT solver than a thin
      curved union.
 
+Cutter profile note: the cutter is built with _internal_profile (the same
+shape threaded_fastener.py's own "External + Subtractive" mode uses), but
+with the crest-flat and root-flat lengths SWAPPED from what that profile's
+own argument names suggest (root_flat, not crest_flat, goes in the
+"crest_flat" slot). Passing crest_flat straight through, as threaded_fastener.py
+does, produces a geometrically valid but backwards thread: a wide flat at
+the crest and a narrow one at the root, rather than the standard (and this
+project's own additive-ridge) convention of a narrow crest flat and a wide
+root flat. Verified empirically in a headless Blender test before relying
+on it — see the conversation history, not worth re-deriving from the
+profile math alone.
+
+Tip: a flat perpendicular step down to tip_r at the thread's own end Z,
+then a STRAIGHT (non-tapered) pin out to tip_length — not a cone. A cone
+here would shrink the blank's diameter while the thread cutter above is
+still cutting a constant-diameter helix through it, so the thread runs out
+against a shrinking target and dead-ends right at the tip instead of just
+stopping cleanly. The flat step keeps the entire thread_length span at a
+uniform major_r for the cutter, and the pin — meant to sit under the
+thread's minor Ø, see tip_diameter_mm's own doc — becomes a plain
+unthreaded lead-in a nut can start on before the crests engage.
+
 Axial layout (Z, head at z=0):
-  hex head            z: [0, hex_length_mm]
-  shank   (optional)  z: [hex_top, hex_top + shank_length_mm]
-  thread core+ridge   z: [shank_top, shank_top + thread_length_mm]
-  tip     (optional)  z: [thread_top, thread_top + tip_length_mm]
+  hex head              z: [0, hex_length_mm]
+  shank     (optional)  z: [hex_top, hex_top + shank_length_mm]
+  thread blank + cut    z: [shank_top, shank_top + thread_length_mm]
+  tip       (optional)  z: [thread_top, thread_top + tip_length_mm]  (flat step, straight pin)
 """
 
 import bpy
@@ -44,13 +67,18 @@ def _thread_params(major_r, pitch, flank_deg, truncation):
     return major_r - depth, cf, fdz, depth
 
 
-def _external_profile(major_r, minor_r, crest_flat, flank_dz):
-    """Crest points outward — bolt ridge on outside of the shaft."""
+def _internal_profile(major_r, minor_r, crest_flat, flank_dz):
+    """
+    Crest points inward. Used here as the SUBTRACTIVE cutter for an
+    external thread — see the module docstring for why crest_flat must be
+    passed root_flat (2 x truncation x pitch), not truncation x pitch, to
+    get the crest/root proportions the right way round.
+    """
     return [
-        (minor_r, 0.0),
-        (major_r, flank_dz),
-        (major_r, flank_dz + crest_flat),
-        (minor_r, flank_dz * 2.0 + crest_flat),
+        (major_r, 0.0),
+        (minor_r, flank_dz),
+        (minor_r, flank_dz + crest_flat),
+        (major_r, flank_dz * 2.0 + crest_flat),
     ]
 
 
@@ -214,6 +242,19 @@ def _bool_union(context, body, addend):
     body.data.update()
 
 
+def _bool_diff(context, body, cutter):
+    bpy.ops.object.select_all(action='DESELECT')
+    body.select_set(True)
+    context.view_layer.objects.active = body
+    mod           = body.modifiers.new("Bool", 'BOOLEAN')
+    mod.operation = 'DIFFERENCE'
+    mod.object    = cutter
+    mod.solver    = 'EXACT'
+    with context.temp_override(active_object=body):
+        bpy.ops.object.modifier_apply(modifier="Bool")
+    bpy.data.objects.remove(cutter, do_unlink=True)
+
+
 # ── Operator ──────────────────────────────────────────────────────────────────
 
 class OBJECT_OT_hex_bolt(bpy.types.Operator):
@@ -244,7 +285,9 @@ class OBJECT_OT_hex_bolt(bpy.types.Operator):
     tip_enable:         BoolProperty( name="Tip",                  default=True)
     tip_length_mm:      FloatProperty(name="Tip Length (mm)",      default=3.0,  min=0.1, soft_max=30.0)
     tip_diameter_mm:    FloatProperty(name="Tip Ø (mm)",           default=0.0,  min=0.0, soft_max=80.0,
-                                      description="0 = sharp point, >0 = flat dog-point tip")
+                                      description="0 = sharp point, >0 = flat dog-point tip. Keep under the "
+                                                  "thread's minor Ø so it works as an unthreaded lead-in pin "
+                                                  "a nut can start on")
 
     def _derived(self):
         major_r = self.thread_diameter_mm / 2.0 + self.outer_compensation_mm
@@ -288,6 +331,7 @@ class OBJECT_OT_hex_bolt(bpy.types.Operator):
             col = layout.column(align=True)
             col.prop(self, "tip_length_mm")
             col.prop(self, "tip_diameter_mm")
+            col.label(text="Max tip Ø for a working lead-in: %.3f mm" % (minor_r * 2.0))
 
         layout.separator()
         box = layout.box()
@@ -311,20 +355,21 @@ class OBJECT_OT_hex_bolt(bpy.types.Operator):
         n      = self.resolution
         cursor = context.scene.cursor.location.copy()
 
-        # ── Core stack: [shank] -> thread-core -> [tip] (head added later) ───
+        # ── Blank stack: [shank] -> thread blank -> [tip] (head added later) ─
         # Built as ONE chained revolve (see _add_chained_revolve) rather than
-        # independently-capped stacked primitives, so the thread-core-to-tip
-        # junction (which sits at the exact same radius, core_r) doesn't end
-        # up with two duplicate coincident cap faces there.
+        # independently-capped stacked primitives, so the thread-blank-to-tip
+        # junction (which sits at the exact same radius) doesn't end up with
+        # two duplicate coincident cap faces there. The thread blank sits at
+        # the FULL major_r — subtraction needs no undersized core the way the
+        # old additive-union approach did.
         z = self.hex_length_mm  # everything sits above where the head will be unioned on
 
-        # A hairline overlap is fine for a flat cut extended past a flat/simple
-        # surface, but two nearly-coincident CURVED surfaces running the full
-        # length of a helix is numerically fragile for the EXACT solver — it
-        # can read the near-coincidence as a shared boundary and cancel
-        # material instead of merging it. Use a real, depth-scaled overlap.
+        # The thread cutter's crest lands need to poke slightly past major_r
+        # so the DIFFERENCE has genuine volume to remove there, not a
+        # hairline touch along the full helix length that the EXACT solver
+        # can read as a no-op instead of a cut. Only the cutter is padded —
+        # the blank itself stays at the real, undistorted major_r.
         overlap = max(0.02, min(0.2 * depth, 0.15))
-        core_r  = minor_r + overlap
 
         def _add_cp(cp_list, r, cz):
             if cp_list and abs(cp_list[-1][0] - r) < 1e-9 and abs(cp_list[-1][1] - cz) < 1e-9:
@@ -339,27 +384,62 @@ class OBJECT_OT_hex_bolt(bpy.types.Operator):
             _add_cp(checkpoints, shank_r, z)
 
         thread_z0 = z
-        _add_cp(checkpoints, core_r, z)
+        _add_cp(checkpoints, major_r, z)
         z += self.thread_length_mm
-        _add_cp(checkpoints, core_r, z)
+        _add_cp(checkpoints, major_r, z)
 
         if self.tip_enable:
+            # Flat step straight down to tip_r at the thread's own end z, THEN
+            # a straight (non-tapered) pin out to tip_length. Not a cone: a
+            # cone here would taper the blank's diameter while the thread
+            # cutter above is still cutting a constant-diameter helix through
+            # it, so the thread would run out against a shrinking target and
+            # dead-end right at the tip instead of just stopping cleanly —
+            # exactly the "won't start in a nut" problem this fixes. The flat
+            # step keeps the whole thread_length span at a uniform major_r for
+            # the cutter, and the pin (meant to sit under minor_r — see
+            # tip_diameter_mm's own doc) becomes an unthreaded lead-in.
+            #
+            # tip_r is clamped to just under minor_r, the same way gear
+            # pressure_angle_deg gets clamped to its own max: silently, by
+            # mutating the property itself so the redo panel shows the
+            # corrected value, rather than erroring or leaving it to build a
+            # tip that's too fat to work as a lead-in.
+            max_tip_r = max(minor_r - overlap, 0.0)
+            if self.tip_diameter_mm / 2.0 > max_tip_r:
+                self.tip_diameter_mm = max_tip_r * 2.0
+            tip_r = self.tip_diameter_mm / 2.0
+            _add_cp(checkpoints, tip_r, z)
             z += self.tip_length_mm
-            _add_cp(checkpoints, self.tip_diameter_mm / 2.0, z)
+            _add_cp(checkpoints, tip_r, z)
 
         bm = bmesh.new()
         _add_chained_revolve(bm, checkpoints, n)
-        core = _to_obj(bm, "__HexBoltCore", context)
-        core.location = cursor
+        blank = _to_obj(bm, "__HexBoltBlank", context)
+        blank.location = cursor
 
-        # ── External thread ridges, unioned onto the thread-core segment ────
-        thread_bm = bmesh.new()
-        prof = _external_profile(major_r, minor_r, cf, fdz)
-        _build_helix(thread_bm, prof, self.pitch_mm, self.thread_length_mm, n)
-        thread_obj = _to_obj(thread_bm, "__HexBoltThread", context)
-        thread_obj.location = (cursor.x, cursor.y, cursor.z + thread_z0)
+        # ── External thread, cut as a helical groove out of the blank ───────
+        # _internal_profile is the same shape threaded_fastener.py's own
+        # "External + Subtractive" mode uses — but note root_flat (2x
+        # truncation x pitch) goes in the crest_flat argument slot, not cf,
+        # or the crest/root flat proportions come out backwards. See the
+        # module docstring.
+        #
+        # The cutter runs one extra pitch past thread_length_mm on purpose:
+        # cut it exactly to length and the LAST crest just dead-ends flush at
+        # the blank's own flat step, the same hard-stop look as before. The
+        # extra pitch carries the helix into the tip pin (already thinner
+        # than minor_r, so fully consumed) or, with no tip, into open space
+        # past the blank's end — either way harmless, since a boolean
+        # difference into material that isn't there does nothing.
+        root_flat = 2.0 * self.truncation * self.pitch_mm
+        cutter_bm = bmesh.new()
+        prof = _internal_profile(major_r + overlap, minor_r, root_flat, fdz)
+        _build_helix(cutter_bm, prof, self.pitch_mm, self.thread_length_mm + self.pitch_mm, n)
+        cutter_obj = _to_obj(cutter_bm, "__HexBoltThreadCutter", context)
+        cutter_obj.location = (cursor.x, cursor.y, cursor.z + thread_z0)
 
-        _bool_union(context, core, thread_obj)
+        _bool_diff(context, blank, cutter_obj)
 
         # ── Head, built separately and unioned on last ───────────────────────
         head_bm = bmesh.new()
@@ -367,17 +447,17 @@ class OBJECT_OT_hex_bolt(bpy.types.Operator):
         head = _to_obj(head_bm, "__HexBoltHead", context)
         head.location = cursor
 
-        _bool_union(context, core, head)
-        core.name = "HexBolt"
+        _bool_union(context, blank, head)
+        blank.name = "HexBolt"
 
-        core["bmech_thread_diameter"] = self.thread_diameter_mm
-        core["bmech_pitch"]           = self.pitch_mm
-        core["bmech_flank_angle_deg"] = self.flank_angle_deg
-        core["bmech_truncation"]      = self.truncation
+        blank["bmech_thread_diameter"] = self.thread_diameter_mm
+        blank["bmech_pitch"]           = self.pitch_mm
+        blank["bmech_flank_angle_deg"] = self.flank_angle_deg
+        blank["bmech_truncation"]      = self.truncation
 
         bpy.ops.object.select_all(action='DESELECT')
-        core.select_set(True)
-        context.view_layer.objects.active = core
+        blank.select_set(True)
+        context.view_layer.objects.active = blank
 
         self.report({'INFO'},
             "Hex bolt: M%.1f thread, %.1f mm total length"

@@ -1,18 +1,32 @@
 """
 Hex Thru-Nut Generator
 
-Two-step construction, matching threaded_fastener.py's own documented
-"Internal + Additive" workflow ("union with a tube bore to build nut thread
-ridges") instead of inverting it:
-  1. Cut a plain round bore through the hex prism, sized to the thread's
-     root diameter (major_r) — large enough to leave real empty space for
-     the ridges to protrude into.
-  2. Union the internal-thread ridge (_internal_profile + _build_helix) onto
-     that bore — the ridge is material meant to be ADDED, not a void shape
-     meant to be subtracted.
-  3. Intersect against a clean Z-bound to guarantee a flush top/bottom,
-     since _build_helix's own step count rounds up and can overshoot the
-     requested height slightly on its own.
+Subtractive construction: cut the internal thread out of a solid hex prism,
+rather than cut an oversized round bore and union a separate ridge into it
+(this file's own approach before this rewrite).
+
+  1. Cut a plain pilot bore through the hex prism, sized to the thread's
+     tip diameter (minor_r) — this alone doesn't create the thread, just
+     the open through-hole the thread ridges will protrude into from.
+  2. Cut the helical thread-groove cutter (_external_profile + _build_helix)
+     out of the same prism, DIFFERENCE rather than union — this widens the
+     pilot bore out toward major_r everywhere except where the internal
+     ridge crest (at minor_r) should remain untouched.
+
+No intersect-clip step is needed here, unlike the old additive-ridge
+version: that one needed to clip off overshoot because _build_helix's step
+count rounds up and its unioned ridge would otherwise protrude past
+z_height_mm. A subtractive cutter has the opposite failure mode — any
+overshoot just cuts into the same-diameter bore a little further, which is
+harmless, since there's nothing outside the prism's real bounds to remove.
+
+Cutter profile note: root_flat (2 x truncation x pitch), not crest_flat
+(truncation x pitch), goes in _external_profile's crest_flat argument slot
+for this to come out the standard way round — narrow crest at minor_r, wide
+root at major_r. Passing crest_flat straight through produces a valid but
+backwards thread. Verified empirically in a headless Blender test before
+relying on it — see the conversation history, not worth re-deriving from
+the profile math alone.
 
 Thread math is duplicated from threaded_fastener.py per this project's
 convention (each generator module is self-contained, no cross-file thread
@@ -38,13 +52,18 @@ def _thread_params(major_r, pitch, flank_deg, truncation):
     return major_r - depth, cf, fdz, depth
 
 
-def _internal_profile(major_r, minor_r, crest_flat, flank_dz):
-    """Crest points inward — cutter shape for tapping female threads."""
+def _external_profile(major_r, minor_r, crest_flat, flank_dz):
+    """
+    Crest points outward. Used here as the SUBTRACTIVE cutter for an
+    internal thread — see the module docstring for why crest_flat must be
+    passed root_flat (2 x truncation x pitch), not truncation x pitch, to
+    get the crest/root proportions the right way round.
+    """
     return [
-        (major_r, 0.0),
-        (minor_r, flank_dz),
-        (minor_r, flank_dz + crest_flat),
-        (major_r, flank_dz * 2.0 + crest_flat),
+        (minor_r, 0.0),
+        (major_r, flank_dz),
+        (major_r, flank_dz + crest_flat),
+        (minor_r, flank_dz * 2.0 + crest_flat),
     ]
 
 
@@ -126,42 +145,6 @@ def _bool_diff(context, body, cutter):
     bpy.data.objects.remove(cutter, do_unlink=True)
 
 
-def _bool_intersect(context, body, bound):
-    bpy.ops.object.select_all(action='DESELECT')
-    body.select_set(True)
-    context.view_layer.objects.active = body
-    mod           = body.modifiers.new("Bool", 'BOOLEAN')
-    mod.operation = 'INTERSECT'
-    mod.object    = bound
-    mod.solver    = 'EXACT'
-    with context.temp_override(active_object=body):
-        bpy.ops.object.modifier_apply(modifier="Bool")
-    bpy.data.objects.remove(bound, do_unlink=True)
-
-
-def _bool_union(context, body, addend):
-    bpy.ops.object.select_all(action='DESELECT')
-    body.select_set(True)
-    context.view_layer.objects.active = body
-    mod           = body.modifiers.new("Bool", 'BOOLEAN')
-    mod.operation = 'UNION'
-    mod.object    = addend
-    mod.solver    = 'EXACT'
-    with context.temp_override(active_object=body):
-        bpy.ops.object.modifier_apply(modifier="Bool")
-    bpy.data.objects.remove(addend, do_unlink=True)
-
-    # EXACT-solver unions of complex meshes can come back with inconsistent
-    # face winding even when topologically solid — re-normalize afterward so
-    # the result doesn't confuse the DIFFERENCE step that follows.
-    fix_bm = bmesh.new()
-    fix_bm.from_mesh(body.data)
-    bmesh.ops.recalc_face_normals(fix_bm, faces=fix_bm.faces[:])
-    fix_bm.to_mesh(body.data)
-    fix_bm.free()
-    body.data.update()
-
-
 # ── Operator ──────────────────────────────────────────────────────────────────
 
 class OBJECT_OT_hex_nut(bpy.types.Operator):
@@ -238,44 +221,29 @@ class OBJECT_OT_hex_nut(bpy.types.Operator):
         body = _to_obj(bm, "HexNut", context)
         body.location = cursor
 
-        # _internal_profile + _build_helix is threaded_fastener.py's own
-        # "Internal + Additive" mode — its docstring says so directly: union
-        # with a tube bore to build nut thread ridges. That means the bore
-        # needs to be cut LARGE (out to the thread's root diameter,
-        # major_r) so there's actual empty space for the ridges to
-        # protrude into — cutting it to the ridge-tip/minor diameter leaves
-        # the body already solid everywhere the ridge occupies, so unioning
-        # the ridge in would be a no-op: hole, no threads.
-        overlap = max(0.02, min(0.2 * depth, 0.15))
-        bore_bm = bmesh.new()
-        _add_cyl_z(bore_bm, major_r - overlap,
+        # Pilot bore, cut to the thread's tip diameter (minor_r) — this alone
+        # is just an open hole; the thread cutter below carves the ridges by
+        # widening it back out toward major_r everywhere except the crests.
+        pilot_bm = bmesh.new()
+        _add_cyl_z(pilot_bm, minor_r,
                    -BOOL_EPSILON, self.z_height_mm + BOOL_EPSILON, self.resolution)
-        bore_cutter = _to_obj(bore_bm, "__HexNutBore", context)
-        bore_cutter.location = cursor
-        _bool_diff(context, body, bore_cutter)
+        pilot_cutter = _to_obj(pilot_bm, "__HexNutPilot", context)
+        pilot_cutter.location = cursor
+        _bool_diff(context, body, pilot_cutter)
 
-        # No +-BOOL_EPSILON axial padding here — that convention is for
-        # SUBTRACTIVE cutters (over-extending past a boundary is harmless
-        # when removing material). This ridge gets UNIONed (added), so any
-        # extension past the nut's real z=0..z_height range would show up
-        # as a visible nub poking out the top/bottom faces.
-        ridge_bm = bmesh.new()
-        prof = _internal_profile(major_r, minor_r, cf, fdz)
-        _build_helix(ridge_bm, prof, self.pitch_mm, self.z_height_mm, self.resolution)
-        ridge = _to_obj(ridge_bm, "__HexNutRidge", context)
-        ridge.location = cursor
-        _bool_union(context, body, ridge)
-
-        # _build_helix's own step count rounds UP to guarantee full coverage,
-        # so it can still slightly overshoot z_height regardless of padding.
-        # Clip the result back to the nut's true bounds to guarantee a flush
-        # top/bottom rather than relying on exact step-count arithmetic.
-        clip_bm = bmesh.new()
-        clip_r  = self.across_flats_mm  # comfortably larger than the hex's own circumradius
-        _add_cyl_z(clip_bm, clip_r, 0.0, self.z_height_mm, self.resolution)
-        clip_bound = _to_obj(clip_bm, "__HexNutClip", context)
-        clip_bound.location = cursor
-        _bool_intersect(context, body, clip_bound)
+        # Thread cutter. Overshoots past major_r slightly (padding, not the
+        # nominal diameter) so its crest lands have genuine volume to remove
+        # from the pilot-bore wall instead of a hairline touch the EXACT
+        # solver can read as a no-op. root_flat (not crest_flat) goes in the
+        # crest_flat argument slot — see module docstring.
+        overlap   = max(0.02, min(0.2 * depth, 0.15))
+        root_flat = 2.0 * self.truncation * self.pitch_mm
+        cutter_bm = bmesh.new()
+        prof = _external_profile(major_r + overlap, minor_r, root_flat, fdz)
+        _build_helix(cutter_bm, prof, self.pitch_mm, self.z_height_mm, self.resolution)
+        cutter = _to_obj(cutter_bm, "__HexNutThreadCutter", context)
+        cutter.location = cursor
+        _bool_diff(context, body, cutter)
 
         body["bmech_thread_diameter"] = self.thread_diameter_mm
         body["bmech_pitch"]           = self.pitch_mm
