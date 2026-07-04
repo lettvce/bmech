@@ -29,23 +29,43 @@ prevent — which is why picking a target here runs `sync_helical_same`, not
 | `hand` | Enum | `RIGHT` | `RIGHT` / `LEFT` | Must match the pinion's hand — see above |
 | `width_mm` | Float (mm) | 10.0 | 1–80 (soft) | |
 | `ring_wall_mm` | Float (mm) | 5.0 | 0.5–30 (soft) | Radial wall thickness beyond the tooth root |
-| `n_slices` | Int | 16 | 2–64 (soft) | Z divisions for the helical cutter |
+| `n_slices` | Int | 16 | 2–64 (soft) | Z divisions for the twisted inner (toothed) wall |
 | `outer_segs` | Int | 64 | 16–256 (soft) | Facets on the outer cylindrical surface |
 
 ## Build method
 
-Same solid-cylinder-minus-cutter approach as the straight annulus gear, but
-the cutter itself is twisted: it's extruded slice-by-slice like an
-external helical gear's body, with twist computed **relative to the
-cutter's bottom face** (`z_bot`) so the cutter and the outer-cylinder body
-align exactly at `z=0` — this is a deliberate choice to avoid boolean seam
-artifacts at the bottom face. `hand_sign` is `+1` for `RIGHT`, `-1` for
-`LEFT`, same convention as every other helical primitive.
+**No boolean, no Solidify modifier** — same direct-bmesh rewrite as the
+straight annulus gear ([annulus_gear.md](annulus_gear.md#build-method)),
+extended across twisted Z-slices. This used to be a solid outer cylinder
+minus a boolean-DIFFERENCE helical cutter (`EXACT` solver); measured
+~10-40x slower in testing (330ms-5.0s for tooth counts 8-100 vs 9-133ms
+direct).
 
-`z` range for the cutter is extended `±BOOL_EPSILON` past the body, same as
-every other boolean cutter in this family. Cap triangulation uses
-`bmesh.ops.triangle_fill` on the boundary edge loop, not center-fan — see
-[README.md](README.md) for why.
+`_build_helical_annulus_solid` builds:
+- The **inner (toothed) wall**: `n_slices` twisted Z-layers of the tooth
+  profile, twist computed **relative to `z=0`**
+  (`hand_sign * z * tan(helix_angle) / pitch_radius`) — simpler than the
+  old boolean cutter's twist formula, which had to be relative to the
+  cutter's own padded bottom face to avoid a boolean seam artifact that no
+  longer exists here. `hand_sign` is `+1` for `RIGHT`, `-1` for `LEFT`,
+  same convention as every other helical primitive.
+- The **outer (cylindrical) wall**: a PLAIN, UNTWISTED, independently-
+  spaced circle (`outer_segs` points, only 2 Z-layers). The outer surface
+  of a helical annulus doesn't twist — only the inner teeth do. As with
+  the straight annulus gear, this is deliberately NOT built with one
+  point per tooth-profile point at a matching angle (that reintroduces
+  zero-area triangles at the tooth profile's collinear dedendum-circle
+  point insertion).
+- The **two end caps**: `bmesh.ops.triangle_fill` fed the boundary edges
+  of both the (twisted) inner ring and the (untwisted) outer ring
+  together at each end — see [annulus_gear.md](annulus_gear.md#build-method)
+  for the fuller rationale.
+
+**Pressure angle clamp has extra margin here too**: `_derived()` clamps to
+`gear_matching.max_pressure_angle_deg(...) - PA_TRIANGLE_FILL_MARGIN_DEG`
+(0.2°), not the theoretical limit itself — `triangle_fill` is more fragile
+right at that boundary than the old `EXACT`-solver boolean was. Swept
+tooth counts 8-100 × pressure angles 10-45° × both hands: 96/96 clean.
 
 Total twist (`width_mm * tan(helix_angle) / pitch_radius`) and normal
 module (`module * cos(helix_angle)`) are shown as read-only info lines.

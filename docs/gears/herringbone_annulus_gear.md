@@ -38,22 +38,42 @@ mirrored halves.
 
 ## Build method
 
-The cutter is built the same way as an external herringbone gear's body —
-bottom half twist rising `0 → peak_twist`, top half falling
-`peak_twist → 0` — but as a boolean cutter rather than the final solid, and
-extended `±BOOL_EPSILON` past the body at both ends.
+**No boolean, no Solidify modifier** — same direct-bmesh rewrite as the
+straight and helical annulus gears ([annulus_gear.md](annulus_gear.md#build-method),
+[helical_annulus_gear.md](helical_annulus_gear.md#build-method)), extended
+to a V-shaped (herringbone) twist. This used to be a solid outer cylinder
+minus a boolean-DIFFERENCE herringbone cutter (`EXACT` solver).
 
-`peak_twist = (width_mm/2) * tan(helix_angle) / pitch_radius`.
+`_build_herringbone_annulus_solid` builds:
+- The **inner (toothed) wall**: `2*n_slices - 1` V-twisted Z-layers of the
+  tooth profile — bottom half twist rising `0 → peak_twist` over
+  `[0, width_mm/2]`, top half falling `peak_twist → 0` over
+  `[width_mm/2, width_mm]`, sharing the mid-slice at the peak (the top-half
+  loop starts at `k=1` to avoid rebuilding that shared slice). Twist is
+  relative to `z=0`/`width_mm` directly now — the old boolean cutter had
+  to pad its Z range by `±BOOL_EPSILON` to avoid a coincident-cap boolean
+  artifact, which no longer applies since there's no boolean.
+  `peak_twist = (width_mm/2) * tan(helix_angle) / pitch_radius`.
+- The **outer (cylindrical) wall**: a PLAIN, UNTWISTED, independently-
+  spaced circle (`outer_segs` points, only 2 Z-layers) — the outer surface
+  doesn't twist, only the inner teeth do. As with the other two annulus
+  generators, this is deliberately NOT built with one point per
+  tooth-profile point at a matching angle (that reintroduces zero-area
+  triangles at the tooth profile's collinear dedendum-circle point
+  insertion).
+- The **two end caps**: `bmesh.ops.triangle_fill` fed the boundary edges
+  of both the (twisted) inner ring and the (untwisted) outer ring together
+  at each end.
 
-One deliberate accuracy trade-off, called out directly in the source: the
-z-range extension for boolean safety means twist is technically `0` at
-`z = -BOOL_EPSILON` and returns to `0` at `z = width_mm + BOOL_EPSILON`
-rather than exactly at the nominal faces — a 0.001mm deviation, accepted
-as negligible in exchange for boolean robustness.
+**Pressure angle clamp has extra margin here too**: `_derived()` clamps to
+`gear_matching.max_pressure_angle_deg(...) - PA_TRIANGLE_FILL_MARGIN_DEG`
+(0.2°), not the theoretical limit itself — `triangle_fill` is more fragile
+right at that boundary than the old `EXACT`-solver boolean was. Swept
+tooth counts 8-100 × pressure angles 10-45° × both hands: 96/96 clean.
 
-The top-half loop skips its first slice (shared with the bottom half's
-last slice, at the peak) — same duplicate-vertex-ring avoidance as the
-external herringbone gear.
+`herringbone_planetary_gear_set.py`'s own ring gear is unaffected by this
+rewrite — it's a separate file with its own cutter function
+(`_make_herringbone_cutter_obj`), still boolean-based.
 
 ## Panel warnings
 

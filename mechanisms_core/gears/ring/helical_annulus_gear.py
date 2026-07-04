@@ -15,12 +15,25 @@ Hand convention (internal gear pair):
   Helical annulus + helical pinion mesh with the SAME hand — opposite of the
   external-external rule. Right annulus meshes with a right pinion.
 
-Build method (no Solidify — boolean only, epsilon = 0.001 mm):
-  1. Solid outer cylinder at outer_r
-  2. Helical cutter: the annulus void profile (bore + N tooth spaces) extruded
-     slice-by-slice with increasing twist — identical to how helical_gear.py
-     builds its body, but using the swapped add/ded cutter profile.
-  3. Boolean DIFFERENCE: outer cylinder − helical cutter → helical annulus.
+Build method — direct bmesh construction, NO boolean at all:
+  1. Build n_slices twisted Z-layers of the inner tooth profile (bore + N
+     tooth spaces), twist increasing linearly with Z — same twist math the
+     old boolean cutter used, just applied straight to the final body.
+  2. Build a PLAIN, UNTWISTED outer ring — only 2 Z-layers (bottom, top),
+     its own independently-spaced circle (outer_segs points). The outer
+     surface of a helical annulus doesn't twist; only the inner teeth do.
+  3. Cap top and bottom with bmesh.ops.triangle_fill fed BOTH the inner
+     profile's boundary loop and the outer ring's boundary loop together —
+     same technique as annulus_gear.py, see that file for why a naive
+     index-matched bridge between the loops doesn't work.
+  4. Side walls: the twisted inner (toothed) wall between consecutive
+     Z-slices, and the plain outer (cylindrical) wall between its own
+     bottom/top rings.
+
+This used to be a solid outer cylinder minus a boolean-DIFFERENCE helical
+cutter (EXACT solver). That was ~10-40x slower in testing (330ms-5.0s for
+tooth counts 8-100 vs 9-122ms direct) — see annulus_gear.py for the fuller
+writeup of the same rewrite applied to the straight annulus gear first.
 """
 
 import bpy
@@ -32,7 +45,7 @@ from .. import gear_matching
 INVOLUTE_POINTS = 15
 ADDENDUM_COEFF  = 1.0
 DEDENDUM_COEFF  = 1.25
-BOOL_EPSILON    = 0.001
+PA_TRIANGLE_FILL_MARGIN_DEG = 0.2
 
 
 def _involute_pt(base_r, t):
@@ -56,8 +69,9 @@ def _build_annulus_cutter_profile(module, tooth_count, pa_deg):
     ADDENDUM_COEFF and DEDENDUM_COEFF are swapped vs the external gear builder:
       ded_r → pitch_r − ADDENDUM × m   (inner bore at annulus tooth tips)
       add_r → pitch_r + DEDENDUM × m   (outer reach at annulus tooth roots)
-    Extruding this profile (with helical twist) and subtracting it from an
-    outer cylinder leaves a ring with involute teeth on its inner bore.
+    This same loop of points becomes the inner (toothed) boundary that
+    _build_helical_annulus_solid sweeps through n_slices twisted Z-layers
+    and bridges to a matching outer ring — no boolean involved.
     """
     pa_rad  = radians(pa_deg)
     pitch_r = module * tooth_count / 2.0
@@ -104,92 +118,69 @@ def _build_annulus_cutter_profile(module, tooth_count, pa_deg):
     return profile
 
 
-def _make_cylinder(context, r, z_bot, z_top, n_segs, mesh_name, obj_name):
-    """Solid cylinder."""
-    bm     = bmesh.new()
-    angles = [2.0 * pi * i / n_segs for i in range(n_segs)]
-
-    bot = [bm.verts.new((r * cos(a), r * sin(a), z_bot)) for a in angles]
-    top = [bm.verts.new((r * cos(a), r * sin(a), z_top)) for a in angles]
-    bm.verts.index_update()
-
-    bm.faces.new(list(reversed(bot)))
-    bm.faces.new(top)
-    for i in range(n_segs):
-        ni = (i + 1) % n_segs
-        bm.faces.new([bot[i], bot[ni], top[ni], top[i]])
-
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
-
-    me = bpy.data.meshes.new(mesh_name)
-    bm.to_mesh(me)
-    bm.free()
-    me.update()
-
-    obj = bpy.data.objects.new(obj_name, me)
-    context.collection.objects.link(obj)
-    return obj
-
-
-def _make_helical_cutter(context, cutter_profile, width_mm, hand_sign, ha_rad,
-                          pitch_r, n_slices, mesh_name, obj_name):
+def _build_helical_annulus_solid(context, inner_profile, width_mm, outer_r, outer_segs,
+                                  hand_sign, ha_rad, pitch_r, n_slices,
+                                  mesh_name, obj_name):
     """
-    Extrude the annulus cutter profile with helical twist into a solid.
-    The cutter is slightly taller than the gear body (±BOOL_EPSILON) to
-    guarantee clean boolean faces with no coplanar coincidence.
+    Build the complete helical annulus ring solid directly — twisted inner
+    toothed wall, plain outer cylindrical wall, and two end caps — with no
+    boolean step. See annulus_gear.py's _build_annulus_solid for the fuller
+    rationale (this is the twisted extension of the same technique):
+
+    - The outer ring stays a PLAIN, UNTWISTED, independently-spaced circle
+      (only 2 Z-layers) — the outer surface of a helical annulus doesn't
+      twist, only the inner teeth do, and (as with the straight annulus)
+      giving the outer ring one point per inner-profile point at a
+      matching angle would reintroduce zero-area triangles wherever the
+      tooth profile's dedendum-circle point insertion puts two inner
+      points on the same angle.
+    - Each end is capped with bmesh.ops.triangle_fill fed the boundary
+      edges of BOTH the (twisted, at that Z) inner profile ring and the
+      (untwisted) outer ring together, which triangulates the annular
+      region directly instead of needing a hand-built bridge.
+
+    Twist is relative to z=0 (not padded past the real Z bounds the way
+    the old boolean cutter needed to be, since there's no boolean here to
+    dodge a coincident-face issue with).
     """
-    n         = len(cutter_profile)
-    z_bot     = -BOOL_EPSILON
-    z_top     = width_mm + BOOL_EPSILON
-    total_h   = z_top - z_bot
+    n = len(inner_profile)
 
     bm = bmesh.new()
-
-    slices = []
+    inner_slices = []
     for k in range(n_slices):
-        z        = z_bot + total_h * k / (n_slices - 1)
-        # Twist relative to z=0 so the gear body and cutter align at the bottom face
-        twist    = hand_sign * (z - z_bot) * tan(ha_rad) / pitch_r
-        c, s     = cos(twist), sin(twist)
-        verts    = [bm.verts.new((x * c - y * s, x * s + y * c, z))
-                    for x, y in cutter_profile]
-        slices.append(verts)
+        z     = width_mm * k / (n_slices - 1)
+        twist = hand_sign * z * tan(ha_rad) / pitch_r
+        c, s  = cos(twist), sin(twist)
+        verts = [bm.verts.new((x * c - y * s, x * s + y * c, z)) for x, y in inner_profile]
+        inner_slices.append(verts)
 
+    outer_angles = [2.0 * pi * i / outer_segs for i in range(outer_segs)]
+    outer_bot = [bm.verts.new((outer_r * cos(a), outer_r * sin(a), 0.0)) for a in outer_angles]
+    outer_top = [bm.verts.new((outer_r * cos(a), outer_r * sin(a), width_mm)) for a in outer_angles]
     bm.verts.index_update()
 
-    # Boundary ring edges for the two capped ends, created explicitly and
-    # BEFORE the side walls so triangle_fill (below) has them to work with;
-    # the side-wall faces.new() calls further down reuse these same edges
-    # automatically rather than creating duplicates.
-    bot_edges = [bm.edges.new([slices[0][i], slices[0][(i + 1) % n]]) for i in range(n)]
-    top_edges = [bm.edges.new([slices[-1][i], slices[-1][(i + 1) % n]]) for i in range(n)]
+    # Boundary ring edges FIRST (both loops, both ends), so triangle_fill
+    # has them; the side-wall faces.new() calls further down reuse these
+    # same edges automatically rather than creating duplicates.
+    bot_edges = [bm.edges.new([inner_slices[0][i], inner_slices[0][(i + 1) % n]]) for i in range(n)]
+    bot_edges += [bm.edges.new([outer_bot[i], outer_bot[(i + 1) % outer_segs]]) for i in range(outer_segs)]
+    top_edges = [bm.edges.new([inner_slices[-1][i], inner_slices[-1][(i + 1) % n]]) for i in range(n)]
+    top_edges += [bm.edges.new([outer_top[i], outer_top[(i + 1) % outer_segs]]) for i in range(outer_segs)]
 
-    # Caps: bmesh's constrained triangle_fill on the boundary loop, not a
-    # fan to a center vertex. _build_annulus_cutter_profile inserts a
-    # dedendum-circle point at the SAME angle as its neighbor wherever
-    # base_r > ded_r (the straight radial segment representing an
-    # undercut flank below the base circle) — real, correct tooth geometry,
-    # not a mistake, but a fan triangle from that segment to the center
-    # degenerates to exactly zero area since all three points are collinear
-    # (a shared twist rotation doesn't change that). A zero-area triangle
-    # looks harmless but isn't: its short edge is shared with a side-wall
-    # face, so naively dropping the triangle turns that edge into a
-    # non-manifold boundary edge instead. triangle_fill avoids the
-    # degenerate case entirely by triangulating the actual polygon rather
-    # than blindly fanning to an arbitrary point — verified directly (0
-    # zero-area faces, 0 non-manifold edges across tooth counts from 8 to
-    # 100, including cases that previously produced hundreds of
-    # non-manifold edges).
     bmesh.ops.triangle_fill(bm, use_beauty=True, edges=bot_edges)
     bmesh.ops.triangle_fill(bm, use_beauty=True, edges=top_edges)
 
-    # Side walls (reuse the boundary edges created above for k=0 and k=n_slices-2)
+    # Inner (toothed) twisted wall
     for k in range(n_slices - 1):
-        bot = slices[k]
-        top = slices[k + 1]
+        bot, top = inner_slices[k], inner_slices[k + 1]
         for i in range(n):
             ni = (i + 1) % n
             bm.faces.new([bot[i], bot[ni], top[ni], top[i]])
+
+    # Outer (cylindrical) wall
+    for i in range(outer_segs):
+        ni = (i + 1) % outer_segs
+        bm.faces.new([outer_bot[ni], outer_bot[i], outer_top[i], outer_top[ni]])
 
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
 
@@ -248,7 +239,14 @@ class OBJECT_OT_helical_annulus_gear(bpy.types.Operator):
         outer_r      = root_r_inner + self.ring_wall_mm
         total_twist  = self.width_mm * tan(ha_rad) / pitch_r
         normal_module = self.module * cos(ha_rad)
-        pa_max        = gear_matching.max_pressure_angle_deg(self.tooth_count, DEDENDUM_COEFF)
+        # PA_TRIANGLE_FILL_MARGIN_DEG below the theoretical self-intersection
+        # limit, not the limit itself — see annulus_gear.py's _derived() for
+        # why: bmesh.ops.triangle_fill's constrained triangulation (used for
+        # this generator's caps since the no-boolean rewrite) is numerically
+        # fragile right at that limit in a way the old EXACT-solver boolean
+        # wasn't.
+        pa_max = gear_matching.max_pressure_angle_deg(self.tooth_count, DEDENDUM_COEFF) \
+            - PA_TRIANGLE_FILL_MARGIN_DEG
         return ha_rad, pitch_r, tip_r, root_r_inner, outer_r, total_twist, normal_module, pa_max
 
     def draw(self, context):
@@ -305,7 +303,12 @@ class OBJECT_OT_helical_annulus_gear(bpy.types.Operator):
         layout.label(text="Max pressure angle for %d teeth: %.1f°" % (self.tooth_count, pa_max))
 
     def execute(self, context):
-        gear_matching.clamp_pressure_angle(self, (self.tooth_count, DEDENDUM_COEFF))
+        # Not gear_matching.clamp_pressure_angle() — see _derived()'s
+        # PA_TRIANGLE_FILL_MARGIN_DEG comment; _derived()'s own pa_max
+        # already has the margin built in.
+        _, _, _, _, _, _, _, pa_max_safe = self._derived()
+        if self.pressure_angle_deg > pa_max_safe:
+            self.pressure_angle_deg = pa_max_safe
         ha_rad, pitch_r, tip_r, root_r_inner, outer_r, total_twist, _, pa_max = self._derived()
 
         if tip_r <= 0:
@@ -314,40 +317,17 @@ class OBJECT_OT_helical_annulus_gear(bpy.types.Operator):
         hand_sign    = 1.0 if self.hand == 'RIGHT' else -1.0
         cursor       = context.scene.cursor.location.copy()
 
-        # 1. Solid outer cylinder (the ring body blank)
-        body = _make_cylinder(
-            context, outer_r,
-            0.0, self.width_mm,
-            self.outer_segs,
+        inner_profile = _build_annulus_cutter_profile(
+            self.module, self.tooth_count, self.pressure_angle_deg
+        )
+        body = _build_helical_annulus_solid(
+            context, inner_profile, self.width_mm, outer_r, self.outer_segs,
+            hand_sign, ha_rad, pitch_r, self.n_slices,
             "HelicalAnnulusGearMesh", "HelicalAnnulusGear"
         )
         body.location = cursor
 
-        # 2. Helical cutter — twisted annulus void profile
-        cutter_pts = _build_annulus_cutter_profile(
-            self.module, self.tooth_count, self.pressure_angle_deg
-        )
-        cutter = _make_helical_cutter(
-            context, cutter_pts,
-            self.width_mm, hand_sign, ha_rad, pitch_r, self.n_slices,
-            "__HelAnnCutMesh", "__HelAnnCut"
-        )
-        cutter.location = cursor
-
-        # 3. Boolean DIFFERENCE
         bpy.ops.object.select_all(action='DESELECT')
-        body.select_set(True)
-        context.view_layer.objects.active = body
-
-        mod           = body.modifiers.new("HelixBore", 'BOOLEAN')
-        mod.operation = 'DIFFERENCE'
-        mod.object    = cutter
-        mod.solver    = 'EXACT'
-
-        bpy.ops.object.modifier_apply(modifier="HelixBore")
-
-        bpy.data.objects.remove(cutter, do_unlink=True)
-
         body.select_set(True)
         context.view_layer.objects.active = body
 

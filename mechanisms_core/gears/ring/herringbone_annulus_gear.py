@@ -15,14 +15,26 @@ Geometry:
 Hand convention (internal gear pair):
   Herringbone annulus + herringbone pinion mesh with the SAME hand.
 
-Build method (no Solidify — boolean only, epsilon = 0.001 mm):
-  1. Solid outer cylinder at outer_r
-  2. Herringbone cutter: void profile extruded slice-by-slice with a
-     V-shaped twist — bottom half rises 0→peak, top half falls peak→0.
-  3. Boolean DIFFERENCE: outer cylinder − herringbone cutter.
+Build method — direct bmesh construction, NO boolean at all:
+  1. Build 2*n_slices-1 V-twisted Z-layers of the inner tooth profile
+     (bore + N tooth spaces) — bottom half rises 0->peak, top half falls
+     peak->0, meeting at the shared mid-slice.
+  2. Build a PLAIN, UNTWISTED outer ring — only 2 Z-layers (bottom, top),
+     its own independently-spaced circle (outer_segs points). The outer
+     surface doesn't twist; only the inner teeth do.
+  3. Cap top and bottom with bmesh.ops.triangle_fill fed BOTH the inner
+     profile's boundary loop and the outer ring's boundary loop together —
+     same technique as annulus_gear.py, see that file for why a naive
+     index-matched bridge between the loops doesn't work.
+  4. Side walls: the V-twisted inner (toothed) wall between consecutive
+     Z-slices, and the plain outer (cylindrical) wall between its own
+     bottom/top rings.
 
-Cap geometry: center-fan triangulation (one center vertex, N flat triangles)
-  — avoids self-intersecting faces that CGAL EXACT solver rejects.
+This used to be a solid outer cylinder minus a boolean-DIFFERENCE
+herringbone cutter (EXACT solver) — see annulus_gear.py for the fuller
+writeup of the same rewrite applied to the straight annulus gear first,
+and helical_annulus_gear.py for the single-twist (non-V) version of this
+same extension.
 """
 
 import bpy
@@ -34,7 +46,7 @@ from .. import gear_matching
 INVOLUTE_POINTS = 15
 ADDENDUM_COEFF  = 1.0
 DEDENDUM_COEFF  = 1.25
-BOOL_EPSILON    = 0.001
+PA_TRIANGLE_FILL_MARGIN_DEG = 0.2
 
 
 def _involute_pt(base_r, t):
@@ -58,6 +70,10 @@ def _build_annulus_cutter_profile(module, tooth_count, pa_deg):
     ADDENDUM_COEFF and DEDENDUM_COEFF are swapped vs the external gear builder:
       ded_r → pitch_r − ADDENDUM × m   (inner bore at annulus tooth tips)
       add_r → pitch_r + DEDENDUM × m   (outer reach at annulus tooth roots)
+
+    This same loop of points becomes the inner (toothed) boundary that
+    _build_herringbone_annulus_solid sweeps through 2*n_slices-1 V-twisted
+    Z-layers and bridges to a matching outer ring — no boolean involved.
     """
     pa_rad  = radians(pa_deg)
     pitch_r = module * tooth_count / 2.0
@@ -104,107 +120,77 @@ def _build_annulus_cutter_profile(module, tooth_count, pa_deg):
     return profile
 
 
-def _make_cylinder(context, r, z_bot, z_top, n_segs, mesh_name, obj_name):
-    """Solid cylinder."""
-    bm     = bmesh.new()
-    angles = [2.0 * pi * i / n_segs for i in range(n_segs)]
-
-    bot = [bm.verts.new((r * cos(a), r * sin(a), z_bot)) for a in angles]
-    top = [bm.verts.new((r * cos(a), r * sin(a), z_top)) for a in angles]
-    bm.verts.index_update()
-
-    bm.faces.new(list(reversed(bot)))
-    bm.faces.new(top)
-    for i in range(n_segs):
-        ni = (i + 1) % n_segs
-        bm.faces.new([bot[i], bot[ni], top[ni], top[i]])
-
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
-
-    me = bpy.data.meshes.new(mesh_name)
-    bm.to_mesh(me)
-    bm.free()
-    me.update()
-
-    obj = bpy.data.objects.new(obj_name, me)
-    context.collection.objects.link(obj)
-    return obj
-
-
-def _make_herringbone_cutter(context, cutter_profile, width_mm, hand_sign, ha_rad,
-                               pitch_r, n_slices, mesh_name, obj_name):
+def _build_herringbone_annulus_solid(context, inner_profile, width_mm, outer_r, outer_segs,
+                                      hand_sign, ha_rad, pitch_r, n_slices,
+                                      mesh_name, obj_name):
     """
-    Extrude the annulus cutter profile with a herringbone (V-shaped) twist.
+    Build the complete herringbone annulus ring solid directly — V-twisted
+    inner toothed wall, plain outer cylindrical wall, and two end caps —
+    with no boolean step. See annulus_gear.py's _build_annulus_solid for
+    the fuller rationale (this is the V-twist extension of the same
+    technique) and helical_annulus_gear.py for the single-twist version.
 
-    The z range is extended by ±BOOL_EPSILON so boolean faces are never coplanar
-    with the body end faces. Twist is 0 at z=-eps, peaks at z=width/2, returns
-    to 0 at z=width+eps (negligible deviation from nominal over 0.001 mm).
+    - The outer ring stays a PLAIN, UNTWISTED, independently-spaced circle
+      (only 2 Z-layers) — the outer surface doesn't twist, only the inner
+      teeth do, and giving the outer ring one point per inner-profile
+      point at a matching angle would reintroduce zero-area triangles at
+      the tooth profile's collinear dedendum-circle point insertion.
+    - Each end is capped with bmesh.ops.triangle_fill fed the boundary
+      edges of BOTH the (twisted, at that Z) inner profile ring and the
+      (untwisted) outer ring together.
 
-    Caps: center-fan triangulation — one vertex at (0,0,z) per cap, N flat
-    triangles fanning out to the boundary. Guaranteed non-overlapping for any
-    star-shaped profile; safe for CGAL EXACT boolean solver.
+    Twist is relative to z=0/width_mm (not padded past the real Z bounds
+    the way the old boolean cutter needed to be, since there's no boolean
+    here to dodge a coincident-face issue with) — bottom half rises
+    0->peak over [0, width_mm/2], top half falls peak->0 over
+    [width_mm/2, width_mm], meeting at the shared mid-slice.
     """
-    n      = len(cutter_profile)
+    n      = len(inner_profile)
     half_h = width_mm / 2.0
 
     bm = bmesh.new()
 
     def _slice(z, twist):
         c, s = cos(twist), sin(twist)
-        return [bm.verts.new((x * c - y * s, x * s + y * c, z))
-                for x, y in cutter_profile]
+        return [bm.verts.new((x * c - y * s, x * s + y * c, z)) for x, y in inner_profile]
 
-    all_slices = []
-
-    # Bottom half: z from −eps to half_h, twist rises 0 → peak
+    inner_slices = []
     for k in range(n_slices):
-        z     = -BOOL_EPSILON + (half_h + BOOL_EPSILON) * k / (n_slices - 1)
-        twist = hand_sign * (z + BOOL_EPSILON) * tan(ha_rad) / pitch_r
-        all_slices.append(_slice(z, twist))
-
-    # Top half: z from half_h to width+eps, twist falls peak → 0
-    # k=0 is the shared mid-slice — skip it
+        z     = half_h * k / (n_slices - 1)
+        twist = hand_sign * z * tan(ha_rad) / pitch_r
+        inner_slices.append(_slice(z, twist))
     for k in range(1, n_slices):
-        z     = half_h + (half_h + BOOL_EPSILON) * k / (n_slices - 1)
-        twist = hand_sign * (width_mm + BOOL_EPSILON - z) * tan(ha_rad) / pitch_r
-        all_slices.append(_slice(z, twist))
+        z     = half_h + half_h * k / (n_slices - 1)
+        twist = hand_sign * (width_mm - z) * tan(ha_rad) / pitch_r
+        inner_slices.append(_slice(z, twist))
 
+    outer_angles = [2.0 * pi * i / outer_segs for i in range(outer_segs)]
+    outer_bot = [bm.verts.new((outer_r * cos(a), outer_r * sin(a), 0.0)) for a in outer_angles]
+    outer_top = [bm.verts.new((outer_r * cos(a), outer_r * sin(a), width_mm)) for a in outer_angles]
     bm.verts.index_update()
 
-    # Boundary ring edges for the two capped ends, created explicitly and
-    # BEFORE the side walls so triangle_fill (below) has them to work with;
-    # the side-wall faces.new() calls further down reuse these same edges
-    # automatically rather than creating duplicates.
-    bot_edges = [bm.edges.new([all_slices[0][i], all_slices[0][(i + 1) % n]]) for i in range(n)]
-    top_edges = [bm.edges.new([all_slices[-1][i], all_slices[-1][(i + 1) % n]]) for i in range(n)]
+    # Boundary ring edges FIRST (both loops, both ends), so triangle_fill
+    # has them; the side-wall faces.new() calls further down reuse these
+    # same edges automatically rather than creating duplicates.
+    bot_edges = [bm.edges.new([inner_slices[0][i], inner_slices[0][(i + 1) % n]]) for i in range(n)]
+    bot_edges += [bm.edges.new([outer_bot[i], outer_bot[(i + 1) % outer_segs]]) for i in range(outer_segs)]
+    top_edges = [bm.edges.new([inner_slices[-1][i], inner_slices[-1][(i + 1) % n]]) for i in range(n)]
+    top_edges += [bm.edges.new([outer_top[i], outer_top[(i + 1) % outer_segs]]) for i in range(outer_segs)]
 
-    # Caps: bmesh's constrained triangle_fill on the boundary loop, not a
-    # fan to a center vertex. _build_annulus_cutter_profile inserts a
-    # dedendum-circle point at the SAME angle as its neighbor wherever
-    # base_r > ded_r (the straight radial segment representing an
-    # undercut flank below the base circle) — real, correct tooth geometry,
-    # not a mistake, but a fan triangle from that segment to the center
-    # degenerates to exactly zero area since all three points are collinear
-    # (a shared twist rotation doesn't change that). A zero-area triangle
-    # looks harmless but isn't: its short edge is shared with a side-wall
-    # face, so naively dropping the triangle turns that edge into a
-    # non-manifold boundary edge instead. triangle_fill avoids the
-    # degenerate case entirely by triangulating the actual polygon rather
-    # than blindly fanning to an arbitrary point — verified directly (0
-    # zero-area faces, 0 non-manifold edges across tooth counts from 8 to
-    # 100, including cases that previously produced hundreds of
-    # non-manifold edges).
     bmesh.ops.triangle_fill(bm, use_beauty=True, edges=bot_edges)
     bmesh.ops.triangle_fill(bm, use_beauty=True, edges=top_edges)
 
-    # Side walls (reuse the boundary edges created above for the first and
-    # last slice pairs)
-    for k in range(len(all_slices) - 1):
-        bot = all_slices[k]
-        top = all_slices[k + 1]
+    # Inner (toothed) V-twisted wall
+    for k in range(len(inner_slices) - 1):
+        bot, top = inner_slices[k], inner_slices[k + 1]
         for i in range(n):
             ni = (i + 1) % n
             bm.faces.new([bot[i], bot[ni], top[ni], top[i]])
+
+    # Outer (cylindrical) wall
+    for i in range(outer_segs):
+        ni = (i + 1) % outer_segs
+        bm.faces.new([outer_bot[ni], outer_bot[i], outer_top[i], outer_top[ni]])
 
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
 
@@ -265,7 +251,14 @@ class OBJECT_OT_herringbone_annulus_gear(bpy.types.Operator):
         half_h        = self.width_mm / 2.0
         peak_twist    = half_h * tan(ha_rad) / pitch_r
         normal_module = self.module * cos(ha_rad)
-        pa_max        = gear_matching.max_pressure_angle_deg(self.tooth_count, DEDENDUM_COEFF)
+        # PA_TRIANGLE_FILL_MARGIN_DEG below the theoretical self-intersection
+        # limit, not the limit itself — see annulus_gear.py's _derived() for
+        # why: bmesh.ops.triangle_fill's constrained triangulation (used for
+        # this generator's caps since the no-boolean rewrite) is numerically
+        # fragile right at that limit in a way the old EXACT-solver boolean
+        # wasn't.
+        pa_max = gear_matching.max_pressure_angle_deg(self.tooth_count, DEDENDUM_COEFF) \
+            - PA_TRIANGLE_FILL_MARGIN_DEG
         return ha_rad, pitch_r, tip_r, root_r_inner, outer_r, half_h, peak_twist, normal_module, pa_max
 
     def draw(self, context):
@@ -323,7 +316,12 @@ class OBJECT_OT_herringbone_annulus_gear(bpy.types.Operator):
         layout.label(text="Max pressure angle for %d teeth: %.1f°" % (self.tooth_count, pa_max))
 
     def execute(self, context):
-        gear_matching.clamp_pressure_angle(self, (self.tooth_count, DEDENDUM_COEFF))
+        # Not gear_matching.clamp_pressure_angle() — see _derived()'s
+        # PA_TRIANGLE_FILL_MARGIN_DEG comment; _derived()'s own pa_max
+        # already has the margin built in.
+        _, _, _, _, _, _, _, _, pa_max_safe = self._derived()
+        if self.pressure_angle_deg > pa_max_safe:
+            self.pressure_angle_deg = pa_max_safe
         ha_rad, pitch_r, tip_r, root_r_inner, outer_r, half_h, peak_twist, _, pa_max = self._derived()
 
         if tip_r <= 0:
@@ -332,40 +330,17 @@ class OBJECT_OT_herringbone_annulus_gear(bpy.types.Operator):
         hand_sign = 1.0 if self.hand == 'RIGHT' else -1.0
         cursor    = context.scene.cursor.location.copy()
 
-        # 1. Solid outer cylinder (ring body blank)
-        body = _make_cylinder(
-            context, outer_r,
-            0.0, self.width_mm,
-            self.outer_segs,
+        inner_profile = _build_annulus_cutter_profile(
+            self.module, self.tooth_count, self.pressure_angle_deg
+        )
+        body = _build_herringbone_annulus_solid(
+            context, inner_profile, self.width_mm, outer_r, self.outer_segs,
+            hand_sign, ha_rad, pitch_r, self.n_slices,
             "HerringboneAnnulusGearMesh", "HerringboneAnnulusGear"
         )
         body.location = cursor
 
-        # 2. Herringbone cutter — V-twisted annulus void profile
-        cutter_pts = _build_annulus_cutter_profile(
-            self.module, self.tooth_count, self.pressure_angle_deg
-        )
-        cutter = _make_herringbone_cutter(
-            context, cutter_pts,
-            self.width_mm, hand_sign, ha_rad, pitch_r, self.n_slices,
-            "__HbAnnCutMesh", "__HbAnnCut"
-        )
-        cutter.location = cursor
-
-        # 3. Boolean DIFFERENCE
         bpy.ops.object.select_all(action='DESELECT')
-        body.select_set(True)
-        context.view_layer.objects.active = body
-
-        mod           = body.modifiers.new("HboneBore", 'BOOLEAN')
-        mod.operation = 'DIFFERENCE'
-        mod.object    = cutter
-        mod.solver    = 'EXACT'
-
-        bpy.ops.object.modifier_apply(modifier="HboneBore")
-
-        bpy.data.objects.remove(cutter, do_unlink=True)
-
         body.select_set(True)
         context.view_layer.objects.active = body
 

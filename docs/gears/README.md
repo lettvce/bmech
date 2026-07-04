@@ -213,54 +213,68 @@ you're just using the operators:
 
 - Internal-tooth features are cut with a **boolean DIFFERENCE modifier,
   `solver='EXACT'`**, applied immediately and the cutter object deleted —
-  never left as a live modifier — **except** the straight annulus gear
-  (`annulus_gear.py`), which no longer uses a boolean at all (see below).
-  Helical/herringbone annulus gears and planetary ring gears still use the
-  boolean approach.
+  never left as a live modifier — **except all three annulus generators**
+  (`annulus_gear.py`, `helical_annulus_gear.py`,
+  `herringbone_annulus_gear.py`), which were rewritten to skip the boolean
+  entirely (see below). Planetary ring gears
+  (`herringbone_planetary_gear_set.py`'s own ring cutter, and its plain/
+  helical siblings) still use the boolean approach.
 - Cutter meshes (where a boolean cutter is still used) are extruded
   `BOOL_EPSILON = 0.001mm` past the body's end faces on both sides,
   specifically so the cutter's cap faces are never exactly coplanar with
   the body's cap faces (coplanar faces are a common cause of EXACT-solver
   boolean failures).
-- **`annulus_gear.py` was rewritten to skip the boolean entirely** —
-  direct bmesh construction (inner toothed wall, outer cylindrical wall,
-  two caps), no cutter object, no `EXACT` solver call. Measured ~80-180x
-  faster (295ms-5.8s boolean-based vs 3.7-35ms direct, for tooth counts
-  8-100) — it was the slowest generator in the family before this change.
-  The two caps are the interesting part: they're built with
-  `bmesh.ops.triangle_fill` fed the boundary edges of **both** the inner
-  (toothed) loop and the outer (circular) loop together in one call,
-  which triangulates the annular region between them directly (treating
-  the inner loop as a hole), rather than hand-bridging the two loops with
-  an index-matched strip of quads. A matched-angle bridge looks like the
-  obvious approach (one outer point per inner-profile point, at the same
-  angle) but doesn't work: the tooth profile inserts a dedendum-circle
-  point at the same angle as its neighbor wherever `base_r > ded_r` (a
-  genuine straight undercut-flank segment, not a bug), and bridging to a
-  same-angle outer point puts three points on the same ray through the
-  origin — an unavoidably zero-area triangle regardless of how the
-  resulting quad gets split. Confirmed by testing: a matched-angle outer
-  ring reintroduces non-manifold edges and zero-area faces at low tooth
-  counts (8/15/20); treating the outer ring as a fully independent,
-  separately-spaced circle and letting `triangle_fill` reconcile the two
-  loops does not. See [annulus_gear.md](annulus_gear.md#build-method) for
-  the full writeup.
-- Where a boolean cutter is STILL used (helical/herringbone annulus,
-  planetary rings), concave/star-shaped end **caps on that cutter** use
-  `bmesh.ops.triangle_fill` on its own single boundary loop, not a
-  center-fan. This used to be reversed — center-fan from an added interior
-  vertex, on the theory that triangle-fill could produce self-intersecting
-  triangles on a concave polygon that the CGAL EXACT solver would then
-  reject. That theory didn't hold up: `triangle_fill` was tested directly
-  against these exact profiles (tooth counts 8 through 100) and produced 0
-  self-intersections, while the center-fan approach had a real, confirmed
-  defect the fan reasoning missed — the same collinear dedendum-circle
-  point described above degenerates a fan triangle to exactly zero area.
-  That looked harmless (a zero-area triangle covers no area) but wasn't:
-  its short edge is shared with a side-wall face, so the mesh depends on
-  that face existing to stay edge-manifold, even though it contributes
-  nothing to visible volume. Dropping it outright (an intermediate fix,
-  since discarded) turned the edge into a non-manifold boundary instead —
+- **All three annulus generators were rewritten to skip the boolean
+  entirely** — direct bmesh construction (inner toothed wall, outer
+  cylindrical wall, two caps), no cutter object, no `EXACT` solver call.
+  Measured 10-180x faster across the three (295ms-5.8s boolean-based vs
+  3.7-208ms direct, for tooth counts 8-100) — the annulus family was the
+  slowest in the whole gear family before this change. The two caps are
+  the interesting part: they're built with `bmesh.ops.triangle_fill` fed
+  the boundary edges of **both** the inner (toothed) loop and the outer
+  (circular) loop together in one call, which triangulates the annular
+  region between them directly (treating the inner loop as a hole),
+  rather than hand-bridging the two loops with an index-matched strip of
+  quads. A matched-angle bridge looks like the obvious approach (one outer
+  point per inner-profile point, at the same angle) but doesn't work: the
+  tooth profile inserts a dedendum-circle point at the same angle as its
+  neighbor wherever `base_r > ded_r` (a genuine straight undercut-flank
+  segment, not a bug), and bridging to a same-angle outer point puts three
+  points on the same ray through the origin — an unavoidably zero-area
+  triangle regardless of how the resulting quad gets split. Confirmed by
+  testing: a matched-angle outer ring reintroduces non-manifold edges and
+  zero-area faces at low tooth counts (8/15/20); treating the outer ring
+  as a fully independent, separately-spaced circle and letting
+  `triangle_fill` reconcile the two loops does not. For the two twisted
+  variants, the outer ring additionally stays PLAIN and UNTWISTED (only 2
+  Z-layers) — only the inner teeth twist. See
+  [annulus_gear.md](annulus_gear.md#build-method) for the full writeup and
+  [helical_annulus_gear.md](helical_annulus_gear.md#build-method) /
+  [herringbone_annulus_gear.md](herringbone_annulus_gear.md#build-method)
+  for the twisted extensions.
+- All three annulus generators' pressure-angle clamps carry an extra
+  `PA_TRIANGLE_FILL_MARGIN_DEG` (0.2°) below the theoretical
+  self-intersection limit, not the limit itself. Right at that limit the
+  tooth tip's flank points become near-coincident — the old boolean-based
+  `EXACT` solver tolerated a profile sitting exactly there, but
+  `triangle_fill`'s constrained triangulation does not, and produced
+  hundreds of non-manifold edges without the margin.
+- Where a boolean cutter is STILL used (planetary rings), concave/
+  star-shaped end **caps on that cutter** use `bmesh.ops.triangle_fill` on
+  its own single boundary loop, not a center-fan. This used to be
+  reversed — center-fan from an added interior vertex, on the theory that
+  triangle-fill could produce self-intersecting triangles on a concave
+  polygon that the CGAL EXACT solver would then reject. That theory didn't
+  hold up: `triangle_fill` was tested directly against these exact
+  profiles (tooth counts 8 through 100) and produced 0 self-intersections,
+  while the center-fan approach had a real, confirmed defect the fan
+  reasoning missed — the same collinear dedendum-circle point described
+  above degenerates a fan triangle to exactly zero area. That looked
+  harmless (a zero-area triangle covers no area) but wasn't: its short
+  edge is shared with a side-wall face, so the mesh depends on that face
+  existing to stay edge-manifold, even though it contributes nothing to
+  visible volume. Dropping it outright (an intermediate fix, since
+  discarded) turned the edge into a non-manifold boundary instead —
   confirmed to produce hundreds of non-manifold edges on some tooth
   counts. Cluster-gear shoulders and bevel gears still use the center-fan
   approach — untouched, since they weren't confirmed to hit the same
