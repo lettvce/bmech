@@ -483,6 +483,10 @@ class OBJECT_OT_add_spur_gear(bpy.types.Operator):
     def bmech_sync_target(self, context):
         gear_matching.sync_module_pa(self, context.window_manager.bmech_gear_target)
 
+    def invoke(self, context, event):
+        gear_matching.reset_target(context)
+        return self.execute(context)
+
     module: FloatProperty(
         name="Module (mm)", default=1.0, min=0.1, max=50.0,
         description="Gear module — controls tooth size",
@@ -594,6 +598,10 @@ class OBJECT_OT_add_rack(bpy.types.Operator):
         gear_matching.sync_module_pa(self, target)
         if target is not None and "bmech_tooth_count" in target.keys():
             self.tooth_count_rack = target["bmech_tooth_count"]
+
+    def invoke(self, context, event):
+        gear_matching.reset_target(context)
+        return self.execute(context)
 
     module: FloatProperty(
         name="Module (mm)", default=1.0, min=0.1, max=50.0,

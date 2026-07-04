@@ -196,6 +196,10 @@ class OBJECT_OT_annulus_gear(bpy.types.Operator):
     def bmech_sync_target(self, context):
         gear_matching.sync_module_pa(self, context.window_manager.bmech_gear_target)
 
+    def invoke(self, context, event):
+        gear_matching.reset_target(context)
+        return self.execute(context)
+
     tooth_count:        IntProperty(  name="Tooth Count",          default=40,   min=8,    soft_max=200,
                                       description="Internal gear tooth count; must exceed the mating pinion count")
     module:             FloatProperty(name="Module (mm)",           default=2.0,  min=0.1,  soft_max=20.0,

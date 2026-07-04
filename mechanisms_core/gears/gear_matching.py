@@ -154,6 +154,23 @@ def _on_target_change(wm, context):
         op.bmech_sync_target(context)
 
 
+def reset_target(context):
+    """
+    Clear the Match Target picker. bmech_gear_target lives on WindowManager
+    (see the module docstring for why), which means its value otherwise
+    persists across unrelated operator invocations within the same
+    session — pick a target for one gear, and the NEXT, unrelated gear you
+    create would silently start pre-matched to it too.
+
+    Call this from each gear operator's invoke() specifically, not
+    execute(): invoke() only runs once, when the operator starts fresh
+    (e.g. from the Add menu), while execute() also re-runs on every
+    redo-panel property tweak — resetting there would wipe out the user's
+    own target selection the moment they adjusted any other property.
+    """
+    context.window_manager.bmech_gear_target = None
+
+
 def register():
     bpy.types.WindowManager.bmech_gear_target = PointerProperty(
         name="Match Target", type=bpy.types.Object,

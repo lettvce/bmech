@@ -108,6 +108,10 @@ class OBJECT_OT_bevel_gear(bpy.types.Operator):
     def bmech_sync_target(self, context):
         gear_matching.sync_bevel(self, context.window_manager.bmech_gear_target)
 
+    def invoke(self, context, event):
+        gear_matching.reset_target(context)
+        return self.execute(context)
+
     tooth_count:        IntProperty(  name="Tooth Count",        default=16,   min=8,    soft_max=120,
                                       description="Tooth count of this gear")
     mate_teeth:         IntProperty(  name="Mate Teeth",         default=16,   min=8,    soft_max=120,
