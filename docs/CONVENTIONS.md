@@ -117,6 +117,85 @@ carry them forward into every future family doc:
   and
   [ratchets/README.md#fdm-compensation-vs-running-clearance--two-different-things-dont-conflate-them](ratchets/README.md#fdm-compensation-vs-running-clearance--two-different-things-dont-conflate-them).)
 
+## The "Match Target" pattern — letting one part's output drive another's properties
+
+Gears are the only family that has this today (`gears/gear_matching.py`),
+but the underlying technique isn't gear-specific — anything where one
+generated part's dimensions should drive another's (a bolt matched to a
+nut's thread, a bearing matched to a shaft's OD) would hit the same set of
+Blender API gotchas. If you build this for another family, these are the
+things that actually bit us getting it right for gears, not obvious from
+reading the finished code:
+
+- **The picker has to live on `WindowManager`, not the operator.**
+  `bpy.types.Operator` cannot hold a `PointerProperty` to an `Object` —
+  Blender silently drops that property **and everything declared after it
+  in the class** on registration. No error, no warning; properties just
+  stop showing up in the panel. Put the picker on `WindowManager` instead,
+  and have each participating operator implement its own
+  `bmech_sync_target(context)` method that a single shared `update`
+  callback (via `context.active_operator`) dispatches to.
+- **Freeze only what the sync actually drives, and only for target kinds
+  that drive it** — not blanket-freeze every matchable property whenever
+  any target is picked. Check whether *this specific* target carries the
+  custom-property keys your sync function reads before disabling the
+  corresponding field in `draw()`. A target that doesn't stamp a given
+  property should leave the matching field editable, since the sync
+  function will never touch it for that target and the user still needs
+  to set it by hand.
+- **Reset the picker in `invoke()`, never in `execute()`.** A
+  `WindowManager` property persists across unrelated operator
+  invocations, so a target picked for one part would silently carry over
+  to the next, unrelated part unless you clear it. But `execute()` also
+  re-runs on every redo-panel property tweak — resetting there wipes out
+  the user's own selection the moment they touch any other field.
+  `invoke()` only fires once, on a genuinely fresh creation, so it's the
+  only place to clear it.
+- **Treat a reset-to-`None` as a no-op in the update callback — don't let
+  it trigger a sync or rebuild.** This one caused a real, confirmed bug:
+  clearing the picker back to empty (from the `invoke()` reset above) is
+  itself a value change, and fires the same `update` callback a genuine
+  pick does. If that callback doesn't special-case `None`, it tries to
+  sync/rebuild using whatever `context.active_operator` still points at —
+  which, at that exact moment, is the *previous* part, not the new one
+  being created. The result was the previous part getting deleted and
+  rebuilt at wherever the 3D cursor happened to be by then. Bail out
+  immediately when the new value is `None`; there's nothing meaningful to
+  sync from an empty target regardless of why it became empty.
+- **Rebuilding the object live when a target is picked needs to avoid
+  `bpy.ops.ed.undo()`.** Picking a target doesn't trigger Blender's own
+  redo-panel auto-rerun — that only watches the operator's *own* bound
+  properties for changes, and the picker lives elsewhere. `ed.undo()`
+  looks like the natural way to mirror what a real redo-panel edit does
+  internally, but calling it from inside a property update callback is a
+  fragile combination — confirmed to delete the object being edited
+  without rebuilding it. The safer approach leans on a convention this
+  whole codebase already follows: every generator's `execute()` ends by
+  deselecting everything else and selecting + activating exactly what it
+  built. That means the update callback can just delete whatever's
+  currently selected + active (plus its now-orphaned mesh data, if any)
+  and call `execute()` again directly — no undo stack involved.
+- **This whole feature category is invisible to headless testing.**
+  `context.active_operator` is always `None` in `blender --background`
+  scripts, and invoking an operator with `'INVOKE_DEFAULT'` collapses to
+  calling `execute()` directly rather than dispatching to a custom
+  `invoke()` — there's no real window/event system in background mode for
+  either to hook into. Neither the sync-on-pick, the reset-on-invoke, nor
+  the rebuild-on-pick behavior can be exercised by any headless script.
+  If you build this pattern elsewhere, budget for manual GUI verification
+  of these specific behaviors — a clean headless test run does not cover
+  them.
+- **A loose target poll (accept any object stamped with the right custom
+  property, without checking its specific "kind") is a feature, not a
+  gap.** For gears this means nothing stops picking a bevel gear as the
+  target for a rack — and that turned out to be mechanically correct to
+  allow, not just permissive: cross-kind matches can be legitimate
+  (sharing a pitch circle across a compound-gear hub, for instance) even
+  when the two parts wouldn't mesh directly. Don't tighten a target poll
+  to "same kind only" without a concrete reason — see
+  [gears/README.md#the-match-target-system-gear_matchingpy](gears/README.md#the-match-target-system-gear_matchingpy)
+  for the specific case this came up in.
+
 ## Two different philosophies for sharing code between primitives — both are intentional
 
 The gear family centralizes shared logic in one helper module

@@ -100,12 +100,30 @@ Every gear operator that finishes successfully stamps custom properties
 applicable `bmech_tooth_count`, `bmech_helix_angle_deg`, `bmech_hand`) onto
 the object it creates, via `gear_matching.stamp_gear(...)`.
 
-Every gear operator also exposes a **Match Target** object picker
-(`target`, a `PointerProperty`). Its poll function
-(`gear_matching.gear_target_poll`) accepts any mesh object carrying a
-`bmech_module` property — it does **not** check `bmech_kind`, so nothing
-stops you from picking a bevel gear as the target for a rack. Meshing
-correctness is on you; the system only saves you from retyping numbers.
+Every gear operator also exposes a **Match Target** object picker, drawn
+via `layout.prop(context.window_manager, "bmech_gear_target", ...)`. This
+lives on `WindowManager`, **not** as a `PointerProperty` on the operator
+itself — `bpy.types.Operator` can't hold a `PointerProperty` to an
+`Object` (Blender silently drops that property and everything declared
+after it in the class on registration), which is exactly the mistake this
+system exists to avoid repeating. Each operator instead implements
+`bmech_sync_target(self, context)`, and a shared `update` callback on the
+WindowManager property (`gear_matching._on_target_change`) dispatches to
+whichever operator `context.active_operator` currently points at. See
+[CONVENTIONS.md#the-match-target-pattern--letting-one-parts-output-drive-anothers-properties](../CONVENTIONS.md#the-match-target-pattern--letting-one-parts-output-drive-anothers-properties)
+for the full list of Blender-API gotchas this pattern runs into — that
+section is written to generalize to any future family that wants the same
+kind of cross-object matching, not just gears.
+
+The poll function (`gear_matching.gear_target_poll`) accepts any mesh
+object carrying a `bmech_module` property — it does **not** check
+`bmech_kind`, so nothing stops you from picking a bevel gear as the target
+for a rack. This is deliberate, not an oversight: cross-kind matches are
+sometimes mechanically real (a helical gear meshing with one half of a
+herringbone gear, both sharing module/pressure-angle/helix/hand) and
+sometimes represent a shared-hub relationship rather than a direct mesh
+(see the spur-gear case below) — the system only saves you from retyping
+numbers, meshing correctness is on you either way.
 
 Picking a target runs one of four sync helpers, chosen by what kind of
 pair the operator represents:
@@ -117,9 +135,27 @@ pair the operator represents:
 | `sync_helical_same` | + helix angle, **same** hand | helical/herringbone annulus gears |
 | `sync_bevel` | module, pressure angle, target's tooth count → this gear's `mate_teeth` | bevel gears |
 
+**A spur-gear target never drives helix angle or hand**, even when the
+gear being created is helical or herringbone. `stamp_gear` never writes
+`bmech_helix_angle_deg`/`bmech_hand` for a `"spur"` kind, so
+`sync_helical_opposite`'s `if "bmech_helix_angle_deg" in target.keys()`
+guards simply skip for a spur target — only module and pressure angle get
+pulled in. This isn't a gap to fix: a plain spur gear and a helical gear
+can't correctly mesh on a standard parallel-shaft arrangement regardless
+of matched module/pressure-angle (the tooth angles don't align), so
+matching a helical/herringbone gear to a spur target represents "shares a
+pitch circle" (e.g. a compound gear with a spur section on the same hub),
+not "these teeth mesh directly" — helix angle and hand are the twisted
+section's own properties to set, not something a non-twisted target could
+meaningfully specify. `helical_gear.py`/`herringbone_gear.py`'s `draw()`
+reflects this directly: `module`/`pressure_angle_deg` are frozen whenever
+any target is set, but `helix_angle_deg`/`hand` are only frozen when the
+target actually has `bmech_helix_angle_deg` — i.e. when it's a
+helical/herringbone target, not a spur one.
+
 Gear-set primitives (planetary/cluster/compound) don't participate in this
 system at all — they build their own internally-consistent meshes in one
-shot and never call `stamp_gear` or read a `target`.
+shot and never call `stamp_gear` or read the target.
 
 ## Bore holes and FDM compensation
 
