@@ -49,8 +49,11 @@ Boolean-only, **no Solidify modifier** (unlike the spur gear): a solid
 outer cylinder is built at `outer_r` × `width_mm`, then the annulus cutter
 profile is extruded into its own solid (`-BOOL_EPSILON` to
 `width_mm + BOOL_EPSILON`) and boolean-DIFFERENCEd out (`EXACT` solver,
-applied, cutter object deleted). Cap triangulation uses the family-wide
-center-fan convention, not `triangle_fill` (see [README.md](README.md)).
+applied, cutter object deleted). Cap triangulation uses `bmesh.ops.triangle_fill`
+on the boundary edge loop, not a center-fan — see [README.md](README.md)
+for why the fan approach was replaced (it silently produced degenerate
+zero-area cap faces at some tooth counts, which then caused a real
+non-manifold defect once a fix attempt tried dropping them).
 
 No hand or helix concept anywhere in this generator — it's a pure
 straight-tooth internal gear.

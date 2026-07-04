@@ -43,8 +43,9 @@ artifacts at the bottom face. `hand_sign` is `+1` for `RIGHT`, `-1` for
 `LEFT`, same convention as every other helical primitive.
 
 `z` range for the cutter is extended `±BOOL_EPSILON` past the body, same as
-every other boolean cutter in this family. Cap triangulation is
-center-fan.
+every other boolean cutter in this family. Cap triangulation uses
+`bmesh.ops.triangle_fill` on the boundary edge loop, not center-fan — see
+[README.md](README.md) for why.
 
 Total twist (`width_mm * tan(helix_angle) / pitch_radius`) and normal
 module (`module * cos(helix_angle)`) are shown as read-only info lines.

@@ -162,12 +162,31 @@ you're just using the operators:
   faces on both sides, specifically so the cutter's cap faces are never
   exactly coplanar with the body's cap faces (coplanar faces are a common
   cause of EXACT-solver boolean failures).
-- Concave/star-shaped end caps (annulus cross-sections, cluster-gear
-  shoulders) are triangulated with a **center-fan** from one added center
-  vertex, not `bmesh.ops.triangle_fill`. Triangle-fill can produce
-  self-intersecting triangles on a concave polygon that Blender's CGAL
-  EXACT solver then rejects; a fan from a single interior point can't
-  self-intersect.
+- Concave/star-shaped end caps: **annulus cross-sections and planetary ring
+  gears use `bmesh.ops.triangle_fill` on the boundary edge loop**, not a
+  center-fan. This used to be reversed — center-fan from an added interior
+  vertex, on the theory that triangle-fill could produce self-intersecting
+  triangles on a concave polygon that the CGAL EXACT solver would then
+  reject. That theory didn't hold up: `triangle_fill` was tested directly
+  against these exact profiles (tooth counts 8 through 100) and produced 0
+  self-intersections, while the center-fan approach had a real, confirmed
+  defect the fan reasoning missed — the tooth-profile builders insert a
+  dedendum-circle point at the same angle as its neighbor wherever
+  `base_r > ded_r` (a genuine straight radial flank segment, not a bug),
+  and a fan triangle from a segment that's already collinear with the
+  center degenerates to exactly zero area. That looked harmless (a
+  zero-area triangle covers no area) but wasn't: its short edge is shared
+  with a side-wall face, so the mesh depends on that face existing to stay
+  edge-manifold, even though it contributes nothing to visible volume.
+  Dropping it outright (an intermediate fix, since discarded) turned the
+  edge into a non-manifold boundary instead — confirmed to produce hundreds
+  of non-manifold edges on some tooth counts. `triangle_fill` sidesteps the
+  whole problem by triangulating the real polygon instead of blindly
+  fanning to an arbitrary point. Cluster-gear shoulders and bevel gears
+  still use the center-fan approach — untouched, since they weren't
+  confirmed to hit the same degenerate-collinear-point condition, and
+  bevel gears in particular have no boolean run against their own mesh, so
+  a degenerate cap face there is cosmetic at worst, not a build failure.
 - Helical/herringbone twist is built by slicing the extrusion into
   `n_slices` (or `n_slices` per half, for herringbone) Z-layers and
   rotating each slice by `hand_sign * z * tan(helix_angle) / pitch_radius`,

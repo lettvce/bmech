@@ -155,30 +155,41 @@ def _make_helical_cutter(context, cutter_profile, width_mm, hand_sign, ha_rad,
                     for x, y in cutter_profile]
         slices.append(verts)
 
-    # Center vertices for fan-triangulated caps (one per cap face).
-    c_bot = bm.verts.new((0.0, 0.0, z_bot))
-    c_top = bm.verts.new((0.0, 0.0, z_top))
-
     bm.verts.index_update()
 
-    # Side walls
+    # Boundary ring edges for the two capped ends, created explicitly and
+    # BEFORE the side walls so triangle_fill (below) has them to work with;
+    # the side-wall faces.new() calls further down reuse these same edges
+    # automatically rather than creating duplicates.
+    bot_edges = [bm.edges.new([slices[0][i], slices[0][(i + 1) % n]]) for i in range(n)]
+    top_edges = [bm.edges.new([slices[-1][i], slices[-1][(i + 1) % n]]) for i in range(n)]
+
+    # Caps: bmesh's constrained triangle_fill on the boundary loop, not a
+    # fan to a center vertex. _build_annulus_cutter_profile inserts a
+    # dedendum-circle point at the SAME angle as its neighbor wherever
+    # base_r > ded_r (the straight radial segment representing an
+    # undercut flank below the base circle) — real, correct tooth geometry,
+    # not a mistake, but a fan triangle from that segment to the center
+    # degenerates to exactly zero area since all three points are collinear
+    # (a shared twist rotation doesn't change that). A zero-area triangle
+    # looks harmless but isn't: its short edge is shared with a side-wall
+    # face, so naively dropping the triangle turns that edge into a
+    # non-manifold boundary edge instead. triangle_fill avoids the
+    # degenerate case entirely by triangulating the actual polygon rather
+    # than blindly fanning to an arbitrary point — verified directly (0
+    # zero-area faces, 0 non-manifold edges across tooth counts from 8 to
+    # 100, including cases that previously produced hundreds of
+    # non-manifold edges).
+    bmesh.ops.triangle_fill(bm, use_beauty=True, edges=bot_edges)
+    bmesh.ops.triangle_fill(bm, use_beauty=True, edges=top_edges)
+
+    # Side walls (reuse the boundary edges created above for k=0 and k=n_slices-2)
     for k in range(n_slices - 1):
         bot = slices[k]
         top = slices[k + 1]
         for i in range(n):
             ni = (i + 1) % n
             bm.faces.new([bot[i], bot[ni], top[ni], top[i]])
-
-    # Caps: fan triangulation from a center point.
-    # For any star-shaped (radially visible) profile these triangles are guaranteed
-    # flat, non-overlapping, and manifold — unlike triangle_fill on a concave polygon,
-    # which can produce self-intersecting tris that CGAL EXACT solver rejects.
-    for i in range(n):
-        ni = (i + 1) % n
-        bm.faces.new([c_bot, slices[0][ni], slices[0][i]])    # bottom, normal −Z
-    for i in range(n):
-        ni = (i + 1) % n
-        bm.faces.new([c_top, slices[-1][i], slices[-1][ni]])  # top, normal +Z
 
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
 

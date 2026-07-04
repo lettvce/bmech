@@ -255,23 +255,39 @@ def _make_herringbone_cutter_obj(context, cutter_profile, width_mm,
         twist = hand_sign * (width_mm + BOOL_EPSILON - z) * tan(ha_rad) / pitch_r
         all_slices.append(_slice(z, twist))
 
-    c_bot = bm.verts.new((0.0, 0.0, all_slices[0][0].co.z))
-    c_top = bm.verts.new((0.0, 0.0, all_slices[-1][0].co.z))
     bm.verts.index_update()
 
+    # Boundary ring edges for the two capped ends, created explicitly and
+    # BEFORE the side walls so triangle_fill (below) has them to work with;
+    # the side-wall faces.new() calls further down reuse these same edges
+    # automatically rather than creating duplicates.
+    bot_edges = [bm.edges.new([all_slices[0][i], all_slices[0][(i + 1) % n]]) for i in range(n)]
+    top_edges = [bm.edges.new([all_slices[-1][i], all_slices[-1][(i + 1) % n]]) for i in range(n)]
+
+    # Caps: bmesh's constrained triangle_fill on the boundary loop, not a
+    # fan to a center vertex. cutter_profile inserts a dedendum-circle
+    # point at the SAME angle as its neighbor wherever base_r > ded_r (the
+    # straight radial segment representing an undercut flank below the
+    # base circle) — real, correct tooth geometry, not a mistake, but a fan
+    # triangle from that segment to the center degenerates to exactly zero
+    # area since all three points are collinear (a shared twist rotation
+    # doesn't change that). A zero-area triangle looks harmless but isn't:
+    # its short edge is shared with a side-wall face, so naively dropping
+    # the triangle (an earlier attempt at this fix) turns that edge into a
+    # non-manifold boundary edge instead. triangle_fill avoids the
+    # degenerate case entirely by triangulating the actual polygon rather
+    # than blindly fanning to an arbitrary point.
+    bmesh.ops.triangle_fill(bm, use_beauty=True, edges=bot_edges)
+    bmesh.ops.triangle_fill(bm, use_beauty=True, edges=top_edges)
+
+    # Side walls (reuse the boundary edges created above for the first and
+    # last slice pairs)
     for k in range(len(all_slices) - 1):
         bot = all_slices[k]
         top = all_slices[k + 1]
         for i in range(n):
             ni = (i + 1) % n
             bm.faces.new([bot[i], bot[ni], top[ni], top[i]])
-
-    for i in range(n):
-        ni = (i + 1) % n
-        bm.faces.new([c_bot, all_slices[0][ni], all_slices[0][i]])
-    for i in range(n):
-        ni = (i + 1) % n
-        bm.faces.new([c_top, all_slices[-1][i], all_slices[-1][ni]])
 
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
     me = bpy.data.meshes.new(mesh_name)
