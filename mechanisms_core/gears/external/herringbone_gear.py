@@ -143,6 +143,17 @@ def _apply_bore(context, obj, bore_r, total_width):
     mod.object    = cutter
     mod.solver    = 'EXACT'
 
+    # modifier_apply's poll requires the active object to also be the ONLY
+    # selected one — temp_override(active_object=obj) alone doesn't select
+    # it, so if a previously-created gear is still selected from an earlier
+    # call, the poll silently fails (returns CANCELLED, not an exception)
+    # and the bore modifier is left un-applied, then the cutter gets
+    # deleted below anyway, leaving the modifier pointing at nothing (no
+    # visible bore at all). Deselect everything and select obj explicitly
+    # first, same pattern as hex_bolt.py/hex_nut.py's _bool_diff.
+    bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    context.view_layer.objects.active = obj
     with context.temp_override(active_object=obj):
         bpy.ops.object.modifier_apply(modifier="Bore")
 
@@ -199,12 +210,15 @@ class OBJECT_OT_herringbone_gear(bpy.types.Operator):
         ha_rad, pitch_r, ded_r, add_r, half_h, peak_twist, normal_module, bore_r, pa_max = self._derived()
 
         layout.prop(context.window_manager, "bmech_gear_target", text="Match Target")
+        has_target = context.window_manager.bmech_gear_target is not None
         col = layout.column(align=True)
         col.prop(self, "tooth_count")
-        col.prop(self, "module")
-        col.prop(self, "pressure_angle_deg")
-        col.prop(self, "helix_angle_deg")
-        col.prop(self, "hand")
+        driven = col.column(align=True)
+        driven.enabled = not has_target
+        driven.prop(self, "module")
+        driven.prop(self, "pressure_angle_deg")
+        driven.prop(self, "helix_angle_deg")
+        driven.prop(self, "hand")
 
         layout.separator()
         col = layout.column(align=True)
