@@ -153,6 +153,27 @@ any target is set, but `helix_angle_deg`/`hand` are only frozen when the
 target actually has `bmech_helix_angle_deg` — i.e. when it's a
 helical/herringbone target, not a spur one.
 
+**Even when a helical/herringbone target *does* drive `helix_angle_deg`,
+`hand` specifically stays editable if the two sides are different
+styles** (one plain helical, one herringbone) — `gear_matching.
+hand_target_ambiguous(self_is_herringbone, target)`. A herringbone tooth
+is two mirrored helical halves (bottom twists one way, top the other); a
+plain helical tooth is a single constant-angle line. A plain helical gear
+can only mesh correctly against **one** half of a herringbone gear at a
+time, and which hand is correct depends on which half — the sync can only
+assume one convention (matching the target's bottom half, per
+`herringbone_gear.py`'s own `hand` property being defined relative to its
+bottom half) as a default, so it's wrong to lock the field when the
+design might actually engage the top half instead. This is NOT the same
+condition as the spur-target case above — `helix_angle_deg`'s *magnitude*
+stays frozen in the cross-style case (it's unambiguous regardless of
+which half is engaged), only `hand` reopens. Same-style pairs (helical↔
+helical, herringbone↔herringbone) have no such ambiguity — a herringbone
+meshes a herringbone across its full width by design — and freeze `hand`
+normally, including across the external/annulus boundary (an external
+helical pinion matching a helical annulus target is still same-style, so
+`hand` stays frozen there too).
+
 Gear-set primitives (planetary/cluster/compound) don't participate in this
 system at all — they build their own internally-consistent meshes in one
 shot and never call `stamp_gear` or read the target.
