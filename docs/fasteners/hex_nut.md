@@ -3,9 +3,12 @@
 `fasteners/hex_nut.py` → `OBJECT_OT_hex_nut` (`object.hex_nut`, "Hex Nut")
 
 A hex thru-nut — internal thread cut all the way through a hex prism.
-Reuses `threaded_fastener.py`'s Internal+Additive thread math by
-duplication, same as [hex_bolt.md](hex_bolt.md) does for External+
-Additive — see
+Built **subtractively**: a helical groove cutter differenced out of the
+prism first, then a plain pilot bore differenced out second, then welded
+clean with a Merge by Distance pass — no separate thread ridge is ever
+unioned in. Reuses `threaded_fastener.py`'s thread math
+(`_thread_params`, `_build_helix`, `_external_profile` as the cutter) by
+duplication, same convention as [hex_bolt.md](hex_bolt.md) — see
 [README.md](README.md#this-family-does-not-share-a-helper-module--and-thats-deliberate).
 This file contains the clearest statement in the codebase of *why* that
 duplication exists:
@@ -27,29 +30,62 @@ duplication exists:
 | `resolution` | Int | 32 | 8–128 (soft) | |
 | `inner_compensation_mm` | Float (mm) | 0.0 | 0.0–0.5 (soft) | Added to thread major radius — printed holes come out tight |
 
-## Build method — three steps, in this order
+## Build method — two different coincidence problems, two different fixes
 
-1. **Cut a plain round bore** through the hex prism, sized to the
-   thread's **root diameter** (`major_r`, minus a small overlap — same
-   `overlap = max(0.02, min(0.2*depth, 0.15))` formula as `hex_bolt.py`),
-   not the minor diameter. Cutting to the minor diameter would leave the
-   body already solid where the ridge needs to sit, making the next step
-   a no-op — you'd get a hole with no threads. The cutter is padded
-   `±BOOL_EPSILON` past both ends of `z_height_mm` (safe for a
-   subtractive cutter — over-cutting past a boundary is harmless).
-2. **Union the internal-thread ridge** (`_internal_profile` +
-   `_build_helix`) onto that bore. Unlike the bore cutter, this ridge
-   gets **no** `±BOOL_EPSILON` padding — the source draws this contrast
-   explicitly: "This ridge gets UNIONed (added), so any extension past
-   the nut's real z=0..z_height range would show up as a visible nub
-   poking out the top/bottom faces." Additive and subtractive steps need
-   opposite padding conventions; see
-   [README.md](README.md#boolean-solver-patterns-specific-to-this-family).
-3. **Intersect against a clean Z-bound** cylinder spanning exactly
-   `[0, z_height_mm]`. This exists to correct `_build_helix`'s own
-   overshoot — its step count always rounds up, so the ridge from step 2
-   can protrude slightly past the nut's nominal height without this final
-   clip.
+This construction produces two DIFFERENT kinds of coincident surface, and
+conflating them — fixing both the same way — reintroduces whichever bug
+that one approach doesn't cover. They need to be understood separately:
+
+1. **Difference the thread cutter FIRST** (`_external_profile` +
+   `_build_helix`, with `root_flat` passed into the profile's `crest_flat`
+   slot — see the module docstring) out of the solid hex prism: **exactly**
+   `major_r` radially (no outward padding), but **half a pitch** of
+   overshoot past **both** `z=0` and `z=z_height_mm` axially.
+2. **Cut a plain pilot bore SECOND** (after the thread cutter, not before)
+   through the same prism, sized to `minor_r + BOOL_EPSILON` — a hairline
+   OVER the true minor diameter, not exactly equal to it. Z is padded
+   `±BOOL_EPSILON` past both ends of `z_height_mm` to guarantee a full
+   through-cut.
+3. **Merge by Distance** (`bmesh.ops.remove_doubles`, a small fixed
+   tolerance) on the resulting mesh, which cleans up whatever coincident
+   geometry remains from steps 1-2.
+
+**Radial coincidence (`minor_r`):** the pilot bore's wall and the thread
+cutter's own root-flat faces are both nominally at `minor_r`. An earlier
+version of this file cut the pilot bore *first*, sized to *exactly*
+`minor_r`, then differenced the thread cutter afterward — undersizing the
+bore the way `hex_bolt.py`'s `overlap` pattern would (shrinking it further)
+left a real, physical, uncut lip at the bore's mouth, narrower than the
+true minor diameter, since undersizing the bore before the thread cut
+leaves material the thread cutter doesn't reliably clear. Cutting the
+thread first and the pilot bore second — sized a hairline *over* `minor_r`
+rather than under it — avoids that lip while still breaking the exact
+radial coincidence.
+
+**Axial wind-up (`z=0` / `z=z_height_mm`):** a single-start helix cut
+exactly flush to the real end faces starts its very first ring — also its
+own flat end cap — before the thread profile has completed even a quarter
+turn, leaving a flat UNTHREADED band at both mouths of the nut (every angle
+reads a uniform `minor_r` there, not the oscillating crest/root pattern a
+real thread has). This is a dimensional defect, not a topological one — it
+can pass a min-radius-only check completely undetected, since the flat
+band happens to sit exactly at `minor_r` too. It needs axial overshoot, so
+the helix is already fully wound up by the time it reaches the real
+boundary. The overshoot amount matters: a FULL pitch — the more obviously
+"safe" choice — is actually the worst one, because it places the same
+profile phase at `z=0` that would land there anyway (the crest's return to
+`minor_r`), exactly coincident with the pilot bore's own wall over an
+extended stretch, which produced a genuine TORN HOLE in one configuration
+tested (real non-manifold boundary edges from a missing face — not
+duplicate geometry, so Merge by Distance can't weld it shut). **Half** a
+pitch lands a different, non-`minor_r` phase at `z=0` instead, avoiding
+that extra coincidence while still providing wind-up room.
+
+The cut ordering (thread first, bore second) and the `+ BOOL_EPSILON`
+pilot-bore sizing were arrived at through direct iteration in Blender by
+the maintainer, not independently re-verified in this repo's own headless
+test suite before shipping — see
+[README.md](README.md#boolean-solver-patterns-specific-to-this-family).
 
 ## Panel warnings
 

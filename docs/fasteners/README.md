@@ -12,7 +12,7 @@ code.
 | Primitive | File | Builds |
 |---|---|---|
 | Raw threaded fastener | `fasteners/threaded_fastener.py` | A thread helix solid, for manual boolean combination |
-| Hex bolt | `fasteners/hex_bolt.py` | Head + shank + external thread + tip, unioned into one part |
+| Hex bolt | `fasteners/hex_bolt.py` | Head + shank + tip blank, chained revolve, with the external thread cut out of it, head unioned on last |
 | Hex nut | `fasteners/hex_nut.py` | Hex prism with an internal thread cut through it |
 | Press-fit pin | `fasteners/press_fit_pin.py` | A tapered friction-fit pin + matching hole cutter, plus a face-alignment operator |
 
@@ -108,48 +108,102 @@ hole_diameter_mm = nominal_diameter_mm - half_interference + hole_diameter_compe
 ## Boolean-solver patterns specific to this family
 
 Fastener geometry leans on Blender's `EXACT` boolean solver far more
-heavily than the gear family (whole bolts and nuts are assembled from
-several unioned/differenced solids, not just one bore cut). Some patterns
-that show up repeatedly and are worth knowing before editing this code:
+heavily than the gear family. Both `hex_bolt.py` and `hex_nut.py` cut
+their threads **subtractively** — a helical groove cutter differenced out
+of a solid blank — rather than unioning a separate thread ridge onto an
+undersized core (`threaded_fastener.py`'s "Additive" modes still work
+that way, and are documented separately, but the two hex-part generators
+were rewritten off of it). A plain difference against a solid blank is a
+numerically easy case for the EXACT solver: the cutter naturally overlaps
+real material throughout, unlike a union of two independently-built,
+nearly-coincident curved surfaces. Some patterns that show up repeatedly
+and are worth knowing before editing this code:
 
-- **Union overlap is depth-scaled, not a fixed hairline epsilon.**
-  `hex_bolt.py` and `hex_nut.py` both compute
-  `overlap = max(0.02, min(0.2 * depth, 0.15))` and build the underlying
-  solid slightly larger than the thread ridge's true minor radius before
-  unioning the ridge onto it. Two nearly-coincident curved surfaces along
-  a full helix length are numerically fragile for the EXACT solver — a
-  hairline gap can be misread as a shared boundary and cancel material
-  instead of merging. A small but real volume of overlap avoids this.
+- **Cutter overlap is depth-scaled, not a fixed hairline epsilon —
+  `hex_bolt.py` only.** `hex_bolt.py` computes
+  `overlap = max(0.02, min(0.2 * depth, 0.15))` and builds the thread
+  cutter's crest reach slightly past the blank's true major radius before
+  differencing it, and overshoots the cutter one extra pitch past
+  `thread_length_mm` so the last crest doesn't dead-end flush at the
+  blank's own flat step (a hard-stop that used to make the thread fail to
+  start in a nut). Two nearly-coincident surfaces along a full helix
+  length are numerically fragile for the EXACT solver — a hairline gap
+  can be misread as a shared boundary and read as a no-op instead of a
+  genuine cut, or a cutter's flat end cap landing exactly on a real face
+  can leave the thread short of that face. A small but real volume of
+  overlap/overshoot avoids both.
+- **`hex_nut.py` mixes two different fixes for two different coincidences
+  — it is NOT simply "exact dimensions, no padding."** It differences the
+  thread cutter FIRST (exactly `major_r` radially, half a pitch of axial
+  overshoot past both `z=0` and `z=z_height_mm`), then cuts a plain pilot
+  bore SECOND, sized to `minor_r + BOOL_EPSILON` — a hairline over the true
+  minor diameter, not exactly equal to it. Treating both coincidences (the
+  radial one at `minor_r`, the axial one at the end faces) the same way
+  breaks one or the other:
+  - The **radial** coincidence (pilot bore wall vs. thread cutter's
+    root-flat faces, both nominally at `minor_r`) — an earlier version cut
+    the bore *first*, sized to exactly `minor_r`, and found that undersizing
+    it further the way `hex_bolt.py`'s `overlap` pattern would left a real,
+    physical, uncut lip at the bore's mouth, narrower than the true minor
+    diameter — not a cosmetic mesh artifact. Cutting the thread first and
+    the pilot bore second, oversized by a hairline rather than undersized,
+    avoids that lip while still breaking the coincidence.
+  - The **axial** coincidence (a helix cut flush to the real end faces
+    starts its own flat end cap before the thread profile has completed
+    even a quarter turn) is a dimensional defect, not a mesh-topology one
+    — the result is a flat UNTHREADED band at both mouths of the nut, and
+    Merge by Distance has nothing to weld there since nothing is
+    duplicated, just wrong-shaped. This needs axial overshoot instead, so
+    the helix is already wound up into a repeating cycle before reaching
+    the real boundary. Critically, the overshoot amount is **half** a
+    pitch, not a full one: a full-pitch shift looks like more margin but
+    actually lands the exact same profile phase (the crest's return to
+    `minor_r`) at `z=0` that would be there anyway — exactly coincident
+    with the pilot bore's own wall over an extended stretch, which produced
+    a genuine TORN HOLE in one configuration tested (real non-manifold
+    boundary edges from a missing face) that Merge by Distance cannot weld
+    shut, since there's no duplicate geometry, just an absent one. Half a
+    pitch lands a different, non-`minor_r` phase at `z=0` instead, avoiding
+    that extra coincidence while still giving the helix enough room to
+    fully engage.
+
+  The cut ordering and the `+ BOOL_EPSILON` pilot-bore sizing came from
+  direct iteration in Blender by the maintainer, not from this repo's own
+  headless verification suite — trust the working combination in the code
+  over re-deriving it from this explanation if they ever disagree. See
+  [hex_nut.md](hex_nut.md#build-method--two-different-coincidence-problems-two-different-fixes)
+  for the verified results (five thread sizes, M4–M12). If you're adding a
+  new subtractive-thread generator: match the *category* of fix to the
+  *category* of coincidence (load-bearing dimension → exact + merge;
+  wind-up/phase → overshoot, and check whether your specific overshoot
+  amount reproduces the boundary condition it was meant to avoid) rather
+  than copying one pattern wholesale.
 - **Chained revolves, not stacked independently-capped primitives.**
-  `hex_bolt.py`'s `_add_chained_revolve` builds the shank→thread-core→tip
+  `hex_bolt.py`'s `_add_chained_revolve` builds the shank→thread-blank→tip
   stack as one continuous solid sharing vertices at each junction, rather
   than three separately-capped cylinders touching end to end. Two
   independently-capped segments meeting at the same radius would produce
   duplicate coincident faces (each segment's own cap covering the
   identical disk) — a fragile degenerate case for the EXACT solver.
   Chaining through shared vertices means there's no internal face for
-  this to happen to.
-- **Blocky joins last, curved unions first.** `hex_bolt.py` unions the
-  thread ridge onto the core before unioning the hex head on, specifically
-  because a flush blocky join (hex prism onto a cylinder end) is far
-  friendlier to the EXACT solver than a thin curved union — sequencing
-  the riskier union earlier means any failure surfaces before the cheap,
-  reliable step, not after.
-- **Re-normalize after every union.** `_bool_union` in both files calls
+  this to happen to. The tip segment specifically is a flat perpendicular
+  step down to `tip_r` at the thread's own end Z, then a straight
+  non-tapered pin — not a cone, which would shrink the blank's diameter
+  while the constant-diameter thread cutter is still cutting through it
+  and cause the same hard-stop dead-end the cutter overshoot above fixes.
+- **Blocky joins last, cut-and-union sequencing matters.** `hex_bolt.py`
+  cuts the thread out of the blank before unioning the hex head on,
+  specifically because a flush blocky join (hex prism onto a cylinder end)
+  is far friendlier to the EXACT solver than the thread cut — sequencing
+  the riskier operation earlier means any failure surfaces before the
+  cheap, reliable step, not after.
+- **Re-normalize after union.** `hex_bolt.py`'s `_bool_union` calls
   `recalc_face_normals` on the result after applying the modifier and
   deleting the operand, because EXACT-solver unions of complex meshes can
   come back with inconsistent face winding even when topologically solid.
-- **Padding direction depends on additive vs. subtractive.** Subtractive
-  cutters (a bore, a hole) are over-extended `±BOOL_EPSILON` past the
-  target's real boundary — safe, since removing a little extra material
-  past an edge is harmless. Additive ridges/features get **no** such
-  padding — extending an additive union past the part's real boundary
-  would leave a visible nub poking out the other side. `hex_nut.py`'s
-  source draws this contrast explicitly at the ridge-union step.
-- **`_build_helix`'s step count rounds up**, so a thread helix can slightly
-  overshoot its requested height. `hex_nut.py` corrects for this with a
-  final `INTERSECT` boolean against a clean Z-bounded cylinder, guaranteeing
-  a flush top/bottom face regardless of the overshoot.
+  `_bool_diff` (used for all thread cuts in both files) hasn't needed this
+  in practice, but if you see winding issues after a difference, this is
+  the first thing to try.
 
 ## Validation: draw() warnings are often looser than the execute() gate
 
