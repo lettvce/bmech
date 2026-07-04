@@ -129,6 +129,7 @@ def _apply_bore(context, obj, bore_r, width_mm):
     me_cut.update()
 
     cutter = bpy.data.objects.new("__HGBore", me_cut)
+    cutter.location = obj.location.copy()
     context.collection.objects.link(cutter)
 
     mod           = obj.modifiers.new("Bore", 'BOOLEAN')

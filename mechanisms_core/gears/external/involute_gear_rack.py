@@ -440,6 +440,16 @@ def _apply_bore(context, obj, bore_r, width_mm):
     mod.object    = cutter
     mod.solver    = 'EXACT'
 
+    # modifier_apply's poll requires the active object to also be the ONLY
+    # selected one — temp_override(active_object=obj) alone doesn't select
+    # it, so if a previously-created gear is still selected from an earlier
+    # call, the poll silently fails (returns CANCELLED, not an exception)
+    # and this modifier is left un-applied. Deselect everything and select
+    # obj explicitly first, same pattern as hex_bolt.py/hex_nut.py's
+    # _bool_diff.
+    bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    context.view_layer.objects.active = obj
     with context.temp_override(active_object=obj):
         bpy.ops.object.modifier_apply(modifier="Bore")
 
@@ -499,7 +509,10 @@ class OBJECT_OT_add_spur_gear(bpy.types.Operator):
     def draw(self, context):
         layout = self.layout
         layout.prop(context.window_manager, "bmech_gear_target", text="Match Target")
-        layout.prop(self, "module")
+        has_target = context.window_manager.bmech_gear_target is not None
+        module_row = layout.row()
+        module_row.enabled = not has_target
+        module_row.prop(self, "module")
         layout.prop(self, "tooth_count")
         layout.prop(self, "pressure_angle_deg")
         layout.prop(self, "width_mm")
@@ -545,6 +558,14 @@ class OBJECT_OT_add_spur_gear(bpy.types.Operator):
         if self.bore_enable:
             bore_r = self.bore_diameter / 2.0 + self.bore_compensation
             if bore_r > 0 and bore_r < dedendum_radius:
+                # modifier_apply's poll requires the active object to also
+                # be the ONLY selected one — a previously-created gear left
+                # selected from an earlier call makes this silently fail
+                # (CANCELLED, not an exception) without the explicit
+                # deselect/select/activate below.
+                bpy.ops.object.select_all(action='DESELECT')
+                obj.select_set(True)
+                context.view_layer.objects.active = obj
                 with context.temp_override(active_object=obj):
                     bpy.ops.object.modifier_apply(modifier="Thickness")
                 _apply_bore(context, obj, bore_r, self.width_mm)

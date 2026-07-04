@@ -169,13 +169,20 @@ def _make_herringbone_mesh(module, tooth_count, pa_deg, width_mm,
 
     bm.verts.index_update()
 
-    c_bot = bm.verts.new((0.0, 0.0, 0.0))
-    c_top = bm.verts.new((0.0, 0.0, width_mm))
-    bm.verts.index_update()
-    for i in range(n):
-        ni = (i + 1) % n
-        bm.faces.new([c_bot, all_slices[0][i],   all_slices[0][ni]])
-        bm.faces.new([c_top, all_slices[-1][ni],  all_slices[-1][i]])
+    # Cap with a single n-gon over the whole profile ring, not a triangle
+    # fan to a center vertex. _build_gear_profile inserts a dedendum-circle
+    # point at the SAME angle as the adjacent involute departure point
+    # wherever base_r > ded_r, so two adjacent ring points can be exactly
+    # collinear with the origin — a fan triangle to the center then has
+    # exactly zero area (confirmed: 28/12 zero-area cap faces on the
+    # default sun/planet gears here before this fix). A single n-gon face
+    # has no center vertex and no per-point triangles, so this can't occur.
+    # Unlike _make_herringbone_cutter_obj below (the ring/annulus cutter),
+    # this is an EXTERNAL gear profile — not deeply concave enough to risk
+    # the self-intersecting-triangulation problem that function's fan-cap
+    # is deliberately avoiding, so switching this one to an n-gon is safe.
+    bm.faces.new(all_slices[0])
+    bm.faces.new(list(reversed(all_slices[-1])))
 
     for k in range(len(all_slices) - 1):
         bot = all_slices[k]

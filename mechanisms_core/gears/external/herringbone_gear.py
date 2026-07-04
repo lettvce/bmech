@@ -135,6 +135,7 @@ def _apply_bore(context, obj, bore_r, total_width):
     me_cut.update()
 
     cutter = bpy.data.objects.new("__HBBore", me_cut)
+    cutter.location = obj.location.copy()
     context.collection.objects.link(cutter)
 
     mod           = obj.modifiers.new("Bore", 'BOOLEAN')
@@ -261,13 +262,18 @@ class OBJECT_OT_herringbone_gear(bpy.types.Operator):
 
         bm.verts.index_update()
 
-        c_bot = bm.verts.new((0.0, 0.0, 0.0))
-        c_top = bm.verts.new((0.0, 0.0, self.width_mm))
-        bm.verts.index_update()
-        for i in range(n):
-            ni = (i + 1) % n
-            bm.faces.new([c_bot, all_slices[0][i],   all_slices[0][ni]])
-            bm.faces.new([c_top, all_slices[-1][ni],  all_slices[-1][i]])
+        # Cap the top/bottom with a single n-gon over the whole profile ring,
+        # not a triangle fan to a center vertex. The tooth profile inserts a
+        # dedendum-circle point at the SAME angle as the adjacent involute
+        # departure point wherever base_r > ded_r (see _build_tooth_profile),
+        # so two adjacent ring points can be exactly collinear with the
+        # origin — a fan triangle to the center then has exactly zero area.
+        # A single n-gon face has no center vertex and no per-point
+        # triangles, so this class of degenerate face can't occur; this
+        # matches how involute_gear_rack.py's profile_to_mesh_object and
+        # helical_gear.py cap their own profiles.
+        bm.faces.new(all_slices[0])
+        bm.faces.new(list(reversed(all_slices[-1])))
 
         for k in range(len(all_slices) - 1):
             bot = all_slices[k]
