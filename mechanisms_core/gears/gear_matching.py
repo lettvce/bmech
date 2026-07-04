@@ -151,7 +151,43 @@ def sync_bevel(op, target):
 def _on_target_change(wm, context):
     op = context.active_operator
     if op is not None and hasattr(op, "bmech_sync_target"):
+        # bmech_gear_target lives on WindowManager, not on the operator, so
+        # Blender's own redo-panel auto-rerun (which only watches the
+        # ACTIVE OPERATOR'S OWN properties for changes) never fires just
+        # because this property changed — bmech_sync_target below updates
+        # op.module etc. in memory, but the object in the viewport is left
+        # showing whatever it looked like before the target was picked.
+        #
+        # First attempt: bpy.ops.ed.undo() then op.execute(context) again,
+        # mirroring what Blender's redo panel does internally when you drag
+        # one of the operator's own property widgets. That's unsafe here —
+        # ed.undo() operates on the GLOBAL undo stack from inside a
+        # property update callback, a known-fragile combination, and
+        # testing confirmed it: it deleted the gear being created without
+        # rebuilding it.
+        #
+        # This is more targeted: every gear operator in this family ends
+        # its own execute() by deselecting everything else and selecting
+        # + activating exactly what it just built (`select_all(DESELECT)`,
+        # `obj.select_set(True)`, `objects.active = obj`) — so whatever is
+        # currently selected/active IS that operator's own prior result,
+        # nothing else, as long as nothing else has been clicked in the
+        # viewport since (the normal redo-panel workflow: adjust properties
+        # immediately after creation). Delete exactly that, then re-run
+        # execute() to rebuild in place instead of leaving stale geometry
+        # or creating a duplicate.
+        stale = list(context.selected_objects)
+        active = context.view_layer.objects.active
+        if active is not None and active not in stale:
+            stale.append(active)
+        for obj in stale:
+            mesh = obj.data if obj.type == 'MESH' else None
+            bpy.data.objects.remove(obj, do_unlink=True)
+            if mesh is not None and mesh.users == 0:
+                bpy.data.meshes.remove(mesh)
+
         op.bmech_sync_target(context)
+        op.execute(context)
 
 
 def reset_target(context):

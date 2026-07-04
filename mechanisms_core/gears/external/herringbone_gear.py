@@ -214,15 +214,26 @@ class OBJECT_OT_herringbone_gear(bpy.types.Operator):
         ha_rad, pitch_r, ded_r, add_r, half_h, peak_twist, normal_module, bore_r, pa_max = self._derived()
 
         layout.prop(context.window_manager, "bmech_gear_target", text="Match Target")
-        has_target = context.window_manager.bmech_gear_target is not None
+        target = context.window_manager.bmech_gear_target
+        has_target = target is not None
+        # A spur-gear target doesn't stamp bmech_helix_angle_deg/bmech_hand
+        # (see gear_matching.sync_helical_opposite and stamp_gear), so it
+        # never drives helix_angle_deg/hand — those stay editable even with
+        # a target set, since the match there is only "shares a pitch
+        # circle" (compound-gear hub), not "these teeth mesh directly".
+        # module/pressure_angle_deg ARE always driven by any target kind.
+        target_drives_helix = has_target and "bmech_helix_angle_deg" in target.keys()
+
         col = layout.column(align=True)
         col.prop(self, "tooth_count")
         driven = col.column(align=True)
         driven.enabled = not has_target
         driven.prop(self, "module")
         driven.prop(self, "pressure_angle_deg")
-        driven.prop(self, "helix_angle_deg")
-        driven.prop(self, "hand")
+        helix_driven = col.column(align=True)
+        helix_driven.enabled = not target_drives_helix
+        helix_driven.prop(self, "helix_angle_deg")
+        helix_driven.prop(self, "hand")
 
         layout.separator()
         col = layout.column(align=True)
