@@ -149,6 +149,17 @@ def sync_bevel(op, target):
 
 
 def _on_target_change(wm, context):
+    if wm.bmech_gear_target is None:
+        # Only a real target pick should trigger a sync + rebuild. This
+        # update callback also fires when reset_target() clears the picker
+        # back to empty at the start of every new gear's invoke() — treating
+        # THAT as a target change too was a real bug: it re-ran whatever
+        # operator context.active_operator still pointed at (the PREVIOUS
+        # gear, since the new one's operator hasn't started yet) using the
+        # 3D cursor's now-moved position, deleting and rebuilding the
+        # previous gear at the new cursor location. There's nothing
+        # meaningful to sync from an empty target anyway, so just return.
+        return
     op = context.active_operator
     if op is not None and hasattr(op, "bmech_sync_target"):
         # bmech_gear_target lives on WindowManager, not on the operator, so
