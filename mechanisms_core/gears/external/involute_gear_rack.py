@@ -655,9 +655,12 @@ class OBJECT_OT_add_rack(bpy.types.Operator):
     def draw(self, context):
         layout = self.layout
         target = context.window_manager.bmech_gear_target
+        has_target = target is not None
         layout.prop(context.window_manager, "bmech_gear_target", text="Match Target")
-        layout.prop(self, "module")
-        layout.prop(self, "pressure_angle_deg")
+        driven = layout.column(align=True)
+        driven.enabled = not has_target
+        driven.prop(self, "module")
+        driven.prop(self, "pressure_angle_deg")
         layout.prop(self, "length_mode")
         if self.length_mode == 'TOOTH_COUNT':
             layout.prop(self, "tooth_count_rack")

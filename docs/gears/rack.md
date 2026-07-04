@@ -32,6 +32,18 @@ No bore properties — a rack has no hub to bore.
   half a tooth pitch (X). If no target is set, this mode silently falls
   back to using `tooth_count_rack` as typed.
 
+`module`/`pressure_angle_deg` are frozen in the redo panel whenever any
+target is set (`sync_module_pa` always drives both), matching the
+convention every other gear generator in this family follows — see
+[README.md](README.md#the-match-target-system-gear_matchingpy).
+`tooth_count_rack` is handled differently: rather than graying it out, the
+panel replaces it entirely with a read-only "Teeth from target: N" label
+when `length_mode == 'MATCH_GEAR'` and a target with `bmech_tooth_count`
+is set, since in that mode the property isn't meaningfully "the same
+field, temporarily driven" — the rack's length is a wholly different
+concept (spanning the target's circumference) than the manual tooth count
+it replaces.
+
 ## Build method
 
 Same flat-profile-plus-Solidify approach as the spur gear:
