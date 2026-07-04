@@ -256,12 +256,25 @@ class OBJECT_OT_helical_annulus_gear(bpy.types.Operator):
         ha_rad, pitch_r, tip_r, root_r_inner, outer_r, total_twist, normal_module, pa_max = self._derived()
 
         layout.prop(context.window_manager, "bmech_gear_target", text="Match Target")
+        target = context.window_manager.bmech_gear_target
+        has_target = target is not None
+        # A spur/straight-annulus target doesn't stamp bmech_helix_angle_deg
+        # /bmech_hand (see gear_matching.sync_helical_same and stamp_gear),
+        # so it never drives helix_angle_deg/hand — those stay editable even
+        # with a target set. module/pressure_angle_deg ARE always driven by
+        # any target kind.
+        target_drives_helix = has_target and "bmech_helix_angle_deg" in target.keys()
+
         col = layout.column(align=True)
         col.prop(self, "tooth_count")
-        col.prop(self, "module")
-        col.prop(self, "pressure_angle_deg")
-        col.prop(self, "helix_angle_deg")
-        col.prop(self, "hand")
+        driven = col.column(align=True)
+        driven.enabled = not has_target
+        driven.prop(self, "module")
+        driven.prop(self, "pressure_angle_deg")
+        helix_driven = col.column(align=True)
+        helix_driven.enabled = not target_drives_helix
+        helix_driven.prop(self, "helix_angle_deg")
+        helix_driven.prop(self, "hand")
 
         layout.separator()
         col = layout.column(align=True)

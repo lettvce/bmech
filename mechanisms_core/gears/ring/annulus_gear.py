@@ -230,10 +230,13 @@ class OBJECT_OT_annulus_gear(bpy.types.Operator):
         pitch_r, tip_r, root_r_inner, outer_r, pa_max = self._derived()
 
         layout.prop(context.window_manager, "bmech_gear_target", text="Match Target")
+        has_target = context.window_manager.bmech_gear_target is not None
         col = layout.column(align=True)
         col.prop(self, "tooth_count")
-        col.prop(self, "module")
-        col.prop(self, "pressure_angle_deg")
+        driven = col.column(align=True)
+        driven.enabled = not has_target
+        driven.prop(self, "module")
+        driven.prop(self, "pressure_angle_deg")
 
         layout.separator()
         col = layout.column(align=True)
