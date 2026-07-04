@@ -135,6 +135,34 @@ def sync_helical_same(op, target):
         op.hand = target["bmech_hand"]
 
 
+def hand_target_ambiguous(self_is_herringbone, target):
+    """
+    True when auto-syncing `hand` from `target` is only correct for ONE of
+    two valid designs, because a herringbone tooth is two mirrored helical
+    halves (bottom twists one way, top the other) while a plain helical
+    tooth has one constant-angle line for its whole face. A plain helical
+    gear can only mesh correctly against ONE half of a herringbone gear at
+    a time, not both — so which hand is "correct" depends on which half
+    (top or bottom) the design actually engages, something the sync has no
+    way to know. This is ambiguous exactly when one side of the pair is
+    herringbone-style and the other is plain-helical-style — a herringbone
+    matching another herringbone (or a plain helical matching another
+    plain helical) has no such ambiguity, since both sides then agree on
+    engaging the "whole tooth" the same way.
+
+    `self_is_herringbone` is whether the operator CALLING this (not the
+    target) builds a herringbone-style tooth. Only meaningful once you've
+    already confirmed the target drives `hand` at all (has `bmech_hand`) —
+    this function doesn't check that itself, since callers already need
+    that check for other reasons (e.g. whether to freeze anything at all).
+    """
+    if target is None:
+        return False
+    target_kind = target.get("bmech_kind", "")
+    target_is_herringbone = "herringbone" in target_kind
+    return self_is_herringbone != target_is_herringbone
+
+
 def sync_bevel(op, target):
     """
     For bevel gear pairs: same module, pressure angle. The target's own

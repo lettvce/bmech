@@ -223,6 +223,12 @@ class OBJECT_OT_herringbone_gear(bpy.types.Operator):
         # circle" (compound-gear hub), not "these teeth mesh directly".
         # module/pressure_angle_deg ARE always driven by any target kind.
         target_drives_helix = has_target and "bmech_helix_angle_deg" in target.keys()
+        # hand specifically stays editable even when driven if the target
+        # is plain helical (this gear is herringbone) — a plain helical
+        # gear only meshes one half of THIS gear's V at a time, and which
+        # hand is correct depends on which half, something the sync can't
+        # know. See gear_matching.hand_target_ambiguous.
+        hand_ambiguous = gear_matching.hand_target_ambiguous(True, target)
 
         col = layout.column(align=True)
         col.prop(self, "tooth_count")
@@ -233,7 +239,9 @@ class OBJECT_OT_herringbone_gear(bpy.types.Operator):
         helix_driven = col.column(align=True)
         helix_driven.enabled = not target_drives_helix
         helix_driven.prop(self, "helix_angle_deg")
-        helix_driven.prop(self, "hand")
+        hand_driven = col.column(align=True)
+        hand_driven.enabled = not target_drives_helix or hand_ambiguous
+        hand_driven.prop(self, "hand")
 
         layout.separator()
         col = layout.column(align=True)
