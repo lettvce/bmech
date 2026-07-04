@@ -43,6 +43,31 @@ teeth elsewhere use a bare dedendum-circle arc) across X, then closes the
 profile with a rectangular base extending `dedendum + module` below the
 root line for a solid foundation.
 
+**`build_rack_profile()` deduplicates adjacent points (including the
+wraparound from its last point back to its first) before returning.**
+Each tooth's own end point (`x_root_right`) is mathematically identical to
+the next tooth's start point (`x_root_left`) — tiling teeth by simple
+concatenation puts a literal duplicate vertex at every tooth-to-tooth
+junction. `bm.faces.new()` (in `profile_to_mesh_object`) already
+auto-closes the polygon loop from its last vertex back to its first, so an
+explicit "return to start" point at the end of the profile was *also* an
+unnecessary duplicate, not just the inter-tooth ones. Two adjacent polygon
+vertices at the identical XY position produce a genuine zero-area
+side-wall face once Solidify extrudes the profile — invisible if you only
+inspect the raw pre-modifier mesh (`obj.data`), since Solidify runs as a
+live, unapplied modifier here (see below) and the defect only exists in
+the *evaluated* result. Confirmed before this fix: exactly
+`tooth_count_rack` zero-area faces for any tooth count (one per junction).
+
+**Unlike the spur/helical gears, the rack's Solidify modifier ("Thickness")
+is never applied** — it's left live on the output object. This is
+deliberate, not an oversight (there's no bore-hole step here that would
+need the modifier baked first), but it does mean any manifoldness check
+against `obj.data` directly is checking the flat, single-sided,
+pre-extrusion profile — not what the rack actually looks like. Check the
+evaluated mesh (`obj.evaluated_get(depsgraph).to_mesh()`) instead, the way
+you would for any object with a live, non-applied modifier.
+
 ## Output
 
 One object, name `Rack` (or `Rack.001`, etc.), stamped

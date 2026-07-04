@@ -348,6 +348,24 @@ def build_rack_profile(module, pressure_angle_deg, tooth_count_rack):
     Full rack profile: tooth_count_rack teeth tiled along X,
     closed with a rectangular base below the dedendum line.
     Returns list of (x, y).
+
+    [FIX] Each tooth's own x_root_right end point is mathematically
+    identical to the next tooth's x_root_left start point (both equal
+    offset_i + half_pitch, by construction) — tiling teeth by simple
+    concatenation put a literal duplicate vertex at every tooth-to-tooth
+    boundary. The old closing logic then added an explicit "back up to
+    start" point that ALSO duplicated tooth 0's own first point — doubly
+    unnecessary, since bm.faces.new() (see profile_to_mesh_object)
+    auto-closes the polygon loop from its last vertex back to its first;
+    no explicit closing point was ever needed. Two adjacent polygon
+    vertices at the identical XY position produce a genuine zero-width
+    side-wall face once Solidify extrudes the profile — confirmed via the
+    evaluated (post-Solidify) mesh: exactly `tooth_count_rack` zero-area
+    faces (one per tooth-to-tooth junction plus the wraparound), not
+    visible from the raw pre-modifier mesh alone. Deduplicating adjacent
+    (including wraparound) points below fixes it generally, without
+    needing to special-case which of the two causes produced a given
+    duplicate.
     """
     tooth_pitch = pi * module
     dedendum    = DEDENDUM_COEFF * module
@@ -367,13 +385,21 @@ def build_rack_profile(module, pressure_angle_deg, tooth_count_rack):
     y_base  = -(dedendum + module)  # extra clearance below root, makes a solid base
 
     # Append base rect. The last tooth's profile already ends at
-    # (x_right, -dedendum) — that's this rect's top-right corner — so we
-    # start from y_base instead of re-adding a duplicate zero-length point.
+    # (x_right, -dedendum) — that's this rect's top-right corner.
     all_pts.append((x_right, y_base))
     all_pts.append((x_left,  y_base))
-    all_pts.append((x_left,  -(dedendum)))   # back up to start
 
-    return all_pts
+    # Deduplicate adjacent points (including the wraparound from the last
+    # point back to the first, since bm.faces.new() closes the loop there
+    # too) — see the docstring above for why duplicates occur here.
+    deduped = []
+    for pt in all_pts:
+        if not deduped or abs(pt[0] - deduped[-1][0]) > 1e-9 or abs(pt[1] - deduped[-1][1]) > 1e-9:
+            deduped.append(pt)
+    if len(deduped) > 1 and abs(deduped[0][0] - deduped[-1][0]) < 1e-9 and abs(deduped[0][1] - deduped[-1][1]) < 1e-9:
+        deduped.pop()
+
+    return deduped
 
 
 # ═════════════════════════════════════════════
