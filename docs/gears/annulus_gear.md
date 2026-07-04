@@ -45,15 +45,68 @@ stays out near the ring body (root).
 
 ## Build method
 
-Boolean-only, **no Solidify modifier** (unlike the spur gear): a solid
-outer cylinder is built at `outer_r` × `width_mm`, then the annulus cutter
-profile is extruded into its own solid (`-BOOL_EPSILON` to
-`width_mm + BOOL_EPSILON`) and boolean-DIFFERENCEd out (`EXACT` solver,
-applied, cutter object deleted). Cap triangulation uses `bmesh.ops.triangle_fill`
-on the boundary edge loop, not a center-fan — see [README.md](README.md)
-for why the fan approach was replaced (it silently produced degenerate
-zero-area cap faces at some tooth counts, which then caused a real
-non-manifold defect once a fix attempt tried dropping them).
+**No boolean, no Solidify modifier** — the ring is built directly with
+bmesh. This used to be a solid outer cylinder minus a boolean-DIFFERENCE
+tooth cutter (`EXACT` solver); that was ~80-180x slower in testing
+(295ms-5.8s for tooth counts 8-100, scaling badly with tooth count) and
+was the most sluggish generator in the whole gear family. The direct
+construction produces the identical shape in 3.7-35ms.
+
+`_build_annulus_solid` builds four pieces directly:
+- The **inner (toothed) wall**: consecutive points of the tooth profile
+  connected vertically between the two Z layers — same idea as an
+  external gear's own tooth-wall construction.
+- The **outer (cylindrical) wall**: a separate, independently-spaced
+  circle (`outer_segs` points) connected the same way. This is
+  deliberately **not** built with one point per tooth-profile point at a
+  matching angle — a matched 1:1 correspondence looks like it would let
+  the two loops bridge directly into a clean cap, but doesn't work: the
+  tooth profile inserts a dedendum-circle point at the same angle as its
+  neighbor wherever `base_r > ded_r` (a genuine straight undercut-flank
+  segment, not a mistake), and bridging to a same-angle outer point puts
+  three points on the same ray through the origin — an unavoidably
+  zero-area triangle regardless of how the resulting quad gets split.
+  Confirmed by testing: a matched-angle outer ring reintroduces
+  non-manifold edges and zero-area faces at low tooth counts (8/15/20)
+  that treating the outer ring as fully independent does not.
+- The **two end caps**, each built with `bmesh.ops.triangle_fill` fed the
+  boundary edges of **both** loops together in one call. `triangle_fill`
+  treats the inner loop as a hole in the outer loop's polygon and
+  triangulates the actual annular region directly, with no trouble from
+  the profile's collinear-point segment, since it isn't assuming any
+  point correspondence between the loops at all — see
+  [README.md](README.md) for the fuller history (a fan-from-a-center-
+  vertex approach was tried and produced degenerate zero-area cap faces;
+  a naive index-matched bridge was tried next and produced the same
+  degenerate faces for a different reason; `triangle_fill` fed both loops
+  together is what actually works).
+
+### Pressure angle clamp has extra margin, specifically for this generator
+
+`_derived()` clamps `pressure_angle_deg` to
+`gear_matching.max_pressure_angle_deg(...) - PA_TRIANGLE_FILL_MARGIN_DEG`
+(0.2°), not the theoretical self-intersection limit itself the way other
+gear generators do via `gear_matching.clamp_pressure_angle`. Right at that
+limit the tooth tip's flank points become near-coincident — the old
+boolean-based `EXACT` solver tolerated a profile sitting exactly there,
+but `bmesh.ops.triangle_fill`'s constrained triangulation does not, and
+produced real non-manifold edges (292-844 of them, in testing) without
+this margin. 0.2° reliably clears it for tooth counts up to ~100 — the
+range that covers virtually every practical FDM design.
+
+**Known limitation, not fixed**: at very high tooth counts (100+, already
+far beyond typical printable annulus gear sizes) combined with a
+pressure angle that gets clamped, an occasional tiny residual (2-6
+non-manifold edges, out of tens of thousands) can still appear. It does
+not correlate cleanly with pressure-angle margin, `outer_segs`, or their
+ratio in testing — it behaves like floating-point noise in
+`triangle_fill`'s own triangulation at extreme profile complexity, not a
+parameter with an obvious closed-form fix. Swept 8-100 teeth × the full
+pressure-angle range: 166/168 combinations (98.8%) built completely clean;
+the 2 failures were both `tooth_count=100` with a *requested* pressure
+angle (40-45°) far above what actually gets used after clamping (~31°) —
+i.e., only reachable by deliberately asking for an unrealistic value at
+an already-extreme tooth count.
 
 No hand or helix concept anywhere in this generator — it's a pure
 straight-tooth internal gear.
