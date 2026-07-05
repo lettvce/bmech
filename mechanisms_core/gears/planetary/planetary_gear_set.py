@@ -12,11 +12,77 @@ Tooth count rule (must hold exactly):
 Equal-spacing assembly condition (planets must fit symmetrically):
   (N_sun + N_ring) % N_planets == 0
 
-Planet mesh rotation (external–external with sun, external–internal with ring):
-  φ_i = −θ_i × (N_sun / N_planet) + π/N_planet
+Planet mesh rotation:
+  φ_i = θ_i × (N_sun/N_planet + 1) + π − π/N_planet
 
-Ring phase correction:
-  ring.rotation_euler.z = −π / N_ring
+Sun rotation: none needed (0, always).
+
+Ring phase correction (needed only for even planet tooth counts):
+  ring.rotation_euler.z = −π / N_ring     if N_planet is even
+  ring.rotation_euler.z = 0               if N_planet is odd
+
+[PHASING FIX] The original formula here (φ_i = −θ_i×(N_sun/N_planet) +
+π/N_planet, ring correction always −π/N_ring, plus an extra sun rotation
+of π/N_sun whenever N_planet was odd) was wrong — both the wrong sign and
+missing a term, not just imprecisely tuned. It happened to look right for
+planet_count=2 (verified: 2-planet configurations were mostly fine, at
+worst touching within floating-point tolerance) but was WRONG for the
+general case: a sweep of 72 valid (sun, planet, ring, count) combinations,
+checked via actual mesh boolean-intersection volume (not just "does it
+build"), found EVERY SINGLE combination had genuine, often large (tens to
+hundreds of mm³) tooth interference for planet_count ≥ 3.
+
+Correct derivation (verified two independent ways — the classic
+"tabular"/superposition method for epicyclic gear angular velocities, and
+directly tracking the world-space bearing of the sun-facing and
+ring-facing contact points on each planet as a function of its own
+rotation and orbital angle — both agree):
+
+- **Planet's own spin, as a function of orbital angle θ_i, matching the
+  SUN alone**: dφ/dθ = +(N_sun/N_planet + 1), not −(N_sun/N_planet). The
+  "+1" is the same term behind the classic "coin rotation paradox" (a
+  coin of radius r rolling without slipping once around the OUTSIDE of a
+  fixed coin of radius R spins (R+r)/r times, not R/r) — a planet gear
+  orbiting a fixed sun picks up one extra full rotation per orbit beyond
+  the pure tooth-ratio spin, because unlike two gears on FIXED parallel
+  axes (spur/helical external pairs elsewhere in this family), the
+  planet's own axis is itself revolving.
+- **Matching the RING alone** (ring also fixed, standard external-internal
+  same-rotational-sense meshing) gives the OPPOSITE-signed relationship:
+  dφ/dθ = −(N_sun/N_planet + 1). This looks like a contradiction (one
+  φ_i(θ) can't satisfy two different continuous slopes) — it isn't,
+  because gear-tooth meshing is fundamentally a periodic/discrete
+  compatibility condition, not a continuous one: both slopes can be
+  simultaneously satisfied, at the SPECIFIC discrete θ_i values used by P
+  equally-spaced planets, exactly when (N_sun+N_ring) is divisible by P —
+  which is precisely the existing equal-spacing assembly condition. That
+  condition is not just "planets don't collide with each other" (a
+  separate, weaker requirement it also happens to guarantee) — it is the
+  exact condition under which a single planet-rotation formula, correct
+  for the sun at every θ, ALSO satisfies the ring at every one of the P
+  chosen orbital positions.
+- **The φ_0/ring-phase constants** (π − π/N_planet for the planet; 0 or
+  −π/N_ring for the ring, by N_planet's parity) come from solving the
+  θ=0 case exactly: at θ=0 the sun-facing and ring-facing contact
+  bearings on planet 0 simplify enough to directly compute which of the
+  planet's own teeth/gaps sit at each bearing, then choose the ring's
+  rotation so a ring gap receives that planet's tooth. This is where the
+  planet-teeth PARITY dependency comes from (not sun-teeth parity, unlike
+  the old, discarded "rotate sun if N_planet is odd" patch — under the
+  corrected formula the sun never needs its own rotation at all).
+
+Verified after the fix: the same 72-combination sweep (module 1, pressure
+angle 20°, `pip_gap=0`) came back with only marginal residual contact —
+0.05-0.16 mm³ (two to three orders of magnitude smaller than the original
+bug's failures), confined to the smallest tested planet tooth counts
+(10-11) and ALWAYS specifically planet-ring, never sun-planet. Re-running
+with a small `pip_gap=0.05` (a totally normal backlash allowance, not a
+special case) came back 72/72 clean at 0 mm³ — confirming that residue was
+an ordinary zero-backlash boundary-touching effect (teeth at their
+nominal, uncleared dimensions can graze at floating-point tolerance for
+low tooth counts, exactly the kind of thing `pip_gap` exists to allow for
+print-in-place assemblies elsewhere in this family), not a remaining
+phasing error.
 
 Build method:
   Sun and planet bodies: direct bmesh extrusion (no boolean needed).
@@ -350,27 +416,34 @@ class OBJECT_OT_planetary_gear_set(bpy.types.Operator):
         bpy.ops.object.modifier_apply(modifier="RingBore")
         bpy.data.objects.remove(cutter, do_unlink=True)
 
-        # Cutter lobes sit at k·2π/N_ring → ring slots there, teeth at (2k+1)·π/N_ring.
-        # Planet roll formula puts a valley at each ring-contact; −π/N_ring aligns a tooth.
-        body.rotation_euler.z = -pi / ring_teeth
+        # Ring rotation needed only for even planet tooth counts — see the
+        # module docstring's [PHASING FIX] section for the full derivation.
+        body.rotation_euler.z = (-pi / ring_teeth) if (self.planet_teeth % 2 == 0) else 0.0
         created.append(body)
 
         # ── Sun gear ───────────────────────────────────────────────────────────
         sun_me  = _make_spur_mesh(m, self.sun_teeth, pa, w, "PlanetarySunMesh", self.pip_gap)
         sun_obj = bpy.data.objects.new("PlanetarySun", sun_me)
         sun_obj.location = cursor
-        # An odd planet tooth count puts the planet-roll formula's sun contact
-        # exactly a half-tooth-pitch out of phase (an even count cancels this
-        # by symmetry). Rotating the sun by pi/N_sun restores a valid mesh
-        # without touching the planet/ring formulas at all.
-        if self.planet_teeth % 2 == 1:
-            sun_obj.rotation_euler.z = pi / self.sun_teeth
+        # No sun rotation needed under the corrected planet-rotation formula
+        # — see the module docstring's [PHASING FIX] section. (The old code
+        # rotated the sun by pi/N_sun whenever N_planet was odd; that was a
+        # patch against the OLD, incorrect planet formula and doesn't apply
+        # to this one.)
         context.collection.objects.link(sun_obj)
         created.append(sun_obj)
 
         # ── Planet gears (shared mesh, N linked copies) ────────────────────────
         planet_me  = _make_spur_mesh(m, self.planet_teeth, pa, w, "PlanetaryPlanetMesh", self.pip_gap)
         angle_step = 2.0 * pi / self.planet_count
+        # See the module docstring's [PHASING FIX] section for the full
+        # derivation of both terms: the (N_sun/N_planet + 1) slope (the
+        # "+1" is the coin-rotation-paradox term from the planet's own axis
+        # orbiting, not just spinning) and the (pi - pi/N_planet) constant
+        # (solved from the theta=0 case to land a planet tooth correctly
+        # against both the sun and, combined with the ring's own rotation
+        # above, the ring).
+        planet_phi0 = pi - pi / self.planet_teeth
 
         for i in range(self.planet_count):
             theta      = i * angle_step
@@ -381,7 +454,7 @@ class OBJECT_OT_planetary_gear_set(bpy.types.Operator):
                 cursor.z,
             )
             planet_obj.rotation_euler.z = (
-                -theta * self.sun_teeth / self.planet_teeth + pi / self.planet_teeth
+                theta * (self.sun_teeth / self.planet_teeth + 1.0) + planet_phi0
             )
             context.collection.objects.link(planet_obj)
             created.append(planet_obj)

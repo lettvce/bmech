@@ -17,7 +17,7 @@ method that the WindowManager property's update callback dispatches to.
 
 import bpy
 from bpy.props import PointerProperty
-from math import pi, cos, tan, atan, sqrt, radians, degrees
+from math import pi, cos, sin, tan, atan, sqrt, radians, degrees
 
 
 def tooth_profile_ok(tooth_count, pressure_angle_deg, tip_addendum_coeff):
@@ -161,6 +161,78 @@ def hand_target_ambiguous(self_is_herringbone, target):
     target_kind = target.get("bmech_kind", "")
     target_is_herringbone = "herringbone" in target_kind
     return self_is_herringbone != target_is_herringbone
+
+
+def rack_phase_align_x(target, tooth_count_rack):
+    """
+    Extra X shift for a rack being positioned against `target` (a gear),
+    so the rack spawns with a gear tooth centered in a rack GAP (and vice
+    versa) instead of an arbitrary phase that depends on tooth-count
+    parity — e.g. a gear tooth landing dead-center on a rack tooth, which
+    is a valid non-interfering snapshot but a visually confusing one to
+    hand a user by default.
+
+    This is COSMETIC, not a correctness fix: standard (zero-profile-shift)
+    involute teeth are in conjugate contact at every point along the path
+    of contact, so every rotational phase of a correctly-dimensioned pair
+    is interference-free — there's no "wrong" phase to avoid, only a
+    nicer-or-plainer-looking one to spawn at by default.
+
+    [CAUTION — got this wrong on the first pass] The existing rack
+    centering (`obj.location.x -= half_rack_length - tooth_pitch/2`, done
+    by each rack operator's own execute() before calling this) already
+    places either a rack TOOTH-center or a rack GAP-center at target's
+    local x=0, DEPENDING ON tooth_count_rack's PARITY — a rack tooth is at
+    x=0 for ODD tooth_count_rack, a gap for EVEN. A first version of this
+    function computed a shift purely from the gear's own phase, blind to
+    that parity — for roughly half of all tooth_count_rack values it
+    "corrected" an alignment that was already right into one that was
+    wrong (verified by hand-checking a module=2, 40-tooth gear against a
+    10-tooth rack: teeth pitch is an exact multiple of the gear's own
+    tooth-center angle here, and separately calculating exact world-space
+    tooth/gap coordinates for both parts showed the pre-fix code already
+    put a gear tooth exactly into a rack gap — the naive fix moved it to
+    tooth-on-tooth instead). `tooth_count_rack` must be part of the input
+    to get this right.
+
+    Derivation: target's teeth are centered at angles i*(2*pi/N) in its
+    own local frame (N = target's tooth count). The rack meshes at the
+    target's local angle -90° (its bottom, see gears/rack/*.py's own
+    docstrings for why). `residual` is the signed angular offset from
+    -90° to the nearest tooth-center multiple of the pitch angle, reduced
+    to (-pitch_angle/2, pitch_angle/2] (i.e. residual=0 means a gear tooth
+    sits exactly at the meshing point); `T` converts that to the actual
+    world-X offset (mm) of that nearest tooth, using exact trig (not the
+    small-angle linear approximation) since residual can be up to half a
+    pitch angle. The existing centering contributes an extra tooth_pitch/2
+    to the target phase for ODD tooth_count_rack (see the CAUTION note
+    above) — folding that in and reducing mod tooth_pitch gives the exact
+    additional shift needed so a rack tooth center lands on a gear gap
+    center (equivalently, a rack gap on a gear tooth) regardless of either
+    part's tooth count or parity.
+    """
+    if target is None:
+        return 0.0
+    if "bmech_module" not in target.keys() or "bmech_tooth_count" not in target.keys():
+        return 0.0
+    target_teeth = target["bmech_tooth_count"]
+    if target_teeth <= 0:
+        return 0.0
+    module       = target["bmech_module"]
+    pitch_radius = module * target_teeth / 2.0
+    tooth_pitch  = pi * module
+    pitch_angle  = 2.0 * pi / target_teeth
+
+    residual = (-pi / 2.0) % pitch_angle
+    if residual > pitch_angle / 2.0:
+        residual -= pitch_angle
+    T = -pitch_radius * sin(residual)
+
+    target_phase = T if (tooth_count_rack % 2 == 0) else T + tooth_pitch / 2.0
+    delta = target_phase % tooth_pitch
+    if delta > tooth_pitch / 2.0:
+        delta -= tooth_pitch
+    return delta
 
 
 def sync_bevel(op, target):

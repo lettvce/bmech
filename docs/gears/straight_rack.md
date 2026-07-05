@@ -1,10 +1,18 @@
-# Rack
+# Straight Rack
 
-`gears/external/involute_gear_rack.py` → `OBJECT_OT_add_rack` (`object.add_rack`, "Add Gear Rack")
+`gears/rack/straight_rack.py` → `OBJECT_OT_add_rack` (`object.add_rack`, "Add Gear Rack")
 
 Straight involute rack — the "gear of infinite radius" that converts a
 mating spur/helical pinion's rotation into linear motion. See
-[README.md](README.md) for family-wide conventions.
+[README.md](README.md) for family-wide conventions, and
+[helical_rack.md](helical_rack.md) / [herringbone_rack.md](herringbone_rack.md)
+for the twisted variants that reuse this file's tooth-profile math.
+
+This used to live combined with the spur gear as
+`gears/external/involute_gear_rack.py` — split out into its own `rack/`
+subfamily alongside the helical and herringbone racks (own menu category,
+`Mechanisms > Gears > Rack`), matching the `external/`/`ring/`/
+`planetary/`/`bevel/` folder-per-subfamily shape.
 
 ## Properties
 
@@ -31,6 +39,13 @@ No bore properties — a rack has no hub to bore.
   by the target's pitch radius (Y) and left by half the rack length minus
   half a tooth pitch (X). If no target is set, this mode silently falls
   back to using `tooth_count_rack` as typed.
+
+Whenever a target is set (independent of `length_mode`), an additional
+small X shift is applied via `gear_matching.rack_phase_align_x` so the
+rack spawns with teeth-into-gaps rather than an arbitrary phase — see
+[helical_rack.md#phase-alignment](helical_rack.md#phase-alignment) for
+the full derivation (it applies identically here; the shear that file
+adds on top doesn't change the Z=0 phase this alignment targets).
 
 `module`/`pressure_angle_deg` are frozen in the redo panel whenever any
 target is set (`sync_module_pa` always drives both), matching the

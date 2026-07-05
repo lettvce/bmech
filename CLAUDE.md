@@ -15,8 +15,8 @@ edit to an existing one.
 
 Every family is documented:
 
-- [docs/gears/](docs/gears/README.md) — 13 primitives, split into
-  `external/`, `ring/`, `planetary/`, `bevel/` subfamilies matching
+- [docs/gears/](docs/gears/README.md) — 15 primitives, split into
+  `external/`, `ring/`, `planetary/`, `bevel/`, `rack/` subfamilies matching
   `mechanisms_core/gears/`'s folder layout.
 - [docs/fasteners/](docs/fasteners/README.md)
 - [docs/bearings/](docs/bearings/README.md)

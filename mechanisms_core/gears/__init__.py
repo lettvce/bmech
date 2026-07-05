@@ -5,6 +5,7 @@ from . import external
 from . import ring
 from . import planetary
 from . import bevel
+from . import rack
 
 if "bpy" in locals():
     importlib.reload(gear_matching)
@@ -12,6 +13,7 @@ if "bpy" in locals():
     importlib.reload(ring)
     importlib.reload(planetary)
     importlib.reload(bevel)
+    importlib.reload(rack)
 
 import bpy
 
@@ -22,9 +24,11 @@ def register():
     ring.register()
     planetary.register()
     bevel.register()
+    rack.register()
 
 
 def unregister():
+    rack.unregister()
     bevel.unregister()
     planetary.unregister()
     ring.unregister()

@@ -1,6 +1,6 @@
 # Spur Gear
 
-`gears/external/involute_gear_rack.py` → `OBJECT_OT_add_spur_gear` (`object.add_spur_gear`, "Add Spur Gear")
+`gears/external/spur_gear.py` → `OBJECT_OT_add_spur_gear` (`object.add_spur_gear`, "Add Spur Gear")
 
 Straight-tooth external involute gear. The baseline gear primitive — every
 other external-gear generator in this library (helical, herringbone, bevel)

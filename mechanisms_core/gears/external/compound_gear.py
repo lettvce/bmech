@@ -10,7 +10,7 @@ on each shared shaft sit at the same XY but different Z, showing they are co-axi
 separate parts.
 
 Solid mesh geometry (no Solidify modifier) — reuses build_gear_profile() from
-involute_gear_rack for profile points, then extrudes and bores here.
+spur_gear for profile points, then extrudes and bores here.
 """
 
 import bpy
@@ -20,7 +20,7 @@ from math import cos, sin, pi
 from bpy.props import (
     FloatProperty, IntProperty, BoolProperty, FloatVectorProperty,
 )
-from . import involute_gear_rack
+from . import spur_gear
 from .. import gear_matching
 
 BORE_SEGMENTS = 32
@@ -143,7 +143,7 @@ class OBJECT_OT_add_compound_gear(bpy.types.Operator):
         for s in stages:
             shaft_x.append(shaft_x[-1] + s['center_dist'])
         pa_max = min(
-            gear_matching.max_pressure_angle_deg(t, involute_gear_rack.ADDENDUM_COEFF)
+            gear_matching.max_pressure_angle_deg(t, spur_gear.ADDENDUM_COEFF)
             for s in stages
             for t in (s['driver_t'], s['driven_t'])
         )
@@ -180,7 +180,7 @@ class OBJECT_OT_add_compound_gear(bpy.types.Operator):
         bore_r = (self.axle_hole_mm / 2.0 + self.axle_compensation_mm) if self.bore_enable else 0.0
         if bore_r > 0:
             min_ded = min(
-                self.module * (t / 2.0 - involute_gear_rack.DEDENDUM_COEFF)
+                self.module * (t / 2.0 - spur_gear.DEDENDUM_COEFF)
                 for s in stages
                 for t in (s['driver_t'], s['driven_t'])
             )
@@ -196,7 +196,7 @@ class OBJECT_OT_add_compound_gear(bpy.types.Operator):
         stages, overall, shaft_x, pa_max = self._compute()
         gear_matching.clamp_pressure_angle(
             self,
-            *[(t, involute_gear_rack.ADDENDUM_COEFF)
+            *[(t, spur_gear.ADDENDUM_COEFF)
               for s in stages for t in (s['driver_t'], s['driven_t'])]
         )
         bore_r = (self.axle_hole_mm / 2.0 + self.axle_compensation_mm) if self.bore_enable else 0.0
@@ -206,9 +206,9 @@ class OBJECT_OT_add_compound_gear(bpy.types.Operator):
         for i, s in enumerate(stages):
             stage_z = cz + i * (self.width_mm + STAGE_GAP_MM)
 
-            driver_prof = involute_gear_rack.build_gear_profile(
+            driver_prof = spur_gear.build_gear_profile(
                 self.module, s['driver_t'], self.pressure_angle_deg)
-            driven_prof = involute_gear_rack.build_gear_profile(
+            driven_prof = spur_gear.build_gear_profile(
                 self.module, s['driven_t'], self.pressure_angle_deg)
 
             driver_name = "GearInput"  if i == 0                    else "GearS%dDriver" % (i + 1)

@@ -60,7 +60,7 @@ non-blocking).
 
 ## Build method
 
-Reuses `involute_gear_rack.build_gear_profile()` for every gear (like
+Reuses `spur_gear.build_gear_profile()` for every gear (like
 cluster_gear, unlike the planetary-set files). Each gear is its own solid
 object (`_build_solid_gear`) — unlike cluster_gear's fused single mesh,
 there's no shoulder-bridging here, and unlike the planetary sets' boolean

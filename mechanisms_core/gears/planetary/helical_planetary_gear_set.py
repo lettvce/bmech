@@ -14,11 +14,17 @@ Tooth count rule (same as spur):
   N_ring = N_sun + 2 × N_planet
   Assembly condition: (N_sun + N_ring) % N_planets == 0
 
-Planet placement (same roll formula as spur — helix doesn't change z=0 phase):
-  φ_i = −θ_i × (N_sun / N_planet) + π/N_planet
+Planet placement (same formula as spur — helix doesn't change z=0 phase):
+  φ_i = θ_i × (N_sun/N_planet + 1) + π − π/N_planet
 
-Ring phase correction (same derivation as spur):
-  ring.rotation_euler.z = −π / N_ring
+Ring phase correction (needed only for even planet tooth counts):
+  ring.rotation_euler.z = −π / N_ring     if N_planet is even
+  ring.rotation_euler.z = 0               if N_planet is odd
+
+See planetary_gear_set.py's module docstring [PHASING FIX] section for
+the full derivation and empirical verification — this file previously
+duplicated that file's original (wrong) formula and has the identical fix
+applied here, verified against the same style of tooth-count sweep.
 
 Build method:
   Sun / Planet : direct bmesh slice-by-slice twist (no boolean needed)
@@ -398,9 +404,10 @@ class OBJECT_OT_helical_planetary_gear_set(bpy.types.Operator):
         bpy.ops.object.modifier_apply(modifier="RingBore")
         bpy.data.objects.remove(cutter, do_unlink=True)
 
-        # Slot centres at k·2π/N_ring → teeth at (2k+1)·π/N_ring.
-        # −π/N_ring aligns a ring tooth with each planet's valley.
-        body.rotation_euler.z = -pi / ring_teeth
+        # Ring rotation needed only for even planet tooth counts — see
+        # planetary_gear_set.py's module docstring [PHASING FIX] section
+        # for the full derivation (this file shares the same z=0 phasing).
+        body.rotation_euler.z = (-pi / ring_teeth) if (self.planet_teeth % 2 == 0) else 0.0
         created.append(body)
 
         # ── Sun gear (helical) ────────────────────────────────────────────────
@@ -409,12 +416,8 @@ class OBJECT_OT_helical_planetary_gear_set(bpy.types.Operator):
                                       "HelPlanetarySunMesh", self.pip_gap)
         sun_obj = bpy.data.objects.new("HelPlanetarySun", sun_me)
         sun_obj.location = cursor
-        # An odd planet tooth count puts the planet-roll formula's sun contact
-        # exactly a half-tooth-pitch out of phase (an even count cancels this
-        # by symmetry). Rotating the sun by pi/N_sun restores a valid mesh
-        # without touching the planet/ring formulas at all.
-        if self.planet_teeth % 2 == 1:
-            sun_obj.rotation_euler.z = pi / self.sun_teeth
+        # No sun rotation needed under the corrected planet-rotation formula
+        # — see planetary_gear_set.py's [PHASING FIX] section.
         context.collection.objects.link(sun_obj)
         created.append(sun_obj)
 
@@ -423,6 +426,9 @@ class OBJECT_OT_helical_planetary_gear_set(bpy.types.Operator):
                                          planet_sign, ha_rad, self.n_slices,
                                          "HelPlanetaryPlanetMesh", self.pip_gap)
         angle_step = 2.0 * pi / self.planet_count
+        # See planetary_gear_set.py's [PHASING FIX] section for the
+        # derivation of both terms.
+        planet_phi0 = pi - pi / self.planet_teeth
 
         for i in range(self.planet_count):
             theta      = i * angle_step
@@ -433,7 +439,7 @@ class OBJECT_OT_helical_planetary_gear_set(bpy.types.Operator):
                 cursor.z,
             )
             planet_obj.rotation_euler.z = (
-                -theta * self.sun_teeth / self.planet_teeth + pi / self.planet_teeth
+                theta * (self.sun_teeth / self.planet_teeth + 1.0) + planet_phi0
             )
             context.collection.objects.link(planet_obj)
             created.append(planet_obj)

@@ -17,9 +17,25 @@ Geometry (90° shaft angle):
 Build method:
   n_slices axial cross-sections from z=0 (large end) to z_top (small end).
   Each slice scales the full involute profile by (z_apex − z) / z_apex.
-  Both end faces closed with center-fan triangulation.
-  No boolean needed — the gear body under the root circle is covered by the
-  center-fan fill of the back and front faces.
+  Both end faces closed with a single n-gon each (not a center-fan — see
+  [CAP FIX] below), so the gear body under the root circle is covered
+  without a boolean.
+
+[CAP FIX] This used to fan each end cap from an added center vertex, like
+cluster_gear.py's shoulders still do. That degenerates: _build_gear_profile
+inserts a dedendum-circle point at the SAME angle as the adjacent involute
+departure point wherever base_r > ded_r (a genuine straight undercut-flank
+segment, not a bug — see annulus_gear.py's docs for the general form of
+this). Two profile points on the same ray through the origin make a
+fan-to-center triangle there degenerate to exactly zero area. Confirmed:
+28 zero-area cap faces at tooth_count=16 (default). Non-manifold count was
+always 0 even with the defect — a zero-area triangle still shares its
+short edge with exactly one real neighboring face, so edge-manifoldness
+was never actually broken, which is why this was cosmetic rather than a
+hard build failure, and safely deferred while other higher-severity issues
+were fixed first. A single n-gon face per cap (no center vertex, matching
+helical_gear.py's/herringbone_gear.py's own end caps) has no per-point
+triangles and can't hit this degenerate case at all.
 
 Note: face_width ≤ L/3 is the standard engineering limit.
 To make the mating gear: swap tooth_count ↔ mate_teeth (δ₂ = 90° − δ₁).
@@ -213,17 +229,10 @@ class OBJECT_OT_bevel_gear(bpy.types.Operator):
                 ni = (i + 1) % n
                 bm.faces.new([bot[i], bot[ni], top[ni], top[i]])
 
-        c_bot = bm.verts.new((0.0, 0.0, 0.0))
-        bm.verts.index_update()
-        for i in range(n):
-            ni = (i + 1) % n
-            bm.faces.new([c_bot, all_slices[0][i], all_slices[0][ni]])
-
-        c_top = bm.verts.new((0.0, 0.0, z_top))
-        bm.verts.index_update()
-        for i in range(n):
-            ni = (i + 1) % n
-            bm.faces.new([c_top, all_slices[-1][ni], all_slices[-1][i]])
+        # Single n-gon per cap, not a center-fan — see [CAP FIX] in the
+        # module docstring for why a fan degenerates here.
+        bm.faces.new(list(reversed(all_slices[0])))
+        bm.faces.new(all_slices[-1])
 
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
 

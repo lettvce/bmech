@@ -1,10 +1,11 @@
 # mechanisms_core/menu.py
 #
 # Gear submenu hierarchy:
-#   Mechanisms → Gears → External   (spur, rack, cluster, compound, helical, herringbone)
+#   Mechanisms → Gears → External   (spur, cluster, compound, helical, herringbone)
 #                      → Ring       (annulus, helical annulus, herringbone annulus)
 #                      → Planetary  (spur, helical, herringbone planetary sets)
 #                      → Bevel      (straight bevel — helical/spiral bevel planned)
+#                      → Rack       (straight, helical, herringbone)
 #                        Crown Gear
 #                        Sprocket
 #            → Fasteners (hex bolt, hex nut, raw threaded fastener)
@@ -40,8 +41,6 @@ class VIEW3D_MT_mechanisms_gears_external(bpy.types.Menu):
         layout = self.layout
         if hasattr(bpy.types, 'OBJECT_OT_add_spur_gear'):
             layout.operator("object.add_spur_gear",      text="Spur Gear")
-        if hasattr(bpy.types, 'OBJECT_OT_add_rack'):
-            layout.operator("object.add_rack",           text="Gear Rack")
         if hasattr(bpy.types, 'OBJECT_OT_add_cluster_gear'):
             layout.operator("object.add_cluster_gear",   text="Cluster Gear")
         if hasattr(bpy.types, 'OBJECT_OT_add_compound_gear'):
@@ -92,6 +91,20 @@ class VIEW3D_MT_mechanisms_gears_bevel(bpy.types.Menu):
             layout.operator("object.bevel_gear", text="Bevel Gear")
 
 
+class VIEW3D_MT_mechanisms_gears_rack(bpy.types.Menu):
+    bl_idname = "VIEW3D_MT_mechanisms_gears_rack"
+    bl_label  = "Rack"
+
+    def draw(self, context):
+        layout = self.layout
+        if hasattr(bpy.types, 'OBJECT_OT_add_rack'):
+            layout.operator("object.add_rack",             text="Straight Rack")
+        if hasattr(bpy.types, 'OBJECT_OT_helical_rack'):
+            layout.operator("object.helical_rack",         text="Helical Rack")
+        if hasattr(bpy.types, 'OBJECT_OT_herringbone_rack'):
+            layout.operator("object.herringbone_rack",     text="Herringbone Rack")
+
+
 class VIEW3D_MT_mechanisms_gears(bpy.types.Menu):
     bl_idname = "VIEW3D_MT_mechanisms_gears"
     bl_label  = "Gears"
@@ -100,7 +113,6 @@ class VIEW3D_MT_mechanisms_gears(bpy.types.Menu):
         layout = self.layout
 
         external_any = (hasattr(bpy.types, 'OBJECT_OT_add_spur_gear')     or
-                        hasattr(bpy.types, 'OBJECT_OT_add_rack')           or
                         hasattr(bpy.types, 'OBJECT_OT_add_cluster_gear')   or
                         hasattr(bpy.types, 'OBJECT_OT_add_compound_gear')  or
                         hasattr(bpy.types, 'OBJECT_OT_helical_gear')       or
@@ -124,9 +136,15 @@ class VIEW3D_MT_mechanisms_gears(bpy.types.Menu):
         if bevel_any:
             layout.menu(VIEW3D_MT_mechanisms_gears_bevel.bl_idname)
 
+        rack_any = (hasattr(bpy.types, 'OBJECT_OT_add_rack')          or
+                    hasattr(bpy.types, 'OBJECT_OT_helical_rack')      or
+                    hasattr(bpy.types, 'OBJECT_OT_herringbone_rack'))
+        if rack_any:
+            layout.menu(VIEW3D_MT_mechanisms_gears_rack.bl_idname)
+
         special_any = (hasattr(bpy.types, 'OBJECT_OT_crown_gear') or
                        hasattr(bpy.types, 'OBJECT_OT_add_sprocket'))
-        if special_any and (external_any or ring_any or planetary_any or bevel_any):
+        if special_any and (external_any or ring_any or planetary_any or bevel_any or rack_any):
             layout.separator()
         if hasattr(bpy.types, 'OBJECT_OT_crown_gear'):
             layout.operator("object.crown_gear",   text="Crown Gear")
@@ -191,6 +209,8 @@ class VIEW3D_MT_mechanisms_add(bpy.types.Menu):
                      hasattr(bpy.types, 'OBJECT_OT_helical_planetary_gear_set')          or
                      hasattr(bpy.types, 'OBJECT_OT_herringbone_planetary_gear_set')      or
                      hasattr(bpy.types, 'OBJECT_OT_bevel_gear')                          or
+                     hasattr(bpy.types, 'OBJECT_OT_helical_rack')                        or
+                     hasattr(bpy.types, 'OBJECT_OT_herringbone_rack')                    or
                      hasattr(bpy.types, 'OBJECT_OT_crown_gear')                          or
                      hasattr(bpy.types, 'OBJECT_OT_add_sprocket'))
         if gears_any:
@@ -224,6 +244,7 @@ classes = (
     VIEW3D_MT_mechanisms_gears_ring,
     VIEW3D_MT_mechanisms_gears_planetary,
     VIEW3D_MT_mechanisms_gears_bevel,
+    VIEW3D_MT_mechanisms_gears_rack,
     VIEW3D_MT_mechanisms_gears,
     VIEW3D_MT_mechanisms_fasteners,
     VIEW3D_MT_mechanisms_add,

@@ -9,8 +9,12 @@ Hand convention (same as helical):
   Planet ↔ Ring: SAME hand       (external-internal)
   ∴ Ring = opposite of Sun = same as Planet.
 
-Ring phase, assembly condition, and planet roll formula are identical to the
-spur and helical planetary sets — only the mesh builders change.
+Ring phase, assembly condition, and planet rotation formula are identical
+to the spur and helical planetary sets — only the mesh builders change.
+See planetary_gear_set.py's module docstring [PHASING FIX] section for
+the full derivation and empirical verification of that formula — this
+file previously duplicated that file's original (wrong) formula and has
+the identical fix applied here.
 
 Sun / Planet build: two mirrored helical halves sharing a mid-slice (2n−1 total).
 Ring build       : solid cylinder + boolean DIFFERENCE with herringbone cutter.
@@ -449,9 +453,10 @@ class OBJECT_OT_herringbone_planetary_gear_set(bpy.types.Operator):
         bpy.ops.object.modifier_apply(modifier="RingBore")
         bpy.data.objects.remove(cutter, do_unlink=True)
 
-        # Cutter lobes at k·2π/N_ring → slots there, teeth at (2k+1)·π/N_ring.
-        # −π/N_ring aligns a ring tooth with each planet's valley.
-        body.rotation_euler.z = -pi / ring_teeth
+        # Ring rotation needed only for even planet tooth counts — see
+        # planetary_gear_set.py's module docstring [PHASING FIX] section
+        # for the full derivation (this file shares the same z=0 phasing).
+        body.rotation_euler.z = (-pi / ring_teeth) if (self.planet_teeth % 2 == 0) else 0.0
         created.append(body)
 
         # ── Sun gear (herringbone) ─────────────────────────────────────────────
@@ -460,12 +465,8 @@ class OBJECT_OT_herringbone_planetary_gear_set(bpy.types.Operator):
                                           "HbPlanetarySunMesh", self.pip_gap)
         sun_obj = bpy.data.objects.new("HbPlanetarySun", sun_me)
         sun_obj.location = cursor
-        # An odd planet tooth count puts the planet-roll formula's sun contact
-        # exactly a half-tooth-pitch out of phase (an even count cancels this
-        # by symmetry). Rotating the sun by pi/N_sun restores a valid mesh
-        # without touching the planet/ring formulas at all.
-        if self.planet_teeth % 2 == 1:
-            sun_obj.rotation_euler.z = pi / self.sun_teeth
+        # No sun rotation needed under the corrected planet-rotation formula
+        # — see planetary_gear_set.py's [PHASING FIX] section.
         context.collection.objects.link(sun_obj)
         created.append(sun_obj)
 
@@ -474,6 +475,9 @@ class OBJECT_OT_herringbone_planetary_gear_set(bpy.types.Operator):
                                              planet_sign, ha_rad, self.n_slices,
                                              "HbPlanetaryPlanetMesh", self.pip_gap)
         angle_step = 2.0 * pi / self.planet_count
+        # See planetary_gear_set.py's [PHASING FIX] section for the
+        # derivation of both terms.
+        planet_phi0 = pi - pi / self.planet_teeth
 
         for i in range(self.planet_count):
             theta      = i * angle_step
@@ -485,7 +489,7 @@ class OBJECT_OT_herringbone_planetary_gear_set(bpy.types.Operator):
                 cursor.z,
             )
             planet_obj.rotation_euler.z = (
-                -theta * self.sun_teeth / self.planet_teeth + pi / self.planet_teeth
+                theta * (self.sun_teeth / self.planet_teeth + 1.0) + planet_phi0
             )
             context.collection.objects.link(planet_obj)
             created.append(planet_obj)

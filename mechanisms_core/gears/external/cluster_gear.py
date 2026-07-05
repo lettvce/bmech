@@ -19,7 +19,7 @@ import bmesh
 from math import cos, sin, pi
 from bpy.props import FloatProperty, IntProperty, BoolProperty, FloatVectorProperty
 
-from . import involute_gear_rack
+from . import spur_gear
 from .. import gear_matching
 
 BORE_SEGMENTS = 32
@@ -144,14 +144,14 @@ class OBJECT_OT_add_cluster_gear(bpy.types.Operator):
     def _compute(self):
         bore_r    = (self.axle_hole_mm / 2.0 + self.axle_compensation_mm) if self.bore_enable else 0.0
         total_h   = self.width_bottom + self.width_top
-        bottom_od = self.module * (self.bottom_teeth + 2 * involute_gear_rack.ADDENDUM_COEFF)
-        top_od    = self.module * (self.top_teeth    + 2 * involute_gear_rack.ADDENDUM_COEFF)
+        bottom_od = self.module * (self.bottom_teeth + 2 * spur_gear.ADDENDUM_COEFF)
+        top_od    = self.module * (self.top_teeth    + 2 * spur_gear.ADDENDUM_COEFF)
         min_ded_r = min(
-            self.module * (t / 2.0 - involute_gear_rack.DEDENDUM_COEFF)
+            self.module * (t / 2.0 - spur_gear.DEDENDUM_COEFF)
             for t in (self.bottom_teeth, self.top_teeth)
         )
         pa_max = min(
-            gear_matching.max_pressure_angle_deg(t, involute_gear_rack.ADDENDUM_COEFF)
+            gear_matching.max_pressure_angle_deg(t, spur_gear.ADDENDUM_COEFF)
             for t in (self.bottom_teeth, self.top_teeth)
         )
         return bore_r, total_h, bottom_od, top_od, min_ded_r, pa_max
@@ -190,15 +190,15 @@ class OBJECT_OT_add_cluster_gear(bpy.types.Operator):
     def execute(self, context):
         gear_matching.clamp_pressure_angle(
             self,
-            (self.bottom_teeth, involute_gear_rack.ADDENDUM_COEFF),
-            (self.top_teeth, involute_gear_rack.ADDENDUM_COEFF),
+            (self.bottom_teeth, spur_gear.ADDENDUM_COEFF),
+            (self.top_teeth, spur_gear.ADDENDUM_COEFF),
         )
         bore_r, total_h, _, _, _, pa_max = self._compute()
         loc = tuple(context.scene.cursor.location)
 
-        bottom_prof = involute_gear_rack.build_gear_profile(
+        bottom_prof = spur_gear.build_gear_profile(
             self.module, self.bottom_teeth, self.pressure_angle_deg)
-        top_prof = involute_gear_rack.build_gear_profile(
+        top_prof = spur_gear.build_gear_profile(
             self.module, self.top_teeth, self.pressure_angle_deg)
 
         bm = bmesh.new()

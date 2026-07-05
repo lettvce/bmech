@@ -42,7 +42,7 @@ warning-style label — it doesn't block `execute()`.
 
 ## Build method
 
-Reuses `involute_gear_rack.build_gear_profile()` for both gear profiles
+Reuses `spur_gear.build_gear_profile()` for both gear profiles
 (unlike the planetary-set files, which keep their own duplicate copies of
 the profile builder). The whole part — bottom gear, shoulder, top gear —
 is assembled as **one continuous bmesh solid**, not two separate objects

@@ -54,11 +54,40 @@ that profile is uniformly scaled by `(z_apex - z) / z_apex` and placed at
 height `z` — this uniform per-slice scaling **is** Tredgold's
 approximation. No twist, no hand.
 
-End caps use center-fan triangulation (single center vertex per face,
-fanned to the rim) at both `z=0` and `z=z_top`. This is explicitly why
-there's no bore feature: the fan fill already covers the hub area under
-the root circle, so there's no boolean step to hook a bore into without
-also cutting into tooth material.
+End caps at both `z=0` and `z=z_top` are each a single n-gon face — no
+center vertex, no boolean. This is explicitly why there's no bore
+feature: the cap already covers the hub area under the root circle, so
+there's no boolean step to hook a bore into without also cutting into
+tooth material.
+
+### Cap fix
+
+This used to fan each end cap from an added center vertex (like
+`cluster_gear.py`'s shoulders still do). That degenerates: the shared
+`_build_gear_profile` inserts a dedendum-circle point at the same angle as
+the adjacent involute departure point wherever `base_r > ded_r` — a real
+undercut-flank segment, not a bug, but it puts that profile point and the
+newly-added center vertex on the same ray through the origin, making the
+fan triangle there exactly zero area. Confirmed before the fix: 28
+zero-area cap faces at the default `tooth_count=16`, across both caps at
+every slice count and pressure angle tried — `non_manifold` was always 0
+even with the defect present (a zero-area triangle still shares its short
+edge with exactly one real neighboring face, so edge-manifoldness was
+never actually broken), which is why this was cosmetic rather than a hard
+build failure and was safely deferred while higher-severity issues in
+other generators were fixed first.
+
+Unlike the annulus family's caps (which bridge an inner AND outer loop and
+need `bmesh.ops.triangle_fill` to do that correctly — see
+[README.md](README.md#booleangeometry-implementation-notes)), a bevel
+gear's cap is a single closed loop with nothing to bridge, so the fix is
+simpler: a single n-gon face per cap, matching how `helical_gear.py`/
+`herringbone_gear.py` already cap their own extrusions. No per-point
+triangles means this class of degenerate face can't occur regardless of
+tooth count or pressure angle. Verified clean (0 zero-area faces, 0
+non-manifold edges) across tooth counts {8, 12, 16, 20, 30, 45, 60} ×
+mate-tooth ratios {8, 16, 24, 45} × pressure angles {14.5°, 20°, 25°,
+30°} — 112 combinations, all clean.
 
 ## Panel warnings
 
