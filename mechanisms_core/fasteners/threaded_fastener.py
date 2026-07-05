@@ -21,6 +21,7 @@ from math import cos, sin, tan, pi, radians, ceil
 from bpy.props import (
     FloatProperty, IntProperty, EnumProperty, FloatVectorProperty,
 )
+from . import fastener_matching
 
 
 # ── Thread geometry ────────────────────────────────────────────────────────────
@@ -106,6 +107,13 @@ class OBJECT_OT_add_threaded_fastener(bpy.types.Operator):
     bl_label   = "Add Threaded Fastener"
     bl_options = {'REGISTER', 'UNDO'}
 
+    def bmech_sync_target(self, context):
+        fastener_matching.sync_raw_thread(self, context.window_manager.bmech_fastener_target)
+
+    def invoke(self, context, event):
+        fastener_matching.reset_target(context)
+        return self.execute(context)
+
     thread_type: EnumProperty(
         name="Thread Type",
         items=[
@@ -175,17 +183,32 @@ class OBJECT_OT_add_threaded_fastener(bpy.types.Operator):
         layout = self.layout
         _, minor_r, _, _, depth = self._derive()
 
+        layout.prop(context.window_manager, "bmech_fastener_target", text="Match Target")
+        has_target = context.window_manager.bmech_fastener_target is not None
+
         box = layout.box()
         box.label(text="Mode")
-        box.prop(self, "thread_type")
+        # thread_type is forced to the opposite of the target's own
+        # orientation (an external target needs an internal thread here,
+        # and vice versa) — see fastener_matching.sync_raw_thread. operation
+        # (additive/subtractive) only controls HOW that thread gets built,
+        # not whether it fits, so it stays free even with a target set.
+        type_row = box.column(align=True)
+        type_row.enabled = not has_target
+        type_row.prop(self, "thread_type")
         box.prop(self, "operation")
 
         box = layout.box()
         box.label(text="Thread Geometry")
-        box.prop(self, "diameter_mm")
-        box.prop(self, "pitch_mm")
-        box.prop(self, "flank_angle_deg")
-        box.prop(self, "truncation")
+        # All four dimensions freeze together whenever a target is set —
+        # same reasoning as hex_bolt.py/hex_nut.py: a mating pair needs all
+        # four to match simultaneously, no partial-match case.
+        driven = box.column(align=True)
+        driven.enabled = not has_target
+        driven.prop(self, "diameter_mm")
+        driven.prop(self, "pitch_mm")
+        driven.prop(self, "flank_angle_deg")
+        driven.prop(self, "truncation")
         box.prop(self, "height_mm")
         box.prop(self, "resolution")
         box.label(text="Thread depth (derived): %.3f mm" % depth)
@@ -223,6 +246,17 @@ class OBJECT_OT_add_threaded_fastener(bpy.types.Operator):
         bm = bmesh.new()
         _build_helix(bm, prof, self.pitch_mm, self.height_mm, self.resolution)
         result = _link(context, bm, name, tuple(context.scene.cursor.location))
+
+        # Stamped by thread_type alone, independent of operation: an
+        # "ExternalThreadCutter" (subtractive) still represents an external
+        # thread once the user finishes the boolean by hand — its own
+        # profile shape uses _internal_profile as the cutter tool (see
+        # execute()'s profile-selection logic above), but the RESULT it
+        # produces is external, which is what other parts need to match
+        # against, not the cutter's own current shape.
+        kind = "external_thread" if self.thread_type == 'EXTERNAL' else "internal_thread"
+        fastener_matching.stamp_thread(result, kind, self.diameter_mm,
+                                        self.pitch_mm, self.flank_angle_deg, self.truncation)
 
         bpy.ops.object.select_all(action='DESELECT')
         result.select_set(True)

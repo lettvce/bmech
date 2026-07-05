@@ -82,18 +82,43 @@ them matter — so `fastener_matching.sync_thread_dims` always copies all
 four together, and both operators' `draw()` freeze all four as one driven
 column, not field-by-field.
 
-**The poll stays loose**, matching the gear family's own established
-reasoning (see [gears/README.md](../gears/README.md#the-match-target-system-gear_matchingpy)):
-`fastener_target_poll` accepts any mesh object stamped with
-`bmech_thread_diameter`, regardless of `bmech_kind` — nothing stops
-picking a bolt as another bolt's target, even though that's not a
-physically meaningful pairing. Meshing correctness is on the user;
-the system only saves retyping four numbers.
+**The poll is deliberately NOT loose here — the opposite of the gear
+family's own established reasoning.** `gear_target_poll` accepts any
+object stamped with `bmech_module` regardless of kind, because cross-kind
+gear matches are sometimes legitimate (see
+[gears/README.md](../gears/README.md#the-match-target-system-gear_matchingpy)).
+Threads have no equivalent legitimate same-orientation case: two external
+threads can never mate, and neither can two internal ones — it's a hard
+physical constraint of the domain, not a matter of user judgment the way
+gear meshing correctness is. `fastener_target_poll` enforces this
+directly: it only offers objects whose orientation (external/internal) is
+the **opposite** of whichever operator is asking.
 
-`threaded_fastener.py` doesn't stamp `bmech_thread_diameter` (or anything
-else) and so can't participate as a target yet, and `press_fit_pin.py`
-uses a separate, unrelated `bmech_kind`-based system (`"press_pin"`/
-`"press_pin_cutter"`) for its own face-alignment operator, not this one.
+Enforcing that needs the poll to know which orientation the asking
+operator itself has: `hex_bolt.py` is permanently `EXTERNAL`, `hex_nut.py`
+permanently `INTERNAL`, but `threaded_fastener.py` can be either,
+decided live by its own `thread_type` property. Since a `PointerProperty`
+poll callback only receives `(self, object)` — no operator reference —
+`fastener_target_poll` reads `bpy.context.active_operator` directly to
+identify the caller (the same global-context pattern this system's own
+update callback already relies on) and looks up `bl_idname` to decide
+which orientation to require. If the asking operator can't be identified
+(headless mode, or some future fastener generator this poll doesn't know
+about yet), it falls back to permissive — same "don't hard-fail when
+context is unavailable" instinct as the rest of this pattern.
+
+`threaded_fastener.py` participates fully as of this feature — it stamps
+`bmech_kind` as `"external_thread"`/`"internal_thread"` based on its own
+`thread_type` (not `operation`; a `SUBTRACTIVE` cutter still represents
+the orientation it will leave behind once you finish the boolean by
+hand). Picking a target on it does double duty: copies the four thread
+dimensions like the hex generators, **and** forces `thread_type` to the
+opposite of the target's orientation (`operation` stays free — it only
+controls how the resulting thread gets built, not whether it fits). See
+[threaded_fastener.md](threaded_fastener.md#match-target) for the full
+writeup. `press_fit_pin.py` uses a separate, unrelated `bmech_kind`-based
+system (`"press_pin"`/`"press_pin_cutter"`) for its own face-alignment
+operator, not this one, and doesn't participate in Match Target.
 
 ## Thread nomenclature: nominal size is always major diameter
 

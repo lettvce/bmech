@@ -53,16 +53,19 @@ or unfreeze together depending on whether any valid target is set.
 driven — length/resolution/compensation are this part's own choices, not
 something the mating fastener could meaningfully specify.
 
-The poll (`fastener_matching.fastener_target_poll`) accepts any mesh
-object stamped with `bmech_thread_diameter` — currently that means
-another `hex_bolt`/`hex_nut` object (both stamp `bmech_kind` too, `"hex_bolt"`/
-`"hex_nut"`, but the poll doesn't check it, matching the gear family's own
-"loose poll, meshing correctness is on you" philosophy — see
-[README.md](README.md#match-target-a-deliberate-exception-to-the-no-shared-module-rule)).
-`threaded_fastener.py` doesn't currently stamp anything and so can't be
-picked as a target yet; `press_fit_pin.py` uses a separate, unrelated
-`bmech_kind`-based system for its own face-alignment operator, not this
-one.
+**Unlike the gear family, the poll here is deliberately NOT loose.** A
+bolt (always `EXTERNAL` orientation) can only target `INTERNAL`-oriented
+objects — `hex_nut` objects, or a `threaded_fastener.py` raw thread
+currently built with `thread_type='INTERNAL'` — never another `hex_bolt`
+or an `EXTERNAL` raw thread, since there's no physical case where two
+external threads mate (unlike some cross-kind gear matches, which can be
+mechanically legitimate). See
+[README.md](README.md#match-target-a-deliberate-exception-to-the-no-shared-module-rule)
+for the full reasoning and the mechanism (`bpy.context.active_operator`
+lookup inside the poll) this restriction depends on — and why that
+mechanism can't be verified by a headless test. `press_fit_pin.py` uses a
+separate, unrelated `bmech_kind`-based system for its own face-alignment
+operator, not this one.
 
 ## Build method
 

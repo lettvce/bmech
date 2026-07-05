@@ -42,6 +42,14 @@ there's no partial-freeze case the way there is for gears. `z_height_mm`,
 editable regardless — none of them are part of what makes a nut fit a
 given bolt.
 
+**The target picker only offers `EXTERNAL`-oriented objects** — a nut
+(always `INTERNAL`) can target a `hex_bolt`, or a `threaded_fastener.py`
+raw thread currently built with `thread_type='EXTERNAL'`, but never
+another `hex_nut` or an `INTERNAL` raw thread. See
+[hex_bolt.md](hex_bolt.md#match-target) and
+[README.md](README.md#match-target-a-deliberate-exception-to-the-no-shared-module-rule)
+for why this diverges from the gear family's deliberately loose poll.
+
 See [README.md](README.md#match-target-a-deliberate-exception-to-the-no-shared-module-rule)
 for why the Match Target machinery lives in a small shared
 `fastener_matching.py` despite this family's own "no shared module" rule

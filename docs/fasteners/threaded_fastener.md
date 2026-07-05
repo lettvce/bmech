@@ -31,7 +31,8 @@ same-named additive counterpart.
 
 | Property | Type | Default | Range | Notes |
 |---|---|---|---|---|
-| `thread_type` | Enum | `EXTERNAL` | `EXTERNAL`/`INTERNAL` | |
+| `target` | Object pointer | — | fastener objects with the OPPOSITE orientation — see Match Target below | Match Target; runs `fastener_matching.sync_raw_thread` |
+| `thread_type` | Enum | `EXTERNAL` | `EXTERNAL`/`INTERNAL` | Forced to the opposite of the target's orientation whenever a target is set — see below |
 | `operation` | Enum | `ADDITIVE` | `ADDITIVE`/`SUBTRACTIVE` | |
 | `diameter_mm` | Float (mm) | 8.0 | 0.5–100 (soft) | Nominal **major** diameter, crest-to-crest |
 | `pitch_mm` | Float (mm) | 1.25 | 0.1–10 (soft) | Distance between thread crests |
@@ -47,6 +48,36 @@ mode — `outer_compensation_mm` only for External+Additive, else
 `inner_compensation_mm` — and always adds it to `major_r` before
 re-deriving `minor_r` from the (now-larger) major radius. See
 [README.md](README.md#fdm-compensation-always-added-one-direction-per-field).
+
+## Match Target
+
+Unlike `hex_bolt.py`/`hex_nut.py` (each permanently one orientation), a
+raw thread can be built as EITHER, so picking a target does two things at
+once: copies `diameter_mm`/`pitch_mm`/`flank_angle_deg`/`truncation` (all
+four, frozen together, same as the hex generators — see
+[hex_bolt.md](hex_bolt.md#match-target)), **and** forces `thread_type` to
+whichever orientation is opposite the target's own — an external target
+needs this built as `INTERNAL`, an internal target needs `EXTERNAL`. Both
+freeze in `draw()` when a target is set. `operation` (additive/
+subtractive) is **never** frozen — it only controls how the resulting
+external or internal thread gets built (union vs. difference), not
+whether it fits, so it stays a free choice regardless of target.
+
+**The target picker itself only offers objects of the OPPOSITE
+orientation** — pick a target while `thread_type='EXTERNAL'` and the
+dropdown only lists internal-kind objects (`hex_nut`, or another raw
+thread currently built as `INTERNAL`), and vice versa. This is a
+deliberate divergence from the gear family's loose-poll philosophy — see
+[README.md](README.md#match-target-a-deliberate-exception-to-the-no-shared-module-rule)
+for why an external/internal thread pairing has no legitimate same-
+orientation case the way cross-kind gear matches sometimes do. Because
+this operator's own orientation is a *live* property rather than a fixed
+kind, the poll has to look up which operator is asking
+(`bpy.context.active_operator`) to know which orientation to filter for —
+this, like every other pick/reset/rebuild behavior in this pattern,
+cannot be exercised by a headless test; verify manually in the GUI that
+the dropdown actually excludes same-orientation objects before trusting
+it, especially after editing `fastener_matching.fastener_target_poll`.
 
 ## Build method
 
@@ -79,7 +110,13 @@ both do enforce a hard gate on their versions of these checks.
 
 ## Output
 
-One object per call, at the 3D cursor. No `bmech_*` stamping, no Match
-Target system — this operator has no concept of "meshing" with another
-part the way the gear family does; it just produces a solid for you to
-manually boolean.
+One object per call, at the 3D cursor, stamped via
+`fastener_matching.stamp_thread`: `bmech_kind` is `"external_thread"` or
+`"internal_thread"` depending on `thread_type` alone — **not** on
+`operation`. An `ExternalThreadCutter` (External+Subtractive) still
+stamps `"external_thread"`, even though its own current mesh shape uses
+the internal (ridge-in) profile as a cutter tool — the profile shape
+describes how this specific object cuts material away, but the RESULT it
+produces once you finish the boolean by hand is an external thread, which
+is what other parts need to match against, not this object's current
+shape. Same reasoning applies to `TapCutter` stamping `"internal_thread"`.
