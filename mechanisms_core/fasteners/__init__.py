@@ -1,11 +1,13 @@
 import importlib
 
+from . import fastener_matching
 from . import threaded_fastener
 from . import hex_bolt
 from . import hex_nut
 from . import press_fit_pin
 
 if "bpy" in locals():
+    importlib.reload(fastener_matching)
     importlib.reload(threaded_fastener)
     importlib.reload(hex_bolt)
     importlib.reload(hex_nut)
@@ -15,6 +17,7 @@ import bpy
 
 
 def register():
+    fastener_matching.register()
     threaded_fastener.register()
     hex_bolt.register()
     hex_nut.register()
@@ -26,3 +29,4 @@ def unregister():
     hex_nut.unregister()
     hex_bolt.unregister()
     threaded_fastener.unregister()
+    fastener_matching.unregister()

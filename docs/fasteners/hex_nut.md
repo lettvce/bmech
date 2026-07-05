@@ -21,6 +21,7 @@ duplication exists:
 
 | Property | Type | Default | Range | Notes |
 |---|---|---|---|---|
+| `target` | Object pointer | — | mesh objects with `bmech_thread_diameter` | Match Target; runs `fastener_matching.sync_thread_dims` — copies `thread_diameter_mm`/`pitch_mm`/`flank_angle_deg`/`truncation` all at once |
 | `z_height_mm` | Float (mm) | 6.5 | 0.5–50 (soft) | |
 | `across_flats_mm` | Float (mm) | 13.0 | 1–100 (soft) | |
 | `thread_diameter_mm` | Float (mm) | 8.0 | 0.5–80 (soft) | Nominal **major** diameter of the internal thread — "the hole size" |
@@ -29,6 +30,22 @@ duplication exists:
 | `truncation` | Float | 0.125 | 0.0–0.3 | |
 | `resolution` | Int | 32 | 8–128 (soft) | |
 | `inner_compensation_mm` | Float (mm) | 0.0 | 0.0–0.5 (soft) | Added to thread major radius — printed holes come out tight |
+
+## Match Target
+
+Same freeze behavior as [hex_bolt.md](hex_bolt.md#match-target):
+`thread_diameter_mm`, `pitch_mm`, `flank_angle_deg`, and `truncation`
+freeze together, all at once, whenever a valid target is set — a nut and
+the bolt it fits need all four thread dimensions to match exactly, so
+there's no partial-freeze case the way there is for gears. `z_height_mm`,
+`across_flats_mm`, `resolution`, and `inner_compensation_mm` stay
+editable regardless — none of them are part of what makes a nut fit a
+given bolt.
+
+See [README.md](README.md#match-target-a-deliberate-exception-to-the-no-shared-module-rule)
+for why the Match Target machinery lives in a small shared
+`fastener_matching.py` despite this family's own "no shared module" rule
+for thread geometry math.
 
 ## Build method — two different coincidence problems, two different fixes
 
@@ -105,6 +122,7 @@ between 0 and 0.5mm builds despite the visible warning.
 ## Output
 
 One object, named `HexNut` directly (not a temp-prefixed intermediate
-name). Same custom-property stamping as `hex_bolt.py`:
+name), stamped via `fastener_matching.stamp_thread`: `bmech_kind="hex_nut"`,
 `bmech_thread_diameter`, `bmech_pitch`, `bmech_flank_angle_deg`,
-`bmech_truncation`.
+`bmech_truncation` — the same stamping `hex_bolt.py` uses, read back by a
+`hex_bolt` (or another `hex_nut`) picking this one as its Match Target.

@@ -23,6 +23,7 @@ tip         [thread_top, thread_top + tip_length_mm]          (if tip_enable)
 
 | Property | Type | Default | Range | Notes |
 |---|---|---|---|---|
+| `target` | Object pointer | — | mesh objects with `bmech_thread_diameter` | Match Target; runs `fastener_matching.sync_thread_dims` — copies `thread_diameter_mm`/`pitch_mm`/`flank_angle_deg`/`truncation` all at once |
 | `hex_length_mm` | Float (mm) | 5.5 | 0.5–30 (soft) | Head height |
 | `hex_across_flats_mm` | Float (mm) | 13.0 | 1–100 (soft) | |
 | `shank_enable` | Bool | True | | |
@@ -38,6 +39,30 @@ tip         [thread_top, thread_top + tip_length_mm]          (if tip_enable)
 | `tip_enable` | Bool | True | | |
 | `tip_length_mm` | Float (mm) | 3.0 | 0.1–30 (soft) | |
 | `tip_diameter_mm` | Float (mm) | 0.0 | 0.0–80 (soft) | 0 = sharp point, >0 = flat dog-point tip. Silently clamped to just under the thread's minor Ø (see below) |
+
+## Match Target
+
+Picking a target freezes `thread_diameter_mm`, `pitch_mm`, `flank_angle_deg`,
+and `truncation` together, all at once, in a driven column in `draw()` —
+unlike the gear family, there's no partial-match case here (a spur-target
+that only drives module/pressure-angle while leaving helix/hand editable,
+say): a bolt and the nut that fits it need **all four** thread dimensions
+to match exactly for the threads to physically engage, so all four freeze
+or unfreeze together depending on whether any valid target is set.
+`thread_length_mm`, `resolution`, and `outer_compensation_mm` are never
+driven — length/resolution/compensation are this part's own choices, not
+something the mating fastener could meaningfully specify.
+
+The poll (`fastener_matching.fastener_target_poll`) accepts any mesh
+object stamped with `bmech_thread_diameter` — currently that means
+another `hex_bolt`/`hex_nut` object (both stamp `bmech_kind` too, `"hex_bolt"`/
+`"hex_nut"`, but the poll doesn't check it, matching the gear family's own
+"loose poll, meshing correctness is on you" philosophy — see
+[README.md](README.md#match-target-a-deliberate-exception-to-the-no-shared-module-rule)).
+`threaded_fastener.py` doesn't currently stamp anything and so can't be
+picked as a target yet; `press_fit_pin.py` uses a separate, unrelated
+`bmech_kind`-based system for its own face-alignment operator, not this
+one.
 
 ## Build method
 
@@ -95,8 +120,8 @@ warning but still builds successfully.
 
 ## Output
 
-One object, renamed `HexBolt`. Custom properties are stamped for other
-tools to introspect the thread spec later: `bmech_thread_diameter`,
-`bmech_pitch`, `bmech_flank_angle_deg`, `bmech_truncation`. This is
-metadata only — there's no Match Target system here the way there is for
-gears; nothing currently reads these properties back.
+One object, renamed `HexBolt`, stamped via `fastener_matching.stamp_thread`:
+`bmech_kind="hex_bolt"`, `bmech_thread_diameter`, `bmech_pitch`,
+`bmech_flank_angle_deg`, `bmech_truncation`. These properties are what a
+`hex_nut` (or a future `hex_bolt` targeting this one) reads back via
+Match Target — see the section above.

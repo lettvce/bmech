@@ -52,6 +52,7 @@ import bpy
 import bmesh
 from math import cos, sin, tan, pi, radians, sqrt, ceil
 from bpy.props import FloatProperty, IntProperty, BoolProperty
+from . import fastener_matching
 
 BOOL_EPSILON = 0.001
 
@@ -263,6 +264,13 @@ class OBJECT_OT_hex_bolt(bpy.types.Operator):
     bl_label   = "Hex Bolt"
     bl_options = {'REGISTER', 'UNDO'}
 
+    def bmech_sync_target(self, context):
+        fastener_matching.sync_thread_dims(self, context.window_manager.bmech_fastener_target)
+
+    def invoke(self, context, event):
+        fastener_matching.reset_target(context)
+        return self.execute(context)
+
     hex_length_mm:      FloatProperty(name="Head Length (mm)",     default=5.5,  min=0.5, soft_max=30.0)
     hex_across_flats_mm: FloatProperty(name="Head Across Flats (mm)", default=13.0, min=1.0, soft_max=100.0)
 
@@ -304,6 +312,9 @@ class OBJECT_OT_hex_bolt(bpy.types.Operator):
         layout = self.layout
         major_r, minor_r, cf, fdz, depth, head_wall, total_length = self._derived()
 
+        layout.prop(context.window_manager, "bmech_fastener_target", text="Match Target")
+        has_target = context.window_manager.bmech_fastener_target is not None
+
         col = layout.column(align=True)
         col.prop(self, "hex_length_mm")
         col.prop(self, "hex_across_flats_mm")
@@ -318,10 +329,16 @@ class OBJECT_OT_hex_bolt(bpy.types.Operator):
         layout.separator()
         col = layout.column(align=True)
         col.prop(self, "thread_length_mm")
-        col.prop(self, "thread_diameter_mm")
-        col.prop(self, "pitch_mm")
-        col.prop(self, "flank_angle_deg")
-        col.prop(self, "truncation")
+        # thread_diameter_mm/pitch_mm/flank_angle_deg/truncation all need to
+        # match a mating nut exactly for the threads to physically engage —
+        # unlike the gear family, there's no partial-match case here, so all
+        # four freeze together whenever any valid target is set.
+        driven = col.column(align=True)
+        driven.enabled = not has_target
+        driven.prop(self, "thread_diameter_mm")
+        driven.prop(self, "pitch_mm")
+        driven.prop(self, "flank_angle_deg")
+        driven.prop(self, "truncation")
         col.prop(self, "resolution")
         col.prop(self, "outer_compensation_mm")
 
@@ -450,10 +467,8 @@ class OBJECT_OT_hex_bolt(bpy.types.Operator):
         _bool_union(context, blank, head)
         blank.name = "HexBolt"
 
-        blank["bmech_thread_diameter"] = self.thread_diameter_mm
-        blank["bmech_pitch"]           = self.pitch_mm
-        blank["bmech_flank_angle_deg"] = self.flank_angle_deg
-        blank["bmech_truncation"]      = self.truncation
+        fastener_matching.stamp_thread(blank, "hex_bolt", self.thread_diameter_mm,
+                                        self.pitch_mm, self.flank_angle_deg, self.truncation)
 
         bpy.ops.object.select_all(action='DESELECT')
         blank.select_set(True)

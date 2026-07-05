@@ -41,6 +41,60 @@ This is the opposite instinct from the gear family, where reuse via
 import is preferred — know which family you're in before reaching for
 either pattern.
 
+## Match Target: a deliberate exception to the no-shared-module rule
+
+`hex_bolt.py` and `hex_nut.py` support Match Target — pick a nut as a
+bolt's target (or vice versa) and its `thread_diameter_mm`, `pitch_mm`,
+`flank_angle_deg`, and `truncation` all copy across at once, the same
+picker/freeze/rebuild-in-place UX the gear family established in
+[gears/gear_matching.py](../gears/README.md#the-match-target-system-gear_matchingpy).
+See [CONVENTIONS.md#the-match-target-pattern--letting-one-parts-output-drive-anothers-properties](../CONVENTIONS.md#the-match-target-pattern--letting-one-parts-output-drive-anothers-properties)
+for the general Blender-API gotchas this pattern runs into regardless of
+family (picker-on-`WindowManager`, reset-in-`invoke`-not-`execute`,
+treating a reset-to-`None` as a no-op, rebuild-via-delete-and-re-execute
+instead of `bpy.ops.ed.undo()`, and the fact that none of the pick/reset/
+rebuild behavior can be exercised by a headless test).
+
+This lives in a small shared module, `fasteners/fastener_matching.py` —
+which looks like it contradicts the "no shared module" rule stated above,
+but doesn't: that rule is specifically about **thread geometry math**
+(`_thread_params`, `_build_helix`, the profile builders), which is pure
+per-call computation with no reason it couldn't be duplicated safely. The
+Match Target *picker* is a single `WindowManager` property, a genuinely
+different kind of thing — it can't be meaningfully duplicated at all: two
+independent `register()` calls each doing
+`bpy.types.WindowManager.bmech_fastener_target = PointerProperty(...)`
+wouldn't coexist as two working copies, the second one to run would just
+silently replace the first's poll/update functions. `fastener_matching.py`
+holds only that picker/poll/sync/stamp machinery — no thread math at all —
+and is registered once from `fasteners/__init__.py`, the same way
+`gears/gear_matching.py` is registered once from `gears/__init__.py`.
+
+**No partial-match nuance, unlike gears.** The gear family's Match Target
+freezing is kind-dependent (a spur target drives module/pressure-angle
+but never helix/hand; a herringbone-vs-helical pairing leaves `hand`
+editable even when driven — see
+[gears/README.md](../gears/README.md#the-match-target-system-gear_matchingpy)).
+A bolt and the nut that fits it need **all four** thread dimensions
+(diameter, pitch, flank angle, truncation) to match simultaneously for
+the threads to physically engage — there's no case where only some of
+them matter — so `fastener_matching.sync_thread_dims` always copies all
+four together, and both operators' `draw()` freeze all four as one driven
+column, not field-by-field.
+
+**The poll stays loose**, matching the gear family's own established
+reasoning (see [gears/README.md](../gears/README.md#the-match-target-system-gear_matchingpy)):
+`fastener_target_poll` accepts any mesh object stamped with
+`bmech_thread_diameter`, regardless of `bmech_kind` — nothing stops
+picking a bolt as another bolt's target, even though that's not a
+physically meaningful pairing. Meshing correctness is on the user;
+the system only saves retyping four numbers.
+
+`threaded_fastener.py` doesn't stamp `bmech_thread_diameter` (or anything
+else) and so can't participate as a target yet, and `press_fit_pin.py`
+uses a separate, unrelated `bmech_kind`-based system (`"press_pin"`/
+`"press_pin_cutter"`) for its own face-alignment operator, not this one.
+
 ## Thread nomenclature: nominal size is always major diameter
 
 Every thread-based generator (`threaded_fastener.py`, `hex_bolt.py`,
