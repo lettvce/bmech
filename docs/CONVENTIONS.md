@@ -99,6 +99,75 @@ carry them forward into every future family doc:
   warnings too (see
   [gears/bevel_gear.md](gears/bevel_gear.md#panel-warnings) for a primitive
   with both kinds).
+- **Prefer clamping over cancelling whenever a natural "closest valid
+  value" exists — don't default to a `self.report({'ERROR'})` +
+  `CANCELLED` banner just because a combination is currently invalid.**
+  `gear_matching.clamp_pressure_angle` is the original instance of this:
+  rather than blocking the operator when `pressure_angle_deg` would
+  self-intersect the tooth profile for the current `tooth_count`, it
+  silently mutates `pressure_angle_deg` down to the exact self-intersection
+  limit and lets the build proceed — the redo panel shows the corrected
+  value instead of a red error banner. `hex_bolt.py`'s `tip_diameter_mm`
+  (clamped to just under the thread's minor radius) and
+  `threaded_container.py`/`threaded_lid.py`'s own `_clamp()` methods
+  (wall thickness, truncation, and thread length clamped against each
+  other in the container; truncation, guide length, and thread length
+  clamped independently in the lid, since its additive thread no longer
+  shares a fixed height budget with the other properties) follow the
+  identical pattern.
+  Concretely:
+    - Write the clamp as its own method (or a shared helper, if the
+      family centralizes logic — gears put theirs in `gear_matching.py`;
+      fasteners duplicate a bespoke `_clamp()`/`_min_*_for_*()` pair per
+      file, per that family's own convention), called once at the very
+      top of `execute()`, **before** `_derived()` or any mesh building —
+      mutate `self.<property>` directly so the value the user sees in the
+      redo panel is the corrected one, not the one they typed.
+    - `draw()`'s existing "is this combination invalid" checks don't go
+      away — keep them, but they become defensive/informational rather
+      than the primary gate, since `_clamp()` should mean they rarely if
+      ever actually fire once wired up. Downgrading their icon from
+      `'ERROR'` to `'INFO'` (still shown at the bottom of the panel, after
+      the derived-values box) signals that distinction to a future reader:
+      an `INFO` label here means "this used to be possible, `_clamp()`
+      should have already fixed it" as opposed to a live blocking gate.
+    - **Still cancel for genuinely irreconcilable combinations** — cases
+      with no meaningful single "closest valid value" to fall back to
+      (`bevel_gear.py`'s `face_width_mm >= cone_dist` is this family's
+      original example: there's no sensible auto-shrink target, the
+      geometry is just asked to be physically impossible). Have the clamp
+      method return a message (or `None`) rather than always succeeding,
+      and only `CANCELLED` + `self.report({'ERROR'}, message)` in that
+      genuinely-unfixable case.
+    - **When a clamp depends on multiple properties interacting, solve
+      for the one property whose role is "how much this construction
+      technique compromises," not the one that's the user's deliberate
+      size choice.** `threaded_container.py`/`threaded_lid.py` clamp
+      `truncation` (not `wall_thickness_mm` or `thread_diameter_mm`) to
+      fix a thread that's too deep for the available material, since
+      `truncation` specifically controls how much a thread's crest/root
+      flats blunt its depth — the size properties are what the user
+      actually came to set.
+    - **Verify a clamp helper doesn't clamp its own return value before
+      the caller gets to check it against the boundary that would make
+      the case irreconcilable.** Confirmed real bug in this project: a
+      first version of `_min_truncation_for_max_depth` clamped its result
+      to `[0, 0.3]` (truncation's own valid range) internally, which made
+      the caller's `if min_trunc > 0.3: return "irreconcilable"` check
+      impossible to ever trigger — the value being compared had already
+      been silently capped at exactly the boundary it was being tested
+      against. Return the raw, unclamped solve from a helper like this;
+      let the caller do the boundary check, then clamp for actual use.
+    - **A margin picked for one constraint doesn't automatically work for
+      a different one, even in the same file.** `threaded_lid.py` reused
+      a 0.1mm margin (already validated for its wall-thickness clamp) for
+      an unrelated thread-length clamp, and a parameter sweep dedicated to
+      exactly that margin (0.1/0.2/0.5/1.0/1.5/2.0/3.0mm) found it
+      reintroduced a real mesh defect below ~1mm — a razor-thin
+      clearance-zone wall segment is numerically fragile for the EXACT
+      solver independent of any other fix already in place. Test the
+      actual margin a new clamp needs; don't assume one that worked
+      elsewhere transfers.
 - **Boolean cutters get deleted after use.** Every generator that cuts a
   feature with a boolean modifier builds a temporary cutter object,
   applies the modifier, and deletes the cutter — never leaves a live

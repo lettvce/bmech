@@ -165,8 +165,20 @@ class OBJECT_OT_add_threaded_fastener(bpy.types.Operator):
         description="FDM: expands major diameter. Use for subtractive and internal modes. "
                     "Printed holes come out tighter than designed.",
     )
+    fit_offset_mm: FloatProperty(
+        name="Fit Offset (mm)", default=0.0, min=0.0, soft_max=0.5,
+        description="FDM: makes a mating External/Internal pair fit together better — "
+                    "subtracted from diameter when Thread Type is External, added when "
+                    "Internal (independent of Additive/Subtractive, which only controls "
+                    "how the thread gets built, not which side of a mating pair it is). "
+                    "Not synced by Match Target.",
+    )
     def _derive(self):
         major_r = self.diameter_mm / 2.0
+        if self.thread_type == 'EXTERNAL':
+            major_r -= self.fit_offset_mm / 2.0
+        else:
+            major_r += self.fit_offset_mm / 2.0
         minor_r, cf, fdz, depth = _thread_params(
             major_r, self.pitch_mm, self.flank_angle_deg, self.truncation,
         )
@@ -226,6 +238,7 @@ class OBJECT_OT_add_threaded_fastener(bpy.types.Operator):
         box.label(text="FDM Compensation")
         box.prop(self, "outer_compensation_mm")
         box.prop(self, "inner_compensation_mm")
+        box.prop(self, "fit_offset_mm")
 
     def execute(self, context):
         major_r, minor_r, cf, fdz, _ = self._derive()

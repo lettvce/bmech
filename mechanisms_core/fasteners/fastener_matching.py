@@ -41,9 +41,10 @@ it's enforced in the poll itself rather than left to the user the way
 gears leave meshing correctness up to the user.
 
 Enforcing that requires the poll to know which orientation the ASKING
-operator has — hex_bolt.py is always EXTERNAL, hex_nut.py is always
-INTERNAL, but threaded_fastener.py can be either, decided live by its own
-`thread_type` property. A PointerProperty's poll callback only receives
+operator has — hex_bolt.py and threaded_container.py are always EXTERNAL,
+hex_nut.py and threaded_lid.py are always INTERNAL, but
+threaded_fastener.py can be either, decided live by its own `thread_type`
+property. A PointerProperty's poll callback only receives
 (self, object) — no operator reference — so this reads
 `bpy.context.active_operator` directly (the same global-context pattern
 gear_matching.py's own update callback already relies on) rather than
@@ -78,9 +79,9 @@ def fastener_orientation(obj):
     if "bmech_thread_diameter" not in obj.keys():
         return None
     kind = obj.get("bmech_kind", "")
-    if kind in ("hex_bolt", "external_thread"):
+    if kind in ("hex_bolt", "external_thread", "threaded_container"):
         return "EXTERNAL"
-    if kind in ("hex_nut", "internal_thread"):
+    if kind in ("hex_nut", "internal_thread", "threaded_lid"):
         return "INTERNAL"
     return None
 
@@ -103,9 +104,9 @@ def fastener_target_poll(_self, obj):
     if op is None:
         return True
     idname = getattr(op, "bl_idname", "")
-    if idname == "object.hex_bolt":
+    if idname in ("object.hex_bolt", "object.threaded_container"):
         return target_orientation == "INTERNAL"
-    if idname == "object.hex_nut":
+    if idname in ("object.hex_nut", "object.threaded_lid"):
         return target_orientation == "EXTERNAL"
     if idname == "object.add_threaded_fastener":
         self_orientation = "EXTERNAL" if op.thread_type == 'EXTERNAL' else "INTERNAL"

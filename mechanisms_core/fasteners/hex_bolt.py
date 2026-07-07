@@ -289,6 +289,11 @@ class OBJECT_OT_hex_bolt(bpy.types.Operator):
     outer_compensation_mm: FloatProperty(name="Compensation (mm)", default=0.0,  min=0.0, soft_max=0.5,
                                       description="FDM: printed external features tend to shrink — "
                                                   "added to thread major radius")
+    fit_offset_mm:      FloatProperty(name="Fit Offset (mm)",      default=0.0,  min=0.0, soft_max=0.5,
+                                      description="FDM: subtracted from thread diameter for a looser, "
+                                                  "better-fitting mesh against a mating internal thread "
+                                                  "whose own diameter is increased by the same offset. "
+                                                  "Not synced by Match Target")
 
     tip_enable:         BoolProperty( name="Tip",                  default=True)
     tip_length_mm:      FloatProperty(name="Tip Length (mm)",      default=3.0,  min=0.1, soft_max=30.0)
@@ -298,7 +303,7 @@ class OBJECT_OT_hex_bolt(bpy.types.Operator):
                                                   "a nut can start on")
 
     def _derived(self):
-        major_r = self.thread_diameter_mm / 2.0 + self.outer_compensation_mm
+        major_r = self.thread_diameter_mm / 2.0 + self.outer_compensation_mm - self.fit_offset_mm / 2.0
         minor_r, cf, fdz, depth = _thread_params(
             major_r, self.pitch_mm, self.flank_angle_deg, self.truncation)
         head_wall = self.hex_across_flats_mm / 2.0 - self.thread_diameter_mm / 2.0
@@ -341,6 +346,7 @@ class OBJECT_OT_hex_bolt(bpy.types.Operator):
         driven.prop(self, "truncation")
         col.prop(self, "resolution")
         col.prop(self, "outer_compensation_mm")
+        col.prop(self, "fit_offset_mm")
 
         layout.separator()
         layout.prop(self, "tip_enable")

@@ -30,6 +30,7 @@ duplication exists:
 | `truncation` | Float | 0.125 | 0.0–0.3 | |
 | `resolution` | Int | 32 | 8–128 (soft) | |
 | `inner_compensation_mm` | Float (mm) | 0.0 | 0.0–0.5 (soft) | Added to thread major radius — printed holes come out tight |
+| `fit_offset_mm` | Float (mm) | 0.0 | 0.0–0.5 (soft) | Added to thread diameter — a looser fit against a mating external thread whose own diameter is reduced by the same offset. Never synced by Match Target |
 
 ## Match Target
 
@@ -38,9 +39,9 @@ Same freeze behavior as [hex_bolt.md](hex_bolt.md#match-target):
 freeze together, all at once, whenever a valid target is set — a nut and
 the bolt it fits need all four thread dimensions to match exactly, so
 there's no partial-freeze case the way there is for gears. `z_height_mm`,
-`across_flats_mm`, `resolution`, and `inner_compensation_mm` stay
-editable regardless — none of them are part of what makes a nut fit a
-given bolt.
+`across_flats_mm`, `resolution`, `inner_compensation_mm`, and
+`fit_offset_mm` stay editable regardless — none of them are part of what
+makes a nut fit a given bolt.
 
 **The target picker only offers `EXTERNAL`-oriented objects** — a nut
 (always `INTERNAL`) can target a `hex_bolt`, or a `threaded_fastener.py`

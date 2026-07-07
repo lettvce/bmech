@@ -36,6 +36,7 @@ tip         [thread_top, thread_top + tip_length_mm]          (if tip_enable)
 | `truncation` | Float | 0.125 | 0.0–0.3 | |
 | `resolution` | Int | 32 | 8–128 (soft) | |
 | `outer_compensation_mm` | Float (mm) | 0.0 | 0.0–0.5 (soft) | Added to thread major radius — printed external features shrink |
+| `fit_offset_mm` | Float (mm) | 0.0 | 0.0–0.5 (soft) | Subtracted from thread diameter — a looser fit against a mating internal thread (e.g. [hex_nut](hex_nut.md)) whose own diameter is increased by the same offset. Never synced by Match Target |
 | `tip_enable` | Bool | True | | |
 | `tip_length_mm` | Float (mm) | 3.0 | 0.1–30 (soft) | |
 | `tip_diameter_mm` | Float (mm) | 0.0 | 0.0–80 (soft) | 0 = sharp point, >0 = flat dog-point tip. Silently clamped to just under the thread's minor Ø (see below) |
@@ -49,9 +50,10 @@ that only drives module/pressure-angle while leaving helix/hand editable,
 say): a bolt and the nut that fits it need **all four** thread dimensions
 to match exactly for the threads to physically engage, so all four freeze
 or unfreeze together depending on whether any valid target is set.
-`thread_length_mm`, `resolution`, and `outer_compensation_mm` are never
-driven — length/resolution/compensation are this part's own choices, not
-something the mating fastener could meaningfully specify.
+`thread_length_mm`, `resolution`, `outer_compensation_mm`, and
+`fit_offset_mm` are never driven — length/resolution/compensation/fit are
+this part's own choices, not something the mating fastener could
+meaningfully specify.
 
 **Unlike the gear family, the poll here is deliberately NOT loose.** A
 bolt (always `EXTERNAL` orientation) can only target `INTERNAL`-oriented

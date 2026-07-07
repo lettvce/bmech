@@ -14,6 +14,8 @@ code.
 | Raw threaded fastener | `fasteners/threaded_fastener.py` | A thread helix solid, for manual boolean combination |
 | Hex bolt | `fasteners/hex_bolt.py` | Head + shank + tip blank, chained revolve, with the external thread cut out of it, head unioned on last |
 | Hex nut | `fasteners/hex_nut.py` | Hex prism with an internal thread cut through it |
+| Threaded container | `fasteners/threaded_container.py` | Screw-top jar body — solid floor, open mouth, external thread cut into the existing neck wall |
+| Threaded lid | `fasteners/threaded_lid.py` | Screw-top jar lid — solid cap, open skirt, internal thread ADDED (unioned) onto the hollow bore wall above an unthreaded guide zone |
 | Press-fit pin | `fasteners/press_fit_pin.py` | A tapered friction-fit pin + matching hole cutter, plus a face-alignment operator |
 
 ## This family does NOT share a helper module — and that's deliberate

@@ -212,6 +212,11 @@ class OBJECT_OT_hex_nut(bpy.types.Operator):
     resolution:       IntProperty(  name="Resolution",          default=32,   min=8,   soft_max=128)
     inner_compensation_mm: FloatProperty(name="Compensation (mm)", default=0.0, min=0.0, soft_max=0.5,
                                       description="FDM: printed holes come out tight — added to thread major radius")
+    fit_offset_mm:    FloatProperty(name="Fit Offset (mm)",        default=0.0, min=0.0, soft_max=0.5,
+                                      description="FDM: added to thread diameter for a looser, "
+                                                  "better-fitting mesh against a mating external thread "
+                                                  "whose own diameter is reduced by the same offset. "
+                                                  "Not synced by Match Target")
 
     def _derived(self):
         # Standard thread nomenclature: the nominal/basic size IS the major
@@ -220,7 +225,7 @@ class OBJECT_OT_hex_nut(bpy.types.Operator):
         # diameter (here: the internal ridge's tip, its innermost/smallest
         # reach) is DERIVED from major_r via pitch + flank angle, not the
         # other way around.
-        major_r = self.thread_diameter_mm / 2.0 + self.inner_compensation_mm
+        major_r = self.thread_diameter_mm / 2.0 + self.inner_compensation_mm + self.fit_offset_mm / 2.0
         minor_r, cf, fdz, depth = _thread_params(
             major_r, self.pitch_mm, self.flank_angle_deg, self.truncation)
         wall = self.across_flats_mm / 2.0 - major_r
@@ -249,6 +254,7 @@ class OBJECT_OT_hex_nut(bpy.types.Operator):
         driven.prop(self, "truncation")
         col.prop(self, "resolution")
         col.prop(self, "inner_compensation_mm")
+        col.prop(self, "fit_offset_mm")
 
         layout.separator()
         box = layout.box()

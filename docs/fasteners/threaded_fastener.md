@@ -42,12 +42,18 @@ same-named additive counterpart.
 | `resolution` | Int | 32 | 8–128 (soft) | Steps per revolution |
 | `outer_compensation_mm` | Float (mm) | 0.0 | 0.0–0.5 (soft) | Added to major diameter. Use for External+Additive (bolt) — printed external features shrink. |
 | `inner_compensation_mm` | Float (mm) | 0.0 | 0.0–0.5 (soft) | Added to major diameter. Use for Subtractive or Internal+Additive — printed holes come out tighter than designed. |
+| `fit_offset_mm` | Float (mm) | 0.0 | 0.0–0.5 (soft) | Fit adjustment for a mating External/Internal pair — subtracted from diameter when `thread_type='EXTERNAL'`, added when `'INTERNAL'`, independent of `operation`. Never synced by Match Target |
 
 `_derive()` applies whichever compensation field matches the active
 mode — `outer_compensation_mm` only for External+Additive, else
 `inner_compensation_mm` — and always adds it to `major_r` before
 re-deriving `minor_r` from the (now-larger) major radius. See
 [README.md](README.md#fdm-compensation-always-added-one-direction-per-field).
+`fit_offset_mm` is applied separately and first, keyed only on
+`thread_type` (not `operation`, which controls how the thread gets built,
+not which side of a mating pair it represents) — see
+[threaded_container.md](threaded_container.md)/[threaded_lid.md](threaded_lid.md)
+for the same offset applied to a fixed-orientation pair.
 
 ## Match Target
 

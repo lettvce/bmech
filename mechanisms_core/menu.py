@@ -166,6 +166,12 @@ class VIEW3D_MT_mechanisms_fasteners(bpy.types.Menu):
             layout.operator("object.hex_nut",               text="Hex Nut")
         if hasattr(bpy.types, 'OBJECT_OT_add_threaded_fastener'):
             layout.operator("object.add_threaded_fastener", text="Threaded Fastener (raw)")
+        if hasattr(bpy.types, 'OBJECT_OT_threaded_container') or hasattr(bpy.types, 'OBJECT_OT_threaded_lid'):
+            layout.separator()
+        if hasattr(bpy.types, 'OBJECT_OT_threaded_container'):
+            layout.operator("object.threaded_container",    text="Threaded Container")
+        if hasattr(bpy.types, 'OBJECT_OT_threaded_lid'):
+            layout.operator("object.threaded_lid",           text="Threaded Lid")
 
 
 # ── Top-level Mechanisms menu ─────────────────────────────────────────────────
