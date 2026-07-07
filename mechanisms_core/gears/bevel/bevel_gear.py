@@ -166,11 +166,22 @@ class OBJECT_OT_bevel_gear(bpy.types.Operator):
          scale_top, add_r, ded_r, over_limit, too_long, pa_max) = self._derived()
 
         layout.prop(context.window_manager, "bmech_gear_target", text="Match Target")
+        has_target = context.window_manager.bmech_gear_target is not None
+
         col = layout.column(align=True)
         col.prop(self, "tooth_count")
-        col.prop(self, "mate_teeth")
-        col.prop(self, "module")
-        col.prop(self, "pressure_angle_deg")
+        # mate_teeth/module/pressure_angle_deg all come from the target via
+        # sync_bevel (the target's own tooth_count becomes THIS gear's
+        # mate_teeth, so the two cone angles stay complementary) — freeze
+        # them together when a target is set, same convention every other
+        # gear/fastener generator uses (see spur_gear.py's own module_row).
+        # tooth_count itself is NOT driven — it's this gear's own choice,
+        # independent of the target — so it stays outside this column.
+        driven = col.column(align=True)
+        driven.enabled = not has_target
+        driven.prop(self, "mate_teeth")
+        driven.prop(self, "module")
+        driven.prop(self, "pressure_angle_deg")
         col.prop(self, "face_width_mm")
         col.prop(self, "n_slices")
 

@@ -28,6 +28,18 @@ Note the minimum tooth count here is **8**, not the 5 used by
 spur/helical/herringbone — keeps the cone-angle math and small-end tooth
 size sane at the apex.
 
+**[BUG, fixed] `mate_teeth`/`module`/`pressure_angle_deg` weren't frozen
+in `draw()` when a target was set** — `sync_bevel` itself always updated
+them correctly on pick, but the panel never grayed them out the way every
+other gear generator does (see [spur_gear.md](spur_gear.md)'s own
+`module_row.enabled = not has_target`), so a target pick looked like it
+silently did nothing, and the driven values could be immediately
+overwritten by hand with no visual cue that they were supposed to be
+locked. `tooth_count` stays outside the frozen column deliberately — it's
+this gear's own choice, not something `sync_bevel` touches (the target's
+`tooth_count` becomes this gear's `mate_teeth`, not its own
+`tooth_count`).
+
 ## Making a mating pair
 
 Two bevel gears mesh at 90° with coincident apices when their cone angles
