@@ -355,14 +355,13 @@ class OBJECT_OT_align_press_pin_to_face(bpy.types.Operator):
     bl_label   = "Align Press Pin to Face"
     bl_options = {'REGISTER', 'UNDO'}
 
-    pin_object: bpy.props.PointerProperty(
-        name="Pin", type=bpy.types.Object, poll=_pin_poll,
-        description="Pin to orient — sticks OUT of the face along its normal",
-    )
-    cutter_object: bpy.props.PointerProperty(
-        name="Cutter", type=bpy.types.Object, poll=_cutter_poll,
-        description="Hole cutter to orient — recesses INTO the face, opposite the pin",
-    )
+    # [BUG, fixed] An Operator can't hold a PointerProperty to an ID type
+    # (Object, Mesh, etc.) at all — Blender rejects it at class-registration
+    # time ("this type doesn't support data-block properties"), which
+    # previously threw a registration error for this operator on every
+    # addon load. Same fix as this family's own Match Target pickers: the
+    # pointer lives on WindowManager instead, and the operator reads it
+    # from context.window_manager.
     standoff_mm: bpy.props.FloatProperty(
         name="Standoff (mm)", default=0.001, min=0.0, soft_max=0.1,
         description="Small overlap so a later boolean doesn't sit on a knife-edge coincident face",
@@ -376,8 +375,8 @@ class OBJECT_OT_align_press_pin_to_face(bpy.types.Operator):
 
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "pin_object")
-        layout.prop(self, "cutter_object")
+        layout.prop(context.window_manager, "bmech_press_pin_align_pin", text="Pin")
+        layout.prop(context.window_manager, "bmech_press_pin_align_cutter", text="Cutter")
         layout.prop(self, "standoff_mm")
 
     def execute(self, context):
@@ -385,10 +384,13 @@ class OBJECT_OT_align_press_pin_to_face(bpy.types.Operator):
         bm   = bmesh.from_edit_mesh(obj.data)
         face = bm.faces.active
 
+        pin_object    = context.window_manager.bmech_press_pin_align_pin
+        cutter_object = context.window_manager.bmech_press_pin_align_cutter
+
         if face is None or not face.select:
             self.report({'ERROR'}, "No active face — select a face in Edit Mode first")
             return {'CANCELLED'}
-        if self.pin_object is None and self.cutter_object is None:
+        if pin_object is None and cutter_object is None:
             self.report({'ERROR'}, "Pick a pin and/or cutter object to align")
             return {'CANCELLED'}
 
@@ -399,15 +401,15 @@ class OBJECT_OT_align_press_pin_to_face(bpy.types.Operator):
 
         # Rotation around the normal is unconstrained for a round pin/cutter —
         # to_track_quat's arbitrary up-axis choice doesn't affect either mesh.
-        if self.pin_object is not None:
-            self.pin_object.rotation_mode       = 'QUATERNION'
-            self.pin_object.rotation_quaternion = normal_world.to_track_quat('Z', 'Y')
-            self.pin_object.location            = center_world - normal_world * self.standoff_mm
+        if pin_object is not None:
+            pin_object.rotation_mode       = 'QUATERNION'
+            pin_object.rotation_quaternion = normal_world.to_track_quat('Z', 'Y')
+            pin_object.location            = center_world - normal_world * self.standoff_mm
 
-        if self.cutter_object is not None:
-            self.cutter_object.rotation_mode       = 'QUATERNION'
-            self.cutter_object.rotation_quaternion = (-normal_world).to_track_quat('Z', 'Y')
-            self.cutter_object.location            = center_world + normal_world * self.standoff_mm
+        if cutter_object is not None:
+            cutter_object.rotation_mode       = 'QUATERNION'
+            cutter_object.rotation_quaternion = (-normal_world).to_track_quat('Z', 'Y')
+            cutter_object.location            = center_world + normal_world * self.standoff_mm
 
         self.report({'INFO'}, "Aligned to active face")
         return {'FINISHED'}
@@ -420,9 +422,19 @@ class OBJECT_OT_align_press_pin_to_face(bpy.types.Operator):
 def register():
     bpy.utils.register_class(OBJECT_OT_add_press_pin)
     bpy.utils.register_class(OBJECT_OT_align_press_pin_to_face)
+    bpy.types.WindowManager.bmech_press_pin_align_pin = bpy.props.PointerProperty(
+        name="Pin", type=bpy.types.Object, poll=_pin_poll,
+        description="Pin to orient — sticks OUT of the face along its normal",
+    )
+    bpy.types.WindowManager.bmech_press_pin_align_cutter = bpy.props.PointerProperty(
+        name="Cutter", type=bpy.types.Object, poll=_cutter_poll,
+        description="Hole cutter to orient — recesses INTO the face, opposite the pin",
+    )
 
 
 def unregister():
+    del bpy.types.WindowManager.bmech_press_pin_align_cutter
+    del bpy.types.WindowManager.bmech_press_pin_align_pin
     bpy.utils.unregister_class(OBJECT_OT_align_press_pin_to_face)
     bpy.utils.unregister_class(OBJECT_OT_add_press_pin)
 

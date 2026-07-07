@@ -99,9 +99,18 @@ to place them without doing the trig by hand.
 
 | Property | Type | Default | Notes |
 |---|---|---|---|
-| `pin_object` | Object pointer | — | Filtered to objects tagged `bmech_kind == "press_pin"` |
-| `cutter_object` | Object pointer | — | Filtered to objects tagged `bmech_kind == "press_pin_cutter"` |
+| `bmech_press_pin_align_pin` | Object pointer (WindowManager) | — | Filtered to objects tagged `bmech_kind == "press_pin"` |
+| `bmech_press_pin_align_cutter` | Object pointer (WindowManager) | — | Filtered to objects tagged `bmech_kind == "press_pin_cutter"` |
 | `standoff_mm` | Float (mm) | 0.001 | 0.0 min, 0.1 (soft) | Small deliberate overlap so a later boolean doesn't land on a knife-edge coincident face |
+
+**[BUG, fixed] The pin/cutter pickers used to be `PointerProperty`s directly
+on the operator** (`pin_object`/`cutter_object`) — Blender rejects that
+outright for any ID-type property ("this type doesn't support data-block
+properties"), throwing a registration error on every addon load. Moved
+onto `WindowManager` instead (`bmech_press_pin_align_pin`/
+`bmech_press_pin_align_cutter`), the same fix this family's own Match
+Target pickers already use — `execute()`/`draw()` read them from
+`context.window_manager` rather than `self`.
 
 ### Behavior
 
