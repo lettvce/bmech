@@ -8,7 +8,7 @@ Website: [lettvce.com](https://lettvce.com)
 ## Install
 
 1. Download the latest `mechanisms_core.zip` from the
-   [Releases page](https://github.com/YOUR_GITHUB_USERNAME/bmech/releases/latest).
+   [Releases page](https://github.com/lettvce/bmech/releases/latest).
 2. In Blender 5.1+: `Edit > Preferences > Get Extensions`, dropdown in the
    top-right corner → `Install from Disk...`.
 3. Select the zip. Generators appear under `Shift-A > Mechanisms`.
