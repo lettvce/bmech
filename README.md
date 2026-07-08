@@ -20,7 +20,8 @@ Website: [lettvce.com](https://lettvce.com)
   clearance support
 - **Springs** — hairspring, serpentine spring
 - **Ratchets** — external ratchet & pawl, internal freewheel ratchet
-- **Fasteners & bearings** — threaded fasteners, press-fit pins, ball bearings
+- **Fasteners** — threaded fasteners
+- **Bearings** — ball bearings
 
 ## Development
 

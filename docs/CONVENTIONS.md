@@ -67,7 +67,7 @@ operator, the same way you'd treat "keep the tests passing."
 | Family | Status | Entry point |
 |---|---|---|
 | Gears | Documented | [docs/gears/README.md](gears/README.md) |
-| Fasteners (`fasteners/threaded_fastener.py`, `fasteners/hex_bolt.py`, `fasteners/hex_nut.py`, `fasteners/press_fit_pin.py`) | Documented | [docs/fasteners/README.md](fasteners/README.md) |
+| Fasteners (`fasteners/threaded_fastener.py`, `fasteners/hex_bolt.py`, `fasteners/hex_nut.py`) | Documented | [docs/fasteners/README.md](fasteners/README.md) |
 | Bearings (`bearings/ball_bearing.py`) | Documented | [docs/bearings/README.md](bearings/README.md) |
 | Springs (`springs/hairspring.py`, `springs/serpentine_spring.py`) | Documented | [docs/springs/README.md](springs/README.md) |
 | Ratchets (`ratchets/ratchet_pawl.py`, `ratchets/internal_ratchet.py`) | Documented | [docs/ratchets/README.md](ratchets/README.md) |

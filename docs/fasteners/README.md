@@ -16,7 +16,6 @@ code.
 | Hex nut | `fasteners/hex_nut.py` | Hex prism with an internal thread cut through it |
 | Threaded container | `fasteners/threaded_container.py` | Screw-top jar body — solid floor, open mouth, external thread cut into the existing neck wall |
 | Threaded lid | `fasteners/threaded_lid.py` | Screw-top jar lid — solid cap, open skirt, internal thread ADDED (unioned) onto the hollow bore wall above an unthreaded guide zone |
-| Press-fit pin | `fasteners/press_fit_pin.py` | A tapered friction-fit pin + matching hole cutter, plus a face-alignment operator |
 
 ## This family does NOT share a helper module — and that's deliberate
 
@@ -118,9 +117,7 @@ dimensions like the hex generators, **and** forces `thread_type` to the
 opposite of the target's orientation (`operation` stays free — it only
 controls how the resulting thread gets built, not whether it fits). See
 [threaded_fastener.md](threaded_fastener.md#match-target) for the full
-writeup. `press_fit_pin.py` uses a separate, unrelated `bmech_kind`-based
-system (`"press_pin"`/`"press_pin_cutter"`) for its own face-alignment
-operator, not this one, and doesn't participate in Match Target.
+writeup.
 
 ## Thread nomenclature: nominal size is always major diameter
 
@@ -148,43 +145,23 @@ depth       = flank_dz / tan(half_angle)   if flank_dz > 0  else 0
 minor_r     = major_r - depth
 ```
 
-`press_fit_pin.py` has no threads and doesn't use this convention — see
-its own doc for the analogous "nominal is a centerline reference, pin and
-hole are derived symmetrically around it" rule.
-
 ## FDM compensation: always added, one direction per field
 
 Every compensation property in this family is **added** to a radius or
 diameter, never subtracted — consistent with the rest of this library.
 Which field you set depends on which side of the part is printed:
 
-- **External features that print undersized** (a bolt's thread, a
-  press-fit pin): compensation is added to grow the feature back out.
+- **External features that print undersized** (a bolt's thread):
+  compensation is added to grow the feature back out.
 - **Internal features that print tight** (a nut's thread bore, a cut
-  hole, a press-fit hole cutter): compensation is added to open the hole
-  back up.
+  hole): compensation is added to open the hole back up.
 
 `threaded_fastener.py` exposes both `outer_compensation_mm` (External +
 Additive mode) and `inner_compensation_mm` (Subtractive or Internal +
 Additive modes) on the same operator, since one operator covers all four
 mode combinations. `hex_bolt.py` only exposes `outer_compensation_mm`
 (it only ever builds External + Additive). `hex_nut.py` only exposes
-`inner_compensation_mm`. `press_fit_pin.py` exposes both
-`pin_diameter_compensation_mm` and `hole_diameter_compensation_mm`
-independently, since it builds both parts in one operator call.
-
-`press_fit_pin.py`'s interference math additionally documents *why* this
-matters for a two-part fit: total interference is split symmetrically
-around the nominal diameter (half added to the pin, half subtracted from
-the hole) — that symmetric split is not FDM compensation, it's the
-mechanical fit spec. FDM compensation is a *separate*, always-additive
-term layered on top of each side of that split:
-
-```
-half_interference = interference_mm / 2
-pin_diameter_mm  = nominal_diameter_mm + half_interference + pin_diameter_compensation_mm
-hole_diameter_mm = nominal_diameter_mm - half_interference + hole_diameter_compensation_mm
-```
+`inner_compensation_mm`.
 
 ## Boolean-solver patterns specific to this family
 
@@ -299,10 +276,3 @@ there is looser than the one that triggers the draw() warning. E.g.
 warning once `head_wall <= 0.5mm`, but only actually cancels execution at
 `head_wall <= 0`. A wall between 0 and 0.5mm will build successfully
 despite the visible warning — read the number, not just the icon color.
-
-`press_fit_pin.py` is the outlier: its `execute()` cancels silently on
-either a failed `validate_press_pin_parameters()` check or a caught
-exception during mesh building, in both cases **without** calling
-`self.report()`. If a press pin operator returns `CANCELLED` with no
-visible error message, check the panel's validation labels — nothing
-will appear in the status bar to tell you what went wrong.

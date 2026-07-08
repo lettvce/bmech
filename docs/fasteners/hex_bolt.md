@@ -65,9 +65,7 @@ mechanically legitimate). See
 [README.md](README.md#match-target-a-deliberate-exception-to-the-no-shared-module-rule)
 for the full reasoning and the mechanism (`bpy.context.active_operator`
 lookup inside the poll) this restriction depends on — and why that
-mechanism can't be verified by a headless test. `press_fit_pin.py` uses a
-separate, unrelated `bmech_kind`-based system for its own face-alignment
-operator, not this one.
+mechanism can't be verified by a headless test.
 
 ## Build method
 

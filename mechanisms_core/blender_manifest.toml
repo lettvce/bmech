@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "mechanisms_core"
-version = "1.0.0"
+version = "1.0.1"
 name = "Mechanisms Core"
 tagline = "Adds a unified Mechanisms submenu to the Shift-A Add menu"
 maintainer = "Blake Wysocki <blakewysocki421@gmail.com>"

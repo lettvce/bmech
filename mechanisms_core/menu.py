@@ -198,10 +198,6 @@ class VIEW3D_MT_mechanisms_add(bpy.types.Menu):
             layout.menu(VIEW3D_MT_mechanisms_ratchet.bl_idname)
             found_any = True
 
-        if hasattr(bpy.types, 'OBJECT_OT_add_press_pin'):
-            layout.operator("object.add_press_pin",        text="Press-Fit Pin")
-            found_any = True
-
         gears_any = (hasattr(bpy.types, 'OBJECT_OT_add_spur_gear')                      or
                      hasattr(bpy.types, 'OBJECT_OT_add_rack')                            or
                      hasattr(bpy.types, 'OBJECT_OT_add_cluster_gear')                    or
