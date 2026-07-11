@@ -3,7 +3,7 @@
 A free Blender extension for generating mechanical parts — gears, springs,
 ratchets, bearings, and fasteners — parametric and ready to 3D print.
 
-Website: [lettvce.com](https://lettvce.com)
+Website: [lettvce.com/bmech](https://lettvce.com/bmech/)
 
 ## Install
 
