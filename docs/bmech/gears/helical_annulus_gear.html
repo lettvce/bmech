@@ -115,6 +115,48 @@
   }
   .card h3 { margin: 0 0 0.4rem; }
   .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .section-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  .section-index a {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+  .section-index a:hover { border-color: var(--accent); }
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0;
+    scroll-margin-top: 1.5rem;
+  }
+  summary {
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    transition: transform 0.15s ease;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details > *:not(summary) {
+    padding: 0 1.2rem 1.2rem;
+  }
+  details .grid { margin-top: 0; }
   footer {
     border-top: 1px solid var(--border);
     text-align: center;
@@ -133,7 +175,7 @@
 </header>
 <main>
 <p><code>gears/ring/helical_annulus_gear.py</code> → <code>OBJECT_OT_helical_annulus_gear</code> (<code>object.helical_annulus_gear</code>, "Helical Annulus Gear")</p>
-<p>Helical internal gear — twisted involute teeth cut into the bore of a solid ring. See <a href="index.html">README.md</a> for family-wide conventions and <a href="annulus_gear.html">annulus_gear.md</a> for the swapped addendum/dedendum geometry shared by all three annulus generators.</p>
+<p>Helical internal gear — twisted involute teeth cut into the bore of a solid ring. See README.md for family-wide conventions and <a href="annulus_gear.html">annulus_gear.md</a> for the swapped addendum/dedendum geometry shared by all three annulus generators.</p>
 <h2>This is where the hand convention flips</h2>
 <p><strong>Read this even if you've already read the helical/herringbone external gear docs.</strong> External-external helical pairs need opposite hands; a helical annulus and its mating helical pinion need the <strong>SAME</strong> hand. Right annulus meshes with a right pinion, not a left one. This is the single most common mistake this library's Match Target system exists to prevent — which is why picking a target here runs <code>sync_helical_same</code>, not <code>sync_helical_opposite</code>.</p>
 <h2>Properties</h2>
@@ -176,5 +218,22 @@
   <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
      <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
 </footer>
+<script>
+// Opens the <details> section matching the URL's #hash, so clicking an
+// index link actually shows that section instead of just scrolling next
+// to a still-collapsed one. Harmless no-op on pages with no <details> or
+// no hash. No framework, no dependency — a handful of lines is all this
+// needs.
+(function () {
+  function openFromHash() {
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+})();
+</script>
 </body>
 </html>

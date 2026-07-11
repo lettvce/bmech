@@ -115,6 +115,48 @@
   }
   .card h3 { margin: 0 0 0.4rem; }
   .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .section-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  .section-index a {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+  .section-index a:hover { border-color: var(--accent); }
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0;
+    scroll-margin-top: 1.5rem;
+  }
+  summary {
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    transition: transform 0.15s ease;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details > *:not(summary) {
+    padding: 0 1.2rem 1.2rem;
+  }
+  details .grid { margin-top: 0; }
   footer {
     border-top: 1px solid var(--border);
     text-align: center;
@@ -150,7 +192,7 @@
 </tbody></table></div>
 <p><code>sun_teeth</code>, <code>planet_teeth</code>, <code>planet_count</code>, <code>module</code>, <code>pressure_angle_deg</code>, <code>width_mm</code>, <code>ring_wall_mm</code>, <code>pip_gap</code>, <code>outer_segs</code> are identical to the spur set.</p>
 <h2>Hand is chosen once, for the sun — everything else follows</h2>
-<p>You only ever set the hand of the <strong>sun</strong> gear. Planet and ring hands are derived automatically from the two mesh rules in <a href="index.html#hand-convention--the-one-rule-most-likely-to-bite-you">README.md</a>:</p>
+<p>You only ever set the hand of the <strong>sun</strong> gear. Planet and ring hands are derived automatically from the two mesh rules in README.md:</p>
 <pre><code>sun-planet is external-external  → planet = OPPOSITE of sun
 planet-ring is external-internal → ring   = SAME as planet
                                   → ring   = OPPOSITE of sun</code></pre>
@@ -167,5 +209,22 @@ planet-ring is external-internal → ring   = SAME as planet
   <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
      <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
 </footer>
+<script>
+// Opens the <details> section matching the URL's #hash, so clicking an
+// index link actually shows that section instead of just scrolling next
+// to a still-collapsed one. Harmless no-op on pages with no <details> or
+// no hash. No framework, no dependency — a handful of lines is all this
+// needs.
+(function () {
+  function openFromHash() {
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+})();
+</script>
 </body>
 </html>

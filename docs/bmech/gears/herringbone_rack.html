@@ -115,6 +115,48 @@
   }
   .card h3 { margin: 0 0 0.4rem; }
   .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .section-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  .section-index a {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+  .section-index a:hover { border-color: var(--accent); }
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0;
+    scroll-margin-top: 1.5rem;
+  }
+  summary {
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    transition: transform 0.15s ease;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details > *:not(summary) {
+    padding: 0 1.2rem 1.2rem;
+  }
+  details .grid { margin-top: 0; }
   footer {
     border-top: 1px solid var(--border);
     text-align: center;
@@ -135,7 +177,7 @@
 <p><code>gears/rack/herringbone_rack.py</code> → <code>OBJECT_OT_herringbone_rack</code> (<code>object.herringbone_rack</code>, "Herringbone Rack")</p>
 <p>A straight rack sheared into a V along X: the bottom half shears one way from <code>Z=0</code> to <code>Z=width/2</code>, the top half shears back the other way from <code>Z=width/2</code> to <code>Z=width</code> — the gear-of-infinite-radius limit of <a href="herringbone_gear.html">herringbone_gear.md</a>'s V-twist, the same way <a href="helical_rack.html">helical_rack.md</a> is the limit of <a href="helical_gear.html">helical_gear.md</a>'s twist.</p>
 <h2>Hand convention</h2>
-<p>Same rule as the helical rack: mating with a herringbone pinion needs the <strong>same</strong> hand — <strong>not</strong> the opposite hand the external-external gear-gear rule would suggest, because a rack contacts its pinion at a different relative angular position than two side-by-side external gears do. See <a href="index.html#hand-convention--the-one-rule-most-likely-to-bite-you">README.md</a> and <a href="helical_rack.html#hand-fix--why-this-needed-correcting-after-initial-release">helical_rack.md</a> for the full derivation and empirical verification. Herringbone parts have no net axial thrust regardless of hand, but hand still determines which way the V opens and must match the mating pinion.</p>
+<p>Same rule as the helical rack: mating with a herringbone pinion needs the <strong>same</strong> hand — <strong>not</strong> the opposite hand the external-external gear-gear rule would suggest, because a rack contacts its pinion at a different relative angular position than two side-by-side external gears do. See README.md and <a href="helical_rack.html#hand-fix--why-this-needed-correcting-after-initial-release">helical_rack.md</a> for the full derivation and empirical verification. Herringbone parts have no net axial thrust regardless of hand, but hand still determines which way the V opens and must match the mating pinion.</p>
 <h2>Properties</h2>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -156,7 +198,7 @@
 </tbody></table></div>
 <p>No bore properties, no <code>n_slices</code> — see Build method below for why.</p>
 <h2>Hand and Match Target freezing</h2>
-<p>Same freeze pattern as <a href="herringbone_gear.html">herringbone_gear.md</a>: <code>module</code>/<code>pressure_angle_deg</code> freeze whenever any target is set; <code>helix_angle_deg</code> freezes only when the target stamps <code>bmech_helix_angle_deg</code>; <code>hand</code> freezes with <code>helix_angle_deg</code> <strong>except</strong> when <code>gear_matching.hand_target_ambiguous(True, target)</code> is true — i.e. when this rack (herringbone-style) is matched against a plain-helical target, since a plain helical pinion only meshes one half of this rack's V at a time, and which hand is correct depends on which half. See <a href="index.html#the-match-target-system-gear_matchingpy">README.md</a> for the full rationale.</p>
+<p>Same freeze pattern as <a href="herringbone_gear.html">herringbone_gear.md</a>: <code>module</code>/<code>pressure_angle_deg</code> freeze whenever any target is set; <code>helix_angle_deg</code> freezes only when the target stamps <code>bmech_helix_angle_deg</code>; <code>hand</code> freezes with <code>helix_angle_deg</code> <strong>except</strong> when <code>gear_matching.hand_target_ambiguous(True, target)</code> is true — i.e. when this rack (herringbone-style) is matched against a plain-helical target, since a plain helical pinion only meshes one half of this rack's V at a time, and which hand is correct depends on which half. See README.md for the full rationale.</p>
 <h2>Build method</h2>
 <p><strong>No <code>n_slices</code> property, unlike <code>herringbone_gear.py</code>.</strong> Each half of the V is its own linear (affine) shear of Z within its own range — see <a href="helical_rack.html#build-method">helical_rack.md</a> for the full derivation of why an affine shear needs no intermediate Z-layers to be exact, unlike a gear's rotational twist. A herringbone rack therefore needs exactly <strong>three</strong> layers total: <code>Z=0</code> (shear 0), <code>Z=width/2</code> (peak shear), and <code>Z=width</code> (shear back to 0) — not <code>2*n_slices-1</code> layers approximating a curved surface the way <code>herringbone_gear.py</code> needs.</p>
 <pre><code>peak_shear = (width/2) * tan(helix_angle)</code></pre>
@@ -177,5 +219,22 @@
   <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
      <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
 </footer>
+<script>
+// Opens the <details> section matching the URL's #hash, so clicking an
+// index link actually shows that section instead of just scrolling next
+// to a still-collapsed one. Harmless no-op on pages with no <details> or
+// no hash. No framework, no dependency — a handful of lines is all this
+// needs.
+(function () {
+  function openFromHash() {
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+})();
+</script>
 </body>
 </html>

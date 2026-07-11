@@ -115,6 +115,48 @@
   }
   .card h3 { margin: 0 0 0.4rem; }
   .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .section-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  .section-index a {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+  .section-index a:hover { border-color: var(--accent); }
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0;
+    scroll-margin-top: 1.5rem;
+  }
+  summary {
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    transition: transform 0.15s ease;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details > *:not(summary) {
+    padding: 0 1.2rem 1.2rem;
+  }
+  details .grid { margin-top: 0; }
   footer {
     border-top: 1px solid var(--border);
     text-align: center;
@@ -133,7 +175,7 @@
 </header>
 <main>
 <p><code>fasteners/threaded_container.py</code> → <code>OBJECT_OT_threaded_container</code> (<code>object.threaded_container</code>, "Threaded Container")</p>
-<p>A screw-top jar body: solid floor, straight outer wall, open mouth at the top, with an <strong>external</strong> thread cut directly into the existing outer wall near the top — no separate raised neck boss. <code>thread_diameter_mm</code> plays double duty as both the container's own OD and the thread's major diameter, matching hex_bolt.py/hex_nut.py's naming convention so <code>fastener_matching.sync_thread_dims</code> works unmodified. See <a href="index.html#match-target-a-deliberate-exception-to-the-no-shared-module-rule">README.md</a> for the family's Match Target system this participates in.</p>
+<p>A screw-top jar body: solid floor, straight outer wall, open mouth at the top, with an <strong>external</strong> thread cut directly into the existing outer wall near the top — no separate raised neck boss. <code>thread_diameter_mm</code> plays double duty as both the container's own OD and the thread's major diameter, matching hex_bolt.py/hex_nut.py's naming convention so <code>fastener_matching.sync_thread_dims</code> works unmodified. See README.md for the family's Match Target system this participates in.</p>
 <h2>Properties</h2>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -157,7 +199,7 @@
 </tbody></table></div>
 <p><code>thread_diameter_mm</code>/<code>pitch_mm</code>/<code>flank_angle_deg</code>/<code>truncation</code> freeze together in a driven column whenever a target is set — same all-four freeze behavior as <a href="hex_bolt.html#match-target">hex_bolt.md</a>, since a container and its mating lid need all four to match simultaneously. <code>wall_thickness_mm</code>/<code>height_mm</code>/<code>thread_length_mm</code>/<code>resolution</code>/ <code>outer_compensation_mm</code>/<code>fit_offset_mm</code> are never driven — fit, like compensation, is this part's own printing-tolerance choice, not something a mating fastener could meaningfully specify.</p>
 <p><code>fit_offset_mm</code> folds into <code>outer_r</code> (<code>_derived()</code> and <code>_clamp()</code> both subtract <code>fit_offset_mm / 2.0</code> alongside adding <code>outer_compensation_mm</code>) before any of the usual wall-thickness/truncation/thread-length clamping runs, so a large fit offset is subject to the same margin protections a large negative OD change would be.</p>
-<p><strong>The target picker only offers <code>INTERNAL</code>-oriented objects</strong> — <code>hex_nut</code>, <code>threaded_lid</code>, or a <code>threaded_fastener.py</code> raw thread currently built with <code>thread_type='INTERNAL'</code>. See <a href="index.html#match-target-a-deliberate-exception-to-the-no-shared-module-rule">README.md</a> for why this family's poll is deliberately NOT loose the way the gear family's is.</p>
+<p><strong>The target picker only offers <code>INTERNAL</code>-oriented objects</strong> — <code>hex_nut</code>, <code>threaded_lid</code>, or a <code>threaded_fastener.py</code> raw thread currently built with <code>thread_type='INTERNAL'</code>. See README.md for why this family's poll is deliberately NOT loose the way the gear family's is.</p>
 <h2>Why the default truncation is higher than the fastener convention</h2>
 <p>Jar/bottle threads use a much coarser pitch than fastener threads (4mm here vs. ~1.25mm for hex_bolt.py's default), and thread depth scales with <code>pitch</code> for a given flank angle and truncation (<code>depth = flank_dz / tan(half_angle)</code>, and <code>flank_dz</code> scales with pitch). At the fastener family's usual <code>truncation=0.125</code>, a 4mm pitch at 30° flank angle produces a thread over 4.6mm deep — deeper than any reasonable container wall. <code>truncation=0.25</code> cuts that to about 1.9mm, safely under the default 3mm wall. If you increase <code>pitch_mm</code>, raise <code>truncation</code> too (up to its 0.3 maximum) or increase <code>wall_thickness_mm</code> to keep <code>depth &lt; wall_thickness_mm</code> — the panel's ERROR label ("Thread too deep for this wall — would break through to interior") fires at <code>depth &gt;= wall_thickness_mm</code>, with a warning starting at 70% of that.</p>
 <h2>Build method</h2>
@@ -165,7 +207,7 @@
 <p>Thread cut: identical technique to <code>hex_bolt.py</code>'s external thread — a helical groove cutter (<code>_internal_profile</code>, crest pointing inward, used subtractively), <code>root_flat</code> swapped into the <code>crest_flat</code> argument slot, a depth-scaled radial <code>overlap</code> so the cut has genuine volume to remove rather than a hairline touch at the wall's own true major radius, cut into the EXISTING solid wall near the top — no base-shape rework needed, unlike <a href="threaded_lid.html">threaded_lid.md</a>, because the container's outer wall is already solid at exactly the thread's major radius.</p>
 <p><strong>Cleanup pass required, unlike hex_bolt.py.</strong> This cut leaves a small, fixed number of zero-area sliver faces (two numerically-identical vertices within one triangle) from the EXACT solver — confirmed empirically to be independent of the cutter's axial overshoot amount (tested 0 to 2 full pitches, defect count never changed) and independent of exactly where the top boundary sits, ruling out a wind-up/coincidence theory; only mesh resolution changed the count. <code>bmesh.ops. dissolve_degenerate</code> (the dedicated tool for exactly this artifact class) run once after the boolean removes them completely — verified 0 zero-area, 0 non-manifold, correct positive volume afterward across a 54-combination parameter sweep.</p>
 <h2>Validation: clamped, not cancelled</h2>
-<p><code>execute()</code> calls <code>self._clamp()</code> first, before any geometry is built — following <a href="../CONVENTIONS.html#conventions-that-apply-across-every-family-not-just-gears">CONVENTIONS.md's clamp-over-cancel rule</a>, the same pattern <code>gear_matching.clamp_pressure_angle</code> and <code>hex_bolt.py</code>'s own <code>tip_diameter_mm</code> clamp use. Rather than cancelling when a combination is invalid, three properties get silently corrected in order:</p>
+<p><code>execute()</code> calls <code>self._clamp()</code> first, before any geometry is built — following CONVENTIONS.md's clamp-over-cancel rule, the same pattern <code>gear_matching.clamp_pressure_angle</code> and <code>hex_bolt.py</code>'s own <code>tip_diameter_mm</code> clamp use. Rather than cancelling when a combination is invalid, three properties get silently corrected in order:</p>
 <ol><li><code>wall_thickness_mm</code> is clamped down to <code>min(outer_r, height_mm) - 0.1</code> whenever it would leave no interior cavity.</li><li><code>truncation</code> is clamped UP (via <code>_min_truncation_for_max_depth</code>, solving the closed-form relationship between thread depth and <code>pitch_mm</code>/<code>flank_angle_deg</code>/<code>truncation</code>) whenever the resulting thread depth would exceed 70% of the (now-valid) wall thickness. Truncation, not wall thickness or thread diameter, is what gets adjusted here — it specifically controls how much a thread's own crest/root flats blunt its depth, while the size properties are what the user actually came to set.</li><li><code>thread_length_mm</code> is clamped down to fit within <code>height_mm - floor_z</code>.</li></ol>
 <p><strong>Only one case still cancels</strong>: if <code>truncation</code> would need to exceed its own max (0.3) to keep depth in check — a pitch too coarse for the wall thickness at any truncation — <code>_clamp()</code> returns a message, <code>self.report({'ERROR'}, ...)</code> fires, and <code>execute()</code> returns <code>CANCELLED</code>. This is the one combination with no meaningful single "closest valid value" to fall back to (matching <code>bevel_gear.py</code>'s own <code>face_width_mm &gt;= cone_dist</code> precedent for the same kind of genuinely irreconcilable case).</p>
 <p><code>draw()</code> still shows the same conditions as <code>INFO</code>-icon labels at the bottom of the panel, after the derived-values box — but they're now purely defensive/informational, since <code>_clamp()</code> means they should rarely or never actually fire once a build completes:</p>
@@ -177,5 +219,22 @@
   <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
      <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
 </footer>
+<script>
+// Opens the <details> section matching the URL's #hash, so clicking an
+// index link actually shows that section instead of just scrolling next
+// to a still-collapsed one. Harmless no-op on pages with no <details> or
+// no hash. No framework, no dependency — a handful of lines is all this
+// needs.
+(function () {
+  function openFromHash() {
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+})();
+</script>
 </body>
 </html>

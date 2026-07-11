@@ -115,6 +115,48 @@
   }
   .card h3 { margin: 0 0 0.4rem; }
   .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .section-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  .section-index a {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+  .section-index a:hover { border-color: var(--accent); }
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0;
+    scroll-margin-top: 1.5rem;
+  }
+  summary {
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    transition: transform 0.15s ease;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details > *:not(summary) {
+    padding: 0 1.2rem 1.2rem;
+  }
+  details .grid { margin-top: 0; }
   footer {
     border-top: 1px solid var(--border);
     text-align: center;
@@ -133,7 +175,7 @@
 </header>
 <main>
 <p><code>ratchets/ratchet_pawl.py</code> — three operators sharing one set of geometry helpers: <code>MESH_OT_add_ratchet_wheel</code> (<code>mesh.add_ratchet_wheel</code>, "Add Ratchet Wheel"), <code>MESH_OT_add_ratchet_pawl</code> (<code>mesh.add_ratchet_pawl</code>, "Add Ratchet Pawl"), and <code>OBJECT_OT_add_ratchet_mechanism</code> (<code>object.add_ratchet_mechanism</code>, "Add Ratchet &amp; Pawl") — the combined operator that builds a matched, auto-positioned pair.</p>
-<p>Rigid, no-spring: <strong>+Z (CCW from above) wheel rotation = LOCK</strong>, -Z (CW) = FREE. See <a href="index.html">README.md</a> for this family's shared conventions, especially the lock-direction convention (which flips for the internal ratchet) and the "no clamping, ever" validation policy.</p>
+<p>Rigid, no-spring: <strong>+Z (CCW from above) wheel rotation = LOCK</strong>, -Z (CW) = FREE. See README.md for this family's shared conventions, especially the lock-direction convention (which flips for the internal ratchet) and the "no clamping, ever" validation policy.</p>
 <h2>Shared constants</h2>
 <p><code>HOLE_SEGMENTS = 32</code> (hole circle resolution), <code>PIVOT_BIAS_ANGLE_DEG = 35.0</code> (tangent-vs-radial blend for the auto pivot solve, see below), <code>PIVOT_PAD_MM = 2.0</code> (minimum wall thickness kept around any pivot/axle hole).</p>
 <h2>Operator 1: Add Ratchet Wheel</h2>
@@ -157,7 +199,7 @@
 <tr><td><code>axle_hole_diameter_mm</code></td><td>Float (mm)</td><td>5.0</td><td>0.1–100 (soft)</td><td></td></tr>
 <tr><td><code>axle_hole_compensation_mm</code></td><td>Float (mm)</td><td>0.0</td><td>-2.0–2.0 (soft)</td><td>Added to hole diameter</td></tr>
 </tbody></table></div>
-<p>The panel shows a read-only <strong>"Back Face Angle (derived)"</strong> label — see <a href="index.html#tooth-ramp-angle-is-derived-never-a-free-input">README.md</a>.</p>
+<p>The panel shows a read-only <strong>"Back Face Angle (derived)"</strong> label — see README.md.</p>
 <h3>Tooth profile</h3>
 <p><code>build_wheel_profile_points()</code> builds a closed CCW loop with exactly 2 vertices per tooth (root, tip) — an earlier version used a two-segment back face to independently satisfy uniform spacing, a radial drive face, and a free-standing ramp angle at once; v1.1 dropped the third constraint (ramp angle became derived) and simplified to a single straight back-face segment per tooth, tip_i → root_(i+1).</p>
 <h3>Validation (raises, always cancels — see family README)</h3>
@@ -215,7 +257,7 @@
 <ol><li>Maps <code>engagement_side</code> to a target angle around the wheel, then <strong>snaps to the nearest actual tooth drive-face angle</strong> — "so the contact point lands exactly on a real drive face instead of in mid-air between teeth."</li><li>Computes the lock-direction tangent at that contact point (per the +Z=LOCK convention) and the outward radial direction.</li><li>Blends them: <code>pivot_dir = normalize(-tangent_lock*cos(bias) + radial_dir*sin(bias))</code> with <code>bias = PIVOT_BIAS_ANGLE_DEG = 35°</code> — the pivot sits mostly <em>against</em> the lock-direction surface velocity (so the wheel's push rotates the pawl arm further into engagement rather than out of it) plus a constant outward lean so the pivot clears the wheel body.</li><li><code>pivot_world = contact_world + pawl_arm_length_mm * pivot_dir</code>.</li></ol>
 <p>Raises <code>ValueError</code> (→ <code>CANCELLED</code>) if <code>tip_engagement_depth_mm &gt;= tooth_depth_mm</code> (tip can't project deeper than the tooth itself), or if the resulting pivot still ends up inside/at the wheel's outer radius (<code>pawl_arm_length_mm</code> too short).</p>
 <h3>Validation — one genuine non-blocking warning in this whole file</h3>
-<p>Almost everything here follows the raise/cancel discipline described in <a href="index.html#validation-no-clamping-ever--but-only-in-ratchet_pawlpy">README.md</a>: wheel geometry checks, pawl structural checks, and the <strong>cross-part check unique to this operator</strong> — <code>pawl_tip_width_mm &gt;= estimate_valley_width_mm(...)</code> ("Tip too wide for tooth valley") — all cancel on failure.</p>
+<p>Almost everything here follows the raise/cancel discipline described in README.md: wheel geometry checks, pawl structural checks, and the <strong>cross-part check unique to this operator</strong> — <code>pawl_tip_width_mm &gt;= estimate_valley_width_mm(...)</code> ("Tip too wide for tooth valley") — all cancel on failure.</p>
 <p>The one exception: in <strong>MANUAL</strong> pivot mode, if the manually-placed pivot ends up more than 0.5mm away from where <code>pawl_arm_length_mm</code> says it should be, <code>execute()</code> issues <code>self.report({'WARNING'}, ...)</code> but still builds the mechanism — "the tip won't land exactly on the drive face" is a warning you can act on or ignore, not a blocking error, since you explicitly chose manual placement.</p>
 <h3>Output</h3>
 <p><strong>2 or 3 objects</strong>: <code>RatchetWheel</code> + <code>Pawl</code>, plus (default on) a <code>RatchetMechanism</code> empty parenting both. Pawl is set active. Success message reports tooth count, derived back-face angle, and which side the pawl engages on.</p>
@@ -224,5 +266,22 @@
   <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
      <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
 </footer>
+<script>
+// Opens the <details> section matching the URL's #hash, so clicking an
+// index link actually shows that section instead of just scrolling next
+// to a still-collapsed one. Harmless no-op on pages with no <details> or
+// no hash. No framework, no dependency — a handful of lines is all this
+// needs.
+(function () {
+  function openFromHash() {
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+})();
+</script>
 </body>
 </html>

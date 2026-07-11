@@ -115,6 +115,48 @@
   }
   .card h3 { margin: 0 0 0.4rem; }
   .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .section-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  .section-index a {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+  .section-index a:hover { border-color: var(--accent); }
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0;
+    scroll-margin-top: 1.5rem;
+  }
+  summary {
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    transition: transform 0.15s ease;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details > *:not(summary) {
+    padding: 0 1.2rem 1.2rem;
+  }
+  details .grid { margin-top: 0; }
   footer {
     border-top: 1px solid var(--border);
     text-align: center;
@@ -133,10 +175,10 @@
 </header>
 <main>
 <p><code>ratchets/internal_ratchet.py</code> → <code>OBJECT_OT_add_internal_ratchet</code> (<code>object.add_internal_ratchet</code>, "Add Internal Freewheel Ratchet")</p>
-<p>A bicycle-freewheel-style mechanism: an outer ring with inward-pointing teeth, an inner hub, and <code>pawl_count</code> pawls mounted on the hub pointing radially outward. <strong>CW rotation of the inner hub (viewed from +Z) = LOCK; CCW = FREE</strong> — the opposite convention from <a href="ratchet_pawl.html">ratchet_pawl.md</a>'s external wheel, see <a href="index.html#the-lock-direction-convention-flips-between-the-two-files--read-this-first">README.md</a> for why.</p>
+<p>A bicycle-freewheel-style mechanism: an outer ring with inward-pointing teeth, an inner hub, and <code>pawl_count</code> pawls mounted on the hub pointing radially outward. <strong>CW rotation of the inner hub (viewed from +Z) = LOCK; CCW = FREE</strong> — the opposite convention from <a href="ratchet_pawl.html">ratchet_pawl.md</a>'s external wheel, see README.md for why.</p>
 <h2>Shared constants</h2>
 <p><code>HOLE_SEGMENTS = 32</code>, <code>RING_SEGMENTS_OUT = 64</code> (the outer ring's own circle resolution — finer than hole segments since it's the visible outer silhouette), <code>PIVOT_PAD_MM = 2.0</code>.</p>
-<p>Some geometry helpers (<code>finalize_mesh_object</code>, <code>build_pawl_profile_points</code>, a variant of <code>create_filled_profile_with_hole</code>) are copied from <code>ratchet_pawl.py</code> — see <a href="index.html#why-internal_ratchetpy-duplicates-code-from-ratchet_pawlpy">README.md</a>.</p>
+<p>Some geometry helpers (<code>finalize_mesh_object</code>, <code>build_pawl_profile_points</code>, a variant of <code>create_filled_profile_with_hole</code>) are copied from <code>ratchet_pawl.py</code> — see README.md.</p>
 <h2>Properties</h2>
 <p><strong>Ring:</strong></p>
 <div class="table-wrap"><table>
@@ -167,7 +209,7 @@
 <tr><td><code>hub_outer_diameter_mm</code></td><td>Float (mm)</td><td>20.0</td><td>1–200 (soft)</td><td>Must be smaller than tip diameter minus clearance</td></tr>
 <tr><td><code>bore_diameter_mm</code></td><td>Float (mm)</td><td>5.0</td><td>0–100 (soft)</td><td></td></tr>
 <tr><td><code>bore_compensation_mm</code></td><td>Float (mm)</td><td>0.0</td><td>-2.0–2.0 (soft)</td><td>Added to bore diameter</td></tr>
-<tr><td><code>clearance_mm</code></td><td>Float (mm)</td><td>0.3</td><td>0–5 (soft)</td><td>Running gap between hub surface and tooth tips — see <a href="index.html#fdm-compensation-vs-running-clearance--two-different-things-dont-conflate-them">README.md</a>. Not a hole compensation.</td></tr>
+<tr><td><code>clearance_mm</code></td><td>Float (mm)</td><td>0.3</td><td>0–5 (soft)</td><td>Running gap between hub surface and tooth tips — see README.md. Not a hole compensation.</td></tr>
 </tbody></table></div>
 <p><strong>Pawls:</strong></p>
 <div class="table-wrap"><table>
@@ -203,10 +245,10 @@
 <p>Unlike <code>ratchet_pawl.py</code>'s tangent-biased heuristic solve, an internal ratchet's pawls are mounted radially outward from the hub, so the positioning math is much simpler: <code>auto_pawl_arm_length() = max(contact_r - pivot_r, 1.0)</code> where both the pivot and the tip contact point lie on the same radial line through the hub center. No angular bias term is needed.</p>
 <p>Pawls are distributed at <code>angle = i * 2*pi/pawl_count + pi/tooth_count</code> — the <code>+pi/tooth_count</code> term is a half-tooth-pitch phase offset, likely so a pawl doesn't spawn straddling a tooth root/tip boundary by coincidence (not explicitly commented in the source, but the pattern is consistent across all <code>pawl_count</code> placements).</p>
 <h2>Ring teeth: a non-convex boundary needs a different tessellation method</h2>
-<p><code>build_inner_teeth_points()</code> produces the same sawtooth pattern as the external wheel's tooth builder, with root/outer radius roles swapped so teeth point inward. But because the inner boundary is <strong>non-convex</strong>, <code>build_ring_object()</code> can't use <code>bmesh.ops.triangle_fill</code> the way every other ring-shaped generator in this library does — it uses <code>mathutils.geometry.tessellate_polygon</code> instead, with the outer contour wound CCW and the inner (tooth) contour wound CW as a hole. See <a href="index.html#why-internal_ratchetpy-duplicates-code-from-ratchet_pawlpy">README.md</a> for why this matters if you're writing a new non-convex ring generator.</p>
+<p><code>build_inner_teeth_points()</code> produces the same sawtooth pattern as the external wheel's tooth builder, with root/outer radius roles swapped so teeth point inward. But because the inner boundary is <strong>non-convex</strong>, <code>build_ring_object()</code> can't use <code>bmesh.ops.triangle_fill</code> the way every other ring-shaped generator in this library does — it uses <code>mathutils.geometry.tessellate_polygon</code> instead, with the outer contour wound CCW and the inner (tooth) contour wound CW as a hole. See README.md for why this matters if you're writing a new non-convex ring generator.</p>
 <p>Drive/ramp faces per tooth (from the builder's own docstring): <strong>drive face</strong> <code>root_i -&gt; tip_i</code> (radial, catches the pawl on CW hub rotation); <strong>ramp face</strong> <code>tip_i -&gt; root_(i+1)</code> (angled chord, pawl slides over it on CCW/FREE rotation).</p>
 <h2>Validation</h2>
-<p><code>validate_freewheel()</code> returns a list of error strings covering: non-positive ring/tip radius, <code>tooth_depth_mm &gt;= ring_inner_r</code>, <code>hub_outer_r &gt;= tip_r - clearance_mm</code> ("Hub outer radius must be &lt; tip radius - clearance — reduce hub diameter or increase ring size"), <code>bore_r &gt;= hub_outer_r</code>, <code>tooth_count &lt; 4</code>, <code>pawl_count &lt; 1</code>, pivot-hole-vs-arm-width, and pawl-arm-length-vs-pivot-hole. <code>draw()</code> shows every returned error at once in an "Issues:" box; <code>execute()</code> re-runs the same full check and cancels (<code>CANCELLED</code>, no <code>self.report()</code> message) if anything comes back non-empty — matching this family's general no-clamping discipline (see <a href="index.html#validation-no-clamping-ever--but-only-in-ratchet_pawlpy">README.md</a>).</p>
+<p><code>validate_freewheel()</code> returns a list of error strings covering: non-positive ring/tip radius, <code>tooth_depth_mm &gt;= ring_inner_r</code>, <code>hub_outer_r &gt;= tip_r - clearance_mm</code> ("Hub outer radius must be &lt; tip radius - clearance — reduce hub diameter or increase ring size"), <code>bore_r &gt;= hub_outer_r</code>, <code>tooth_count &lt; 4</code>, <code>pawl_count &lt; 1</code>, pivot-hole-vs-arm-width, and pawl-arm-length-vs-pivot-hole. <code>draw()</code> shows every returned error at once in an "Issues:" box; <code>execute()</code> re-runs the same full check and cancels (<code>CANCELLED</code>, no <code>self.report()</code> message) if anything comes back non-empty — matching this family's general no-clamping discipline (see README.md).</p>
 <h2>Output</h2>
 <p><strong><code>2 + pawl_count</code> objects</strong> per call: <code>FreewheelRing</code>, <code>FreewheelHub</code>, and <code>pawl_count</code> pawls named <code>FreewheelPawl.000</code>…<code>FreewheelPawl.%03d</code> (zero-padded). Default <code>pawl_count=3</code> gives 5 objects. If <code>parent_under_empty</code>, all are parented under a new <code>FreewheelRatchet</code> empty (<code>PLAIN_AXES</code>, sized to <code>ring_outer_r * 0.3</code>). Ring is set active. Success message: <code>"Internal freewheel ratchet: %d teeth, %d pawls, ring Ø %.1f mm"</code>.</p>
 </main>
@@ -214,5 +256,22 @@
   <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
      <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
 </footer>
+<script>
+// Opens the <details> section matching the URL's #hash, so clicking an
+// index link actually shows that section instead of just scrolling next
+// to a still-collapsed one. Harmless no-op on pages with no <details> or
+// no hash. No framework, no dependency — a handful of lines is all this
+// needs.
+(function () {
+  function openFromHash() {
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+})();
+</script>
 </body>
 </html>

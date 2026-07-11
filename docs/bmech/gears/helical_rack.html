@@ -115,6 +115,48 @@
   }
   .card h3 { margin: 0 0 0.4rem; }
   .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .section-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  .section-index a {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+  .section-index a:hover { border-color: var(--accent); }
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0;
+    scroll-margin-top: 1.5rem;
+  }
+  summary {
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    transition: transform 0.15s ease;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details > *:not(summary) {
+    padding: 0 1.2rem 1.2rem;
+  }
+  details .grid { margin-top: 0; }
   footer {
     border-top: 1px solid var(--border);
     text-align: center;
@@ -133,7 +175,7 @@
 </header>
 <main>
 <p><code>gears/rack/helical_rack.py</code> → <code>OBJECT_OT_helical_rack</code> (<code>object.helical_rack</code>, "Helical Rack")</p>
-<p>A straight rack whose teeth are sheared along X as a linear function of Z — the gear-of-infinite-radius limit of <a href="helical_gear.html">helical_gear.md</a>'s twist. Meshes with a helical pinion of the same module, pressure angle, and helix angle, and the <strong>same</strong> hand — <strong>not</strong> the opposite hand the external-external gear-gear rule would suggest. See <a href="index.html#hand-convention--the-one-rule-most-likely-to-bite-you">README.md</a> for why a rack is the exception: it contacts its pinion at a different relative angular position (directly below, θ=-90°) than two side-by-side external gears do (θ=180° apart), and that's what flips the sign.</p>
+<p>A straight rack whose teeth are sheared along X as a linear function of Z — the gear-of-infinite-radius limit of <a href="helical_gear.html">helical_gear.md</a>'s twist. Meshes with a helical pinion of the same module, pressure angle, and helix angle, and the <strong>same</strong> hand — <strong>not</strong> the opposite hand the external-external gear-gear rule would suggest. See README.md for why a rack is the exception: it contacts its pinion at a different relative angular position (directly below, θ=-90°) than two side-by-side external gears do (θ=180° apart), and that's what flips the sign.</p>
 <h2>Properties</h2>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -154,11 +196,11 @@
 </tbody></table></div>
 <p>No bore properties, no <code>n_slices</code> — see Build method below for why.</p>
 <h2>Hand and Match Target freezing</h2>
-<p>Same freeze pattern as <a href="helical_gear.html">helical_gear.md</a>: <code>module</code>/ <code>pressure_angle_deg</code> freeze whenever any target is set; <code>helix_angle_deg</code> freezes only when the target itself stamps <code>bmech_helix_angle_deg</code> (a spur-gear target never drives it, matching <code>sync_helical_same</code>'s own guard); <code>hand</code> freezes with <code>helix_angle_deg</code> <strong>except</strong> when <code>gear_matching.hand_target_ambiguous(False, target)</code> is true — i.e. when this rack (plain-helical style) is matched against a herringbone target, since a plain helical rack only meshes one half of a herringbone pinion's V, and which hand is correct depends on which half. See <a href="index.html#the-match-target-system-gear_matchingpy">README.md</a> for the full rationale — this rack follows exactly the same logic <code>helical_gear.py</code> uses for gear-gear pairs.</p>
+<p>Same freeze pattern as <a href="helical_gear.html">helical_gear.md</a>: <code>module</code>/ <code>pressure_angle_deg</code> freeze whenever any target is set; <code>helix_angle_deg</code> freezes only when the target itself stamps <code>bmech_helix_angle_deg</code> (a spur-gear target never drives it, matching <code>sync_helical_same</code>'s own guard); <code>hand</code> freezes with <code>helix_angle_deg</code> <strong>except</strong> when <code>gear_matching.hand_target_ambiguous(False, target)</code> is true — i.e. when this rack (plain-helical style) is matched against a herringbone target, since a plain helical rack only meshes one half of a herringbone pinion's V, and which hand is correct depends on which half. See README.md for the full rationale — this rack follows exactly the same logic <code>helical_gear.py</code> uses for gear-gear pairs.</p>
 <h2>Build method</h2>
 <p>*<em>No <code>n_slices</code> property, unlike every helical/herringbone </em>gear<em>.</em><em> A helical gear twists by </em>rotating<em> each Z-slice's profile by an angle that grows nonlinearly relative to straight-line interpolation between slices, so more slices measurably improve the approximation to the true curved helical surface. A helical rack instead </em>shears* the profile — <code>x' = x + hand_sign * z * tan(helix_angle)</code>, a transform that is <strong>linear in z</strong>. A straight 3D edge between the bottom-layer vertex <code>(x, y, 0)</code> and the top-layer vertex <code>(x + shear(width), y, width)</code> passes exactly through <code>(x + shear(z), y, z)</code> for every z in between (parametrize <code>t = z/width</code>: both the edge and <code>shear(z)</code> scale identically with <code>t</code>). This is an exact affine identity, not an approximation, so <strong>exactly two Z-layers</strong> — bottom and top — reproduce the sheared surface with no faceting error at any resolution. Adding an <code>n_slices</code> property here would misleadingly suggest a smoothness/accuracy tradeoff that doesn't exist for this shape.</p>
 <p><code>shear(z) = z * tan(helix_angle)</code> — note there's no division by pitch radius, unlike the gear's <code>twist_angle(z) = z * tan(helix_angle) / pitch_radius</code>. The rack is the pitch-radius-→-∞ limit of the gear case: the <em>arc-length</em> displacement of any profile point (<code>radius * twist_angle(z)</code>) converges to the radius-independent constant <code>z * tan(helix_angle)</code> as radius grows without bound, since displacement at any fixed radius on the pitch circle is what a rack tooth's true straight-line motion represents.</p>
-<p>Otherwise reuses <code>straight_rack.py</code>'s tooth-profile math verbatim (<code>build_rack_tooth_profile</code>/<code>build_rack_profile</code>, duplicated here per this family's per-file mesh-helper convention — see <a href="index.html#the-match-target-system-gear_matchingpy">README.md</a>), tiled across X, then two straight-side-quad layers connect the sheared bottom and top n-gon faces.</p>
+<p>Otherwise reuses <code>straight_rack.py</code>'s tooth-profile math verbatim (<code>build_rack_tooth_profile</code>/<code>build_rack_profile</code>, duplicated here per this family's per-file mesh-helper convention — see README.md), tiled across X, then two straight-side-quad layers connect the sheared bottom and top n-gon faces.</p>
 <p>Swept tooth counts 2–50 × pressure angles 14.5–30° × helix angles 5–44° × both hands: 0 non-manifold edges, 0 zero-area faces (checked on the evaluated mesh — see <a href="straight_rack.html#build-method">straight_rack.md</a> for why the raw pre-modifier/pre-eval mesh isn't the right thing to check; this generator has no modifiers at all, everything is baked bmesh geometry, but the same "evaluate before trusting" habit caught this reliably).</p>
 <h2>Hand fix — why this needed correcting after initial release</h2>
 <p>The first version of this file reused <code>sync_helical_opposite</code> (the external-external gear-gear rule) on the assumption that a rack, having external tooth geometry, follows the same hand rule as two side-by-side external gears. It doesn't. The two cases contact at <em>different relative angular positions</em> on the pinion — two side-by-side gears contact at a θ=180°-apart pair of points (each gear's contact point faces the other), while a rack sitting directly below its pinion contacts at the pinion's own θ=-90° point (a 90°, not 180°, offset from a θ=0° reference). That difference changes the sign of the tooth-flank-slope relationship the hand rule depends on.</p>
@@ -177,5 +219,22 @@
   <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
      <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
 </footer>
+<script>
+// Opens the <details> section matching the URL's #hash, so clicking an
+// index link actually shows that section instead of just scrolling next
+// to a still-collapsed one. Harmless no-op on pages with no <details> or
+// no hash. No framework, no dependency — a handful of lines is all this
+// needs.
+(function () {
+  function openFromHash() {
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+})();
+</script>
 </body>
 </html>

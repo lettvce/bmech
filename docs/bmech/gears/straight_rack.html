@@ -115,6 +115,48 @@
   }
   .card h3 { margin: 0 0 0.4rem; }
   .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .section-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  .section-index a {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+  .section-index a:hover { border-color: var(--accent); }
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0;
+    scroll-margin-top: 1.5rem;
+  }
+  summary {
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    transition: transform 0.15s ease;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details > *:not(summary) {
+    padding: 0 1.2rem 1.2rem;
+  }
+  details .grid { margin-top: 0; }
   footer {
     border-top: 1px solid var(--border);
     text-align: center;
@@ -133,7 +175,7 @@
 </header>
 <main>
 <p><code>gears/rack/straight_rack.py</code> → <code>OBJECT_OT_add_rack</code> (<code>object.add_rack</code>, "Add Gear Rack")</p>
-<p>Straight involute rack — the "gear of infinite radius" that converts a mating spur/helical pinion's rotation into linear motion. See <a href="index.html">README.md</a> for family-wide conventions, and <a href="helical_rack.html">helical_rack.md</a> / <a href="herringbone_rack.html">herringbone_rack.md</a> for the twisted variants that reuse this file's tooth-profile math.</p>
+<p>Straight involute rack — the "gear of infinite radius" that converts a mating spur/helical pinion's rotation into linear motion. See README.md for family-wide conventions, and <a href="helical_rack.html">helical_rack.md</a> / <a href="herringbone_rack.html">herringbone_rack.md</a> for the twisted variants that reuse this file's tooth-profile math.</p>
 <p>This used to live combined with the spur gear as <code>gears/external/involute_gear_rack.py</code> — split out into its own <code>rack/</code> subfamily alongside the helical and herringbone racks (own menu category, <code>Mechanisms &gt; Gears &gt; Rack</code>), matching the <code>external/</code>/<code>ring/</code>/ <code>planetary/</code>/<code>bevel/</code> folder-per-subfamily shape.</p>
 <h2>Properties</h2>
 <div class="table-wrap"><table>
@@ -155,7 +197,7 @@
 <h2><code>length_mode</code></h2>
 <ul><li><strong><code>TOOTH_COUNT</code></strong> — rack length is exactly <code>tooth_count_rack</code> teeth, independent of any target.</li><li><strong><code>MATCH_GEAR</code></strong> — if a target gear is set (and stamped with <code>bmech_tooth_count</code>), the rack is sized to span <strong>one full pitch circumference</strong> of that gear (i.e. <code>tooth_count_rack</code> teeth = the target's own tooth count), and the rack is positioned/centered against the target automatically: <code>obj.location = target.location</code>, offset down by the target's pitch radius (Y) and left by half the rack length minus half a tooth pitch (X). If no target is set, this mode silently falls back to using <code>tooth_count_rack</code> as typed.</li></ul>
 <p>Whenever a target is set (independent of <code>length_mode</code>), an additional small X shift is applied via <code>gear_matching.rack_phase_align_x</code> so the rack spawns with teeth-into-gaps rather than an arbitrary phase — see <a href="helical_rack.html#phase-alignment">helical_rack.md#phase-alignment</a> for the full derivation (it applies identically here; the shear that file adds on top doesn't change the Z=0 phase this alignment targets).</p>
-<p><code>module</code>/<code>pressure_angle_deg</code> are frozen in the redo panel whenever any target is set (<code>sync_module_pa</code> always drives both), matching the convention every other gear generator in this family follows — see <a href="index.html#the-match-target-system-gear_matchingpy">README.md</a>. <code>tooth_count_rack</code> is handled differently: rather than graying it out, the panel replaces it entirely with a read-only "Teeth from target: N" label when <code>length_mode == 'MATCH_GEAR'</code> and a target with <code>bmech_tooth_count</code> is set, since in that mode the property isn't meaningfully "the same field, temporarily driven" — the rack's length is a wholly different concept (spanning the target's circumference) than the manual tooth count it replaces.</p>
+<p><code>module</code>/<code>pressure_angle_deg</code> are frozen in the redo panel whenever any target is set (<code>sync_module_pa</code> always drives both), matching the convention every other gear generator in this family follows — see README.md. <code>tooth_count_rack</code> is handled differently: rather than graying it out, the panel replaces it entirely with a read-only "Teeth from target: N" label when <code>length_mode == 'MATCH_GEAR'</code> and a target with <code>bmech_tooth_count</code> is set, since in that mode the property isn't meaningfully "the same field, temporarily driven" — the rack's length is a wholly different concept (spanning the target's circumference) than the manual tooth count it replaces.</p>
 <h2>Build method</h2>
 <p>Same flat-profile-plus-Solidify approach as the spur gear: <code>build_rack_profile()</code> tiles <code>build_rack_tooth_profile()</code> (straight flanks at <code>pressure_angle_deg</code> from vertical, with a quarter-circle root fillet of radius <code>ROOT_FILLET_COEFF * module = 0.38 * module</code> — the rack tooth profile is the only builder in this library that fillets the root; gear teeth elsewhere use a bare dedendum-circle arc) across X, then closes the profile with a rectangular base extending <code>dedendum + module</code> below the root line for a solid foundation.</p>
 <p><strong><code>build_rack_profile()</code> deduplicates adjacent points (including the wraparound from its last point back to its first) before returning.</strong> Each tooth's own end point (<code>x_root_right</code>) is mathematically identical to the next tooth's start point (<code>x_root_left</code>) — tiling teeth by simple concatenation puts a literal duplicate vertex at every tooth-to-tooth junction. <code>bm.faces.new()</code> (in <code>profile_to_mesh_object</code>) already auto-closes the polygon loop from its last vertex back to its first, so an explicit "return to start" point at the end of the profile was <em>also</em> an unnecessary duplicate, not just the inter-tooth ones. Two adjacent polygon vertices at the identical XY position produce a genuine zero-area side-wall face once Solidify extrudes the profile — invisible if you only inspect the raw pre-modifier mesh (<code>obj.data</code>), since Solidify runs as a live, unapplied modifier here (see below) and the defect only exists in the <em>evaluated</em> result. Confirmed before this fix: exactly <code>tooth_count_rack</code> zero-area faces for any tooth count (one per junction).</p>
@@ -167,5 +209,22 @@
   <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
      <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
 </footer>
+<script>
+// Opens the <details> section matching the URL's #hash, so clicking an
+// index link actually shows that section instead of just scrolling next
+// to a still-collapsed one. Harmless no-op on pages with no <details> or
+// no hash. No framework, no dependency — a handful of lines is all this
+// needs.
+(function () {
+  function openFromHash() {
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+})();
+</script>
 </body>
 </html>

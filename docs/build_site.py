@@ -39,6 +39,69 @@ FAMILY_TITLES = {
     "ratchets": "Ratchets",
 }
 
+# Short, end-user-facing explanations of each family's shared settings —
+# hand-written, not extracted from the .md docs, since those are written
+# for contributors (implementation detail, boolean-solver notes, etc.)
+# and this is deliberately the opposite: what a normal user needs to know
+# to set the sliders sensibly, nothing about how the generator is built.
+UNITS_BLURB = {
+    "gears": (
+        "Every gear shares two settings that have to match for two gears "
+        "to mesh: <strong>module</strong> (tooth size — pick one module "
+        "and use it for every gear in a train) and "
+        "<strong>pressure angle</strong> (tooth shape, usually 20°). "
+        "Everything else — tooth count, width, bore — is specific to "
+        "that one gear."
+    ),
+    "fasteners": (
+        "Threads are described by four numbers that all have to match "
+        "for a bolt and nut to fit together: <strong>thread diameter</strong> "
+        "(the nominal size, e.g. M8), <strong>pitch</strong> (distance "
+        "between threads), <strong>flank angle</strong> (thread shape, "
+        "usually 60°), and <strong>truncation</strong> (how flat the "
+        "crest and root are)."
+    ),
+    "bearings": (
+        "Set the <strong>bore diameter</strong> (for the axle) and "
+        "<strong>outer diameter</strong> (for the housing), then choose "
+        "how many balls to use — more balls means a larger bearing for "
+        "the same ball size. The overhang angle controls how much "
+        "support-free clearance the ball pockets get when printing."
+    ),
+    "springs": (
+        "Both spring generators build a flat coiled ribbon. "
+        "<strong>Strip width</strong> and <strong>strip thickness</strong> "
+        "control the ribbon's own cross-section; inner/outer radius and "
+        "turn count control the size and tightness of the coil."
+    ),
+    "ratchets": (
+        "Ratchets use the same sizing convention as gears: set "
+        "<strong>module</strong> (tooth size) and <strong>tooth count</strong>, "
+        "or switch to outer-diameter mode and let module be worked out "
+        "automatically. Tooth depth can be automatic or set by hand."
+    ),
+}
+
+# Whether a family supports Match Target at all, and if so, a short
+# description of what it does — no implementation detail (no mention of
+# WindowManager pointers, poll callbacks, or freezing behavior; that's
+# contributor-facing content, not something an end user needs).
+MATCH_TARGET_BLURB = {
+    "gears": (
+        "Pick another gear as a <strong>Match Target</strong> and its "
+        "module and pressure angle are copied over automatically, so "
+        "the new gear is guaranteed to mesh with it."
+    ),
+    "fasteners": (
+        "Pick a bolt or nut as a <strong>Match Target</strong> and its "
+        "thread dimensions are copied over automatically, so the two "
+        "are guaranteed to fit together."
+    ),
+    "bearings": None,
+    "springs": None,
+    "ratchets": None,
+}
+
 # Primitive doc filename (without .md) -> showcase render filename (with
 # .png). Doc filenames match the Python module name; render filenames
 # match the operator's own bl_idname — these don't always agree (e.g. a
@@ -108,12 +171,15 @@ def _inline(text):
         label, href = m.group(1), m.group(2)
         if href.startswith(('http://', 'https://', 'mailto:')):
             return '<a href="%s">%s</a>' % (href, label)
-        # README.md becomes that family's index.html (the category landing
-        # page IS README.md's rendered content, not a separate page) — every
-        # other .md file gets the plain .md -> .html swap, including
-        # CONVENTIONS.md, which the build step below generates a real page
-        # for specifically so these links resolve instead of 404ing.
-        href = re.sub(r'README\.md(#|$)', r'index.html\1', href)
+        # README.md and CONVENTIONS.md don't get their own public page —
+        # they're internal/contributor-facing docs (family-wide shared
+        # conventions, cross-family rules), not something an end user
+        # downloading the extension needs. Rather than link to a page that
+        # doesn't exist, demote these to plain text: keep the label,
+        # drop the link.
+        basename = href.split('/')[-1].split('#')[0]
+        if basename in ('README.md', 'CONVENTIONS.md'):
+            return label
         href = re.sub(r'\.md(#|$)', r'.html\1', href)
         return '<a href="%s">%s</a>' % (href, label)
 
@@ -360,6 +426,48 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .card h3 {{ margin: 0 0 0.4rem; }}
   .card p {{ margin: 0; color: var(--muted); font-size: 0.9rem; }}
+  .section-index {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 2.5rem;
+  }}
+  .section-index a {{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+    text-decoration: none;
+  }}
+  .section-index a:hover {{ border-color: var(--accent); }}
+  details {{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0;
+    scroll-margin-top: 1.5rem;
+  }}
+  summary {{
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    list-style: none;
+  }}
+  summary::-webkit-details-marker {{ display: none; }}
+  summary::before {{
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    transition: transform 0.15s ease;
+  }}
+  details[open] summary::before {{ transform: rotate(90deg); }}
+  details > *:not(summary) {{
+    padding: 0 1.2rem 1.2rem;
+  }}
+  details .grid {{ margin-top: 0; }}
   footer {{
     border-top: 1px solid var(--border);
     text-align: center;
@@ -383,6 +491,23 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
      <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
 </footer>
+<script>
+// Opens the <details> section matching the URL's #hash, so clicking an
+// index link actually shows that section instead of just scrolling next
+// to a still-collapsed one. Harmless no-op on pages with no <details> or
+// no hash. No framework, no dependency — a handful of lines is all this
+// needs.
+(function () {{
+  function openFromHash() {{
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }}
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+}})();
+</script>
 </body>
 </html>
 """
@@ -398,11 +523,27 @@ def render_page(title, heading, breadcrumb, body_html, hero_img_rel=None):
 
 
 def first_paragraph(md_text):
-    """First non-heading paragraph of a doc, for card-grid summaries."""
+    """
+    First non-heading paragraph of a doc, as PLAIN TEXT (markdown syntax
+    stripped, not converted to HTML), for card-grid summaries. Plain text
+    because it gets truncated to a short teaser length — running that
+    truncated fragment through _inline() afterward is what produced
+    literal "[annulus_gear.md](a" garbage in the card summaries: a link
+    or code span cut off mid-syntax just doesn't match _inline()'s
+    regexes, so the raw markdown leaks through untouched. Stripping the
+    syntax to plain words FIRST sidesteps that entirely — there's no
+    markup left to split.
+    """
     for block in re.split(r'\n\s*\n', md_text):
         block = block.strip()
         if block and not block.startswith('#') and not block.startswith('`'):
-            return re.sub(r'\s+', ' ', block)[:160]
+            text = re.sub(r'\s+', ' ', block)
+            text = re.sub(r'`([^`]+)`', r'\1', text)
+            text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+            text = re.sub(r'\*([^*]+)\*', r'\1', text)
+            text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+            text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            return text[:160]
     return ''
 
 
@@ -418,30 +559,25 @@ def strip_leading_h1(md_text):
     return md_text
 
 
-def build_conventions_page():
+def remove_stale_conventions_page():
     """
-    CONVENTIONS.md lives at docs/bmech/ root (not inside a family folder)
-    and is linked from many family docs — without a real page for it,
-    every one of those links 404s. Not really end-user documentation (it's
-    contributor/AI-agent facing, per CLAUDE.md), but resolving is better
-    than a dead link, and it's a reasonable thing for an open-source repo
-    to show anyway.
+    CONVENTIONS.html used to be generated from CONVENTIONS.md. It isn't
+    anymore — README.md/CONVENTIONS.md are internal/contributor-facing
+    docs (family-wide shared conventions, cross-family rules), not
+    something an end user downloading the extension needs, so neither
+    gets a public page now (see _link()'s own handling of links to them).
+    This just cleans up a leftover file from a previous run so re-running
+    the build after this change doesn't leave a stale, now-unlinked page
+    sitting on disk.
     """
-    path = os.path.join(BMECH_ROOT, 'CONVENTIONS.md')
-    if not os.path.exists(path):
-        return
-    with open(path, 'r', encoding='utf-8') as f:
-        md_text = f.read()
-    body_html = markdown_to_html(strip_leading_h1(md_text))
-    breadcrumb = '<a href="index.html">bmech</a> / Conventions'
-    html = render_page('Conventions', 'bmech Conventions', breadcrumb, body_html)
-    with open(os.path.join(BMECH_ROOT, 'CONVENTIONS.html'), 'w', encoding='utf-8') as f:
-        f.write(html)
-    print('built CONVENTIONS.html')
+    path = os.path.join(BMECH_ROOT, 'CONVENTIONS.html')
+    if os.path.exists(path):
+        os.remove(path)
+        print('removed stale CONVENTIONS.html')
 
 
 def build():
-    build_conventions_page()
+    remove_stale_conventions_page()
 
     families = sorted(
         d for d in os.listdir(BMECH_ROOT)
@@ -476,12 +612,11 @@ def build():
             with open(os.path.join(family_dir, stem + '.html'), 'w', encoding='utf-8') as f:
                 f.write(html)
 
-            # Truncate the RAW markdown first, then run it through _inline()
-            # — truncating after conversion risks slicing through a half-
-            # built HTML tag, whereas truncating raw markdown just risks an
-            # unmatched **/[ ] delimiter, which _inline()'s regexes simply
-            # won't match (leaves a stray literal character, not broken markup).
-            summary = _inline(first_paragraph(md_text))
+            # first_paragraph() already strips markdown to plain text and
+            # HTML-escapes it — don't run it through _inline() too, that
+            # would double-escape (&amp; -> &amp;amp;) since there's no
+            # markdown syntax left for _inline() to convert.
+            summary = first_paragraph(md_text)
             card_img_html = '<img src="../assets/img/%s" alt="">' % img_name if img_exists else ''
             cards.append(
                 '<a class="card" href="%s.html">%s<h3>%s</h3><p>%s</p></a>'
@@ -489,14 +624,39 @@ def build():
             )
 
         # ── Category landing page ────────────────────────────────────────
-        readme_path = os.path.join(family_dir, 'README.md')
-        readme_md = ''
-        if os.path.exists(readme_path):
-            with open(readme_path, 'r', encoding='utf-8') as f:
-                readme_md = f.read()
-        intro_html = markdown_to_html(strip_leading_h1(readme_md)) if readme_md else ''
+        # Three collapsible sections (each starts closed — <details> with
+        # no `open` attribute — and expands when its <summary> header is
+        # clicked, no JS needed for that part), plus a small index at the
+        # top linking to each by anchor. No README.md content — that's the
+        # family's internal shared-conventions writeup (contributor/AI-
+        # agent facing per CLAUDE.md), not something an end user needs;
+        # the Units and Target Matching blurbs below are hand-written for
+        # end users instead of extracted from it.
+        match_target_html = MATCH_TARGET_BLURB.get(family)
+        if match_target_html is None:
+            match_target_html = "This family doesn't currently support Match Target."
 
-        body_html = intro_html + '\n<h2>Primitives</h2>\n<div class="grid">\n' + '\n'.join(cards) + '\n</div>'
+        index_links = [
+            '<a href="#primitives">Primitives in this family</a>',
+            '<a href="#units-core-parameters">Units and Core Parameters</a>',
+            '<a href="#target-matching">Target Matching</a>',
+        ]
+
+        body_html = (
+            '<nav class="section-index">' + ''.join(index_links) + '</nav>\n'
+            '<details id="primitives">\n'
+            '<summary>Primitives in this family</summary>\n'
+            '<div class="grid">\n' + '\n'.join(cards) + '\n</div>\n'
+            '</details>\n'
+            '<details id="units-core-parameters">\n'
+            '<summary>Units and Core Parameters</summary>\n'
+            '<p>' + UNITS_BLURB[family] + '</p>\n'
+            '</details>\n'
+            '<details id="target-matching">\n'
+            '<summary>Target Matching</summary>\n'
+            '<p>' + match_target_html + '</p>\n'
+            '</details>\n'
+        )
         breadcrumb = '<a href="../index.html">bmech</a> / %s' % family_title
         html = render_page(family_title, family_title, breadcrumb, body_html)
         with open(os.path.join(family_dir, 'index.html'), 'w', encoding='utf-8') as f:

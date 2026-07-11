@@ -115,6 +115,48 @@
   }
   .card h3 { margin: 0 0 0.4rem; }
   .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .section-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  .section-index a {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+  .section-index a:hover { border-color: var(--accent); }
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0;
+    scroll-margin-top: 1.5rem;
+  }
+  summary {
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    transition: transform 0.15s ease;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details > *:not(summary) {
+    padding: 0 1.2rem 1.2rem;
+  }
+  details .grid { margin-top: 0; }
   footer {
     border-top: 1px solid var(--border);
     text-align: center;
@@ -159,7 +201,7 @@
 <p><code>height_mm</code> is <strong>not a property</strong> — it's a pure derived sum (<code>wall_thickness_mm + thread_length_mm + guide_length_mm</code>), shown read-only in the panel's info box. There is no longer a fixed "total height" budget the other three have to fit inside; adding cap, thread, or guide length simply grows the part.</p>
 <p><code>thread_diameter_mm</code>/<code>pitch_mm</code>/<code>flank_angle_deg</code>/<code>truncation</code> freeze together in a driven column whenever a target is set, same all-four freeze behavior as <a href="hex_bolt.html#match-target">hex_bolt.md</a>. <code>wall_thickness_mm</code>/<code>thread_length_mm</code>/<code>guide_length_mm</code>/<code>resolution</code>/ <code>inner_compensation_mm</code>/<code>fit_offset_mm</code> are never driven — fit is this part's own printing-tolerance choice, not something the mating container could meaningfully specify.</p>
 <p><code>fit_offset_mm</code> folds into <code>major_r</code> (<code>_derived()</code> and <code>_clamp()</code> both add <code>fit_offset_mm / 2.0</code> alongside <code>inner_compensation_mm</code>) before any of the usual truncation/thread-length clamping runs, so a large fit offset is subject to the same margin protections as a large <code>inner_compensation_mm</code> — it can't push <code>minor_r</code> to zero or below any more than compensation can.</p>
-<p><strong>The target picker only offers <code>EXTERNAL</code>-oriented objects</strong> — <code>hex_bolt</code>, <code>threaded_container</code>, or a <code>threaded_fastener.py</code> raw thread currently built with <code>thread_type='EXTERNAL'</code>. See <a href="index.html#match-target-a-deliberate-exception-to-the-no-shared-module-rule">README.md</a>.</p>
+<p><strong>The target picker only offers <code>EXTERNAL</code>-oriented objects</strong> — <code>hex_bolt</code>, <code>threaded_container</code>, or a <code>threaded_fastener.py</code> raw thread currently built with <code>thread_type='EXTERNAL'</code>. See README.md.</p>
 <h2>Why additive, and the tradeoff that comes with it</h2>
 <p><code>hex_bolt.py</code>'s own docstring records that this codebase tried additive (union) threading once before and abandoned it: unioning a separately-built helical ridge onto an undersized core is a numerically harder case for the <code>EXACT</code> boolean solver than differencing a cutter out of solid material, because a plain difference against a solid blank always has genuine material to remove, while a union of two independently-built, nearly-coincident curved surfaces can read as a hairline touch and cancel material instead of merging. See <a href="../../blender_extension_lessons.txt">blender_extension_lessons.txt</a>'s "EXACT boolean solver" section for the general form of this lesson.</p>
 <p>This file uses additive anyway, as a deliberate choice: the earlier subtractive design's real complexity wasn't the cut direction itself, it was the overshoot/clip dance needed because the cutter had to terminate <em>flush with other pre-existing boundaries</em> (the ceiling above, the clearance-zone wall below) without leaving a visible seam. An additive ridge has no such boundary to land on — it only needs to touch the surrounding wall at all, and is allowed to hard-start/hard-stop in open bore air at both ends (see the module docstring's <code>[REDESIGN]</code> note). The one piece of the old numerical-fragility problem that <em>does</em> still apply — the ridge's root radius touching the wall at exactly <code>major_r</code> being a hairline coincidence, not a genuine volumetric overlap — is handled the same way <code>hex_bolt.py</code>'s old additive mode handled it: a depth-scaled radial <code>overlap</code> pushes the ridge's root past <code>major_r</code>, so the union has real volume to merge.</p>
@@ -175,7 +217,7 @@
 <p><strong>Recalc face normals unconditionally after the union</strong> — per <code>blender_extension_lessons.txt</code>, EXACT-solver unions can come back with inconsistent face winding even on a genuinely manifold/solid result; <code>_bool_op</code> does this every time regardless of whether a defect is suspected.</p>
 <p><strong>[BUG, fixed] <code>_build_helix</code> crashes outright (not just a mesh defect) if <code>thread_length_mm</code> is too small relative to the thread's own profile span.</strong> <code>_build_helix</code> computes <code>steps = ceil((height - profile_span) * res / pitch) + 1</code>, where <code>profile_span = 2*fdz + crest_flat</code> is the axial height one full crest-to-crest repeat occupies. Once <code>thread_length_mm &lt;= profile_span</code> this goes to zero or negative rings and <code>_build_helix</code> throws <code>IndexError</code> building <code>rings[0]</code> — confirmed empirically (e.g. <code>thread_length_mm=4</code> with <code>pitch_mm=8</code> crashes every time, well within both properties' own valid ranges). Fixed in <code>_clamp()</code> (see below) by clamping <code>thread_length_mm</code> up to <code>profile_span + 0.5 * pitch_mm</code> whenever it's smaller — a half-pitch margin comfortably guarantees several real ring steps.</p>
 <h2>Validation: clamped, not cancelled</h2>
-<p><code>execute()</code> calls <code>self._clamp()</code> first — same <a href="../CONVENTIONS.html#conventions-that-apply-across-every-family-not-just-gears">clamp-over-cancel rule</a> as <a href="threaded_container.html#validation-clamped-not-cancelled">threaded_container.md</a>. Only two silent-correction steps remain (down from three in every earlier version) plus the crash-prevention floor above — since <code>height_mm</code> is now a pure derived sum rather than a fixed budget the other properties have to fit inside, there is no longer any "wall_thickness_mm vs. total height" conflict to reconcile at all:</p>
+<p><code>execute()</code> calls <code>self._clamp()</code> first — same clamp-over-cancel rule as <a href="threaded_container.html#validation-clamped-not-cancelled">threaded_container.md</a>. Only two silent-correction steps remain (down from three in every earlier version) plus the crash-prevention floor above — since <code>height_mm</code> is now a pure derived sum rather than a fixed budget the other properties have to fit inside, there is no longer any "wall_thickness_mm vs. total height" conflict to reconcile at all:</p>
 <ol><li><code>truncation</code> clamped UP (via <code>_min_truncation_for_max_depth</code>) whenever the resulting thread depth would push <code>minor_r</code> below a <code>max(1.0, major_r * 0.05)</code> margin. Depends only on <code>major_r</code> — wall thickness plays no part, same as every earlier version.</li><li><code>guide_length_mm</code> clamped up to <code>max(1.0, 0.25 * pitch_mm)</code> — the same margin the earlier subtractive design used for its clearance zone. The original numerical mechanism (a razor-thin exact-coincidence wall) doesn't apply the same way to an additive ridge, but the margin is kept anyway as the only guard against a guide zone too thin for the container's neck to actually self-align in.</li><li><code>thread_length_mm</code> clamped up to <code>(2*fdz + crest_flat) + 0.5 * pitch_mm</code> whenever smaller — see the <code>[BUG, fixed]</code> note above; this is a crash fix, not a quality-only floor.</li></ol>
 <p><strong>One case still cancels</strong>: if <code>truncation</code> would need to exceed 0.3 to keep <code>minor_r</code> positive with margin (a pitch too coarse for the thread diameter at any truncation) — no meaningful single "closest valid value" to fall back to.</p>
 <p><code>draw()</code> shows these as <code>INFO</code>-icon labels at the bottom of the panel (purely defensive/informational post-clamp), except the thread-length warning, which is a genuine, non-clamped, separate concern from the crash floor above:</p>
@@ -187,5 +229,22 @@
   <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
      <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
 </footer>
+<script>
+// Opens the <details> section matching the URL's #hash, so clicking an
+// index link actually shows that section instead of just scrolling next
+// to a still-collapsed one. Harmless no-op on pages with no <details> or
+// no hash. No framework, no dependency — a handful of lines is all this
+// needs.
+(function () {
+  function openFromHash() {
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+})();
+</script>
 </body>
 </html>

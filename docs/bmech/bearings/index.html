@@ -115,6 +115,48 @@
   }
   .card h3 { margin: 0 0 0.4rem; }
   .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .section-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  .section-index a {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+  .section-index a:hover { border-color: var(--accent); }
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0;
+    scroll-margin-top: 1.5rem;
+  }
+  summary {
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    transition: transform 0.15s ease;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details > *:not(summary) {
+    padding: 0 1.2rem 1.2rem;
+  }
+  details .grid { margin-top: 0; }
   footer {
     border-top: 1px solid var(--border);
     text-align: center;
@@ -132,25 +174,43 @@
   
 </header>
 <main>
-<p>Currently one primitive: <code>bearings/ball_bearing.py</code>. This README exists so the family/primitive doc pattern is already in place when a second bearing type (roller, thrust, etc.) is added — see <a href="../CONVENTIONS.html">../CONVENTIONS.md</a> for the pattern itself.</p>
-<h2>Primitives in this family</h2>
-<div class="table-wrap"><table>
-<thead><tr>
-<th>Primitive</th>
-<th>File</th>
-</tr></thead><tbody>
-<tr><td>Ball bearing</td><td><code>bearings/ball_bearing.py</code></td></tr>
-</tbody></table></div>
-<h2>Conventions</h2>
-<ul><li>Fully self-contained — imports only <code>bpy</code>, <code>bmesh</code>, <code>math</code>. No shared helper module (there's nothing to share yet with only one primitive).</li><li>Wall-thickness safety is <strong>auto-corrected, not just validated</strong>: the bore and outer diameter are silently nudged (bore shrunk / OD expanded) to guarantee both races keep at least <code>MIN_WALL_MM = 0.8mm</code> of material, and the panel shows an INFO-icon note when this happens. This is a different pattern from most other families' geometry validation, which cancels or warns rather than auto-adjusting the user's inputs — see <a href="ball_bearing.html#auto-corrected-wall-thickness">ball_bearing.md</a> for detail.</li><li><code>clearance_mm</code> and <code>gap_mm</code> here are <strong>fit clearances baked directly into geometry</strong> (added to a groove radius or a ball-packing gap), not a print-shrinkage compensation offset in the sense used elsewhere in this library (compare to the fastener family's <code>*_compensation_mm</code> fields). There is no separate "shrink compensation" property on this generator.</li></ul>
-<h2>Primitives</h2>
+<nav class="section-index"><a href="#primitives">Primitives in this family</a><a href="#units-core-parameters">Units and Core Parameters</a><a href="#target-matching">Target Matching</a></nav>
+<details id="primitives">
+<summary>Primitives in this family</summary>
 <div class="grid">
-<a class="card" href="ball_bearing.html"><img src="../assets/img/add_ball_bearing.png" alt=""><h3>Ball Bearing</h3><p>Generates an inner race, an outer race, and <code>ball_count</code> truncated-sphere balls — a complete, FDM-assemblable ball bearing. See <a href="index.html">README.md</a> for famil</p></a>
+<a class="card" href="ball_bearing.html"><img src="../assets/img/add_ball_bearing.png" alt=""><h3>Ball Bearing</h3><p>Generates an inner race, an outer race, and ball_count truncated-sphere balls — a complete, FDM-assemblable ball bearing. See README.md for family-wide notes.</p></a>
 </div>
+</details>
+<details id="units-core-parameters">
+<summary>Units and Core Parameters</summary>
+<p>Set the <strong>bore diameter</strong> (for the axle) and <strong>outer diameter</strong> (for the housing), then choose how many balls to use — more balls means a larger bearing for the same ball size. The overhang angle controls how much support-free clearance the ball pockets get when printing.</p>
+</details>
+<details id="target-matching">
+<summary>Target Matching</summary>
+<p>This family doesn't currently support Match Target.</p>
+</details>
+
 </main>
 <footer>
   <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
      <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
 </footer>
+<script>
+// Opens the <details> section matching the URL's #hash, so clicking an
+// index link actually shows that section instead of just scrolling next
+// to a still-collapsed one. Harmless no-op on pages with no <details> or
+// no hash. No framework, no dependency — a handful of lines is all this
+// needs.
+(function () {
+  function openFromHash() {
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+})();
+</script>
 </body>
 </html>

@@ -115,6 +115,48 @@
   }
   .card h3 { margin: 0 0 0.4rem; }
   .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .section-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  .section-index a {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+  .section-index a:hover { border-color: var(--accent); }
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0;
+    scroll-margin-top: 1.5rem;
+  }
+  summary {
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    transition: transform 0.15s ease;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details > *:not(summary) {
+    padding: 0 1.2rem 1.2rem;
+  }
+  details .grid { margin-top: 0; }
   footer {
     border-top: 1px solid var(--border);
     text-align: center;
@@ -132,28 +174,44 @@
   
 </header>
 <main>
-<p>Two primitives, <code>springs/hairspring.py</code> and <code>springs/serpentine_spring.py</code>. Both generate a single flat, printable spring mesh from a swept ribbon cross-section — otherwise they don't share code, math, or a common geometry model (one's a spiral, one's a zigzag). See <a href="../CONVENTIONS.html">../CONVENTIONS.md</a> for the family/primitive pattern this doc follows.</p>
-<h2>Primitives in this family</h2>
-<div class="table-wrap"><table>
-<thead><tr>
-<th>Primitive</th>
-<th>File</th>
-<th>Shape</th>
-</tr></thead><tbody>
-<tr><td>Hairspring</td><td><code>springs/hairspring.py</code></td><td>Archimedean spiral ribbon</td></tr>
-<tr><td>Serpentine spring</td><td><code>springs/serpentine_spring.py</code></td><td>Zigzag with rounded U-bends</td></tr>
-</tbody></table></div>
-<h2>Conventions</h2>
-<ul><li>Both fully self-contained — no shared helper module, no <code>bmech_*</code> stamping, no Match Target system. Neither file imports from the other or from any sibling <code>mechanisms_core</code> module.</li><li>Both build a <strong>flat 2D ribbon path</strong> (a centerline offset into outer/inner edges) rather than sweeping a profile curve — the ribbon's thickness dimensions are direct geometry inputs, not a Solidify modifier, except where noted below.</li><li><strong>Neither generator has a print-shrinkage FDM compensation property</strong> — no <code>*_compensation_mm</code> field anywhere in this family. The <code>strip_width</code>/<code>strip_thickness</code>/<code>strip_height</code> properties on both primitives carry FDM-driven <em>minimum</em> values (print-line-width floors like 0.4mm/0.2mm), but those are clamped inputs, not additive shrink-compensation offsets the way the fastener and gear families use the term. Don't go looking for a compensation field here — there isn't one.</li><li>Validation in both files follows the same soft pattern: <code>draw()</code> shows ERROR-icon labels for degenerate combinations of inputs, but neither file actually cancels on most of them — values get silently clamped in <code>execute()</code> instead (e.g. a too-small gap or too-narrow leg length is floored to a small positive number rather than blocking the operator). Check each primitive's doc for the one or two cases that genuinely do cancel.</li><li>Both output exactly <strong>one object per call</strong>, at the 3D cursor (no parenting-empty option, unlike bearings/planetary gear sets — there's only ever one part to place).</li></ul>
-<h2>Primitives</h2>
+<nav class="section-index"><a href="#primitives">Primitives in this family</a><a href="#units-core-parameters">Units and Core Parameters</a><a href="#target-matching">Target Matching</a></nav>
+<details id="primitives">
+<summary>Primitives in this family</summary>
 <div class="grid">
-<a class="card" href="hairspring.html"><img src="../assets/img/add_hairspring.png" alt=""><h3>Hairspring</h3><p>A flat Archimedean-spiral ribbon — the kind of spring used in mechanical clock balance wheels. See <a href="index.html">README.md</a> for family-wide notes.</p></a>
-<a class="card" href="serpentine_spring.html"><img src="../assets/img/add_serpentine_spring.png" alt=""><h3>Serpentine Spring</h3><p>A flat zigzag spring — straight legs connected by rounded U-bends, compressing along one axis. See <a href="index.html">README.md</a> for family-wide notes.</p></a>
+<a class="card" href="hairspring.html"><img src="../assets/img/add_hairspring.png" alt=""><h3>Hairspring</h3><p>A flat Archimedean-spiral ribbon — the kind of spring used in mechanical clock balance wheels. See README.md for family-wide notes.</p></a>
+<a class="card" href="serpentine_spring.html"><img src="../assets/img/add_serpentine_spring.png" alt=""><h3>Serpentine Spring</h3><p>A flat zigzag spring — straight legs connected by rounded U-bends, compressing along one axis. See README.md for family-wide notes.</p></a>
 </div>
+</details>
+<details id="units-core-parameters">
+<summary>Units and Core Parameters</summary>
+<p>Both spring generators build a flat coiled ribbon. <strong>Strip width</strong> and <strong>strip thickness</strong> control the ribbon's own cross-section; inner/outer radius and turn count control the size and tightness of the coil.</p>
+</details>
+<details id="target-matching">
+<summary>Target Matching</summary>
+<p>This family doesn't currently support Match Target.</p>
+</details>
+
 </main>
 <footer>
   <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
      <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
 </footer>
+<script>
+// Opens the <details> section matching the URL's #hash, so clicking an
+// index link actually shows that section instead of just scrolling next
+// to a still-collapsed one. Harmless no-op on pages with no <details> or
+// no hash. No framework, no dependency — a handful of lines is all this
+// needs.
+(function () {
+  function openFromHash() {
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+})();
+</script>
 </body>
 </html>

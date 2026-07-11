@@ -115,6 +115,48 @@
   }
   .card h3 { margin: 0 0 0.4rem; }
   .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .section-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  .section-index a {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+  .section-index a:hover { border-color: var(--accent); }
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0;
+    scroll-margin-top: 1.5rem;
+  }
+  summary {
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    transition: transform 0.15s ease;
+  }
+  details[open] summary::before { transform: rotate(90deg); }
+  details > *:not(summary) {
+    padding: 0 1.2rem 1.2rem;
+  }
+  details .grid { margin-top: 0; }
   footer {
     border-top: 1px solid var(--border);
     text-align: center;
@@ -132,40 +174,44 @@
   
 </header>
 <main>
-<p>Two primitives: <code>ratchets/ratchet_pawl.py</code> (external wheel + pawl, 3 operators) and <code>ratchets/internal_ratchet.py</code> (internal freewheel ring + hub + pawls, 1 operator). Both build <strong>rigid, no-spring</strong> mechanisms — you swing or hold the pawl into engagement yourself; there's no living hinge or spring-loaded pawl anywhere in this family. See <a href="../CONVENTIONS.html">../CONVENTIONS.md</a> for the family/primitive pattern.</p>
-<h2>Primitives in this family</h2>
-<div class="table-wrap"><table>
-<thead><tr>
-<th>Primitive</th>
-<th>File</th>
-<th>Operators</th>
-</tr></thead><tbody>
-<tr><td>External ratchet &amp; pawl</td><td><code>ratchets/ratchet_pawl.py</code></td><td><code>mesh.add_ratchet_wheel</code>, <code>mesh.add_ratchet_pawl</code>, <code>object.add_ratchet_mechanism</code></td></tr>
-<tr><td>Internal freewheel ratchet</td><td><code>ratchets/internal_ratchet.py</code></td><td><code>object.add_internal_ratchet</code></td></tr>
-</tbody></table></div>
-<h2>The lock direction convention flips between the two files — read this first</h2>
-<p><strong>External wheel</strong> (<code>ratchet_pawl.py</code>): rotating the wheel <strong>+Z (CCW, viewed from above) = LOCK</strong>; <strong>-Z (CW) = FREE</strong>.</p>
-<p><strong>Internal ring/hub</strong> (<code>internal_ratchet.py</code>): rotating the hub <strong>CW (viewed from +Z) = LOCK</strong>; <strong>CCW = FREE</strong> — the opposite sense, explicitly justified in the source as matching "the drive-side view of a standard bicycle rear hub."</p>
-<p>The underlying sawtooth math is identical between the two (<code>internal_ratchet.py</code>'s inner-teeth builder is directly derived from the external wheel's profile builder, "with the outer_radius and root_radius roles swapped so teeth point inward") — the lock direction flips because an internal ring's teeth point <em>inward</em> rather than outward, which reverses the geometric handedness relative to which way the hub turns, even though nothing about the tooth shape itself changed. Don't assume both files share a rotation convention just because they share tooth math — check which file you're in.</p>
-<h2>Why <code>internal_ratchet.py</code> duplicates code from <code>ratchet_pawl.py</code></h2>
-<p><code>internal_ratchet.py</code>'s own comment: "Geometry helpers (finalize_mesh_object, build_pawl_profile_points, create_filled_profile_with_hole) are copied from ratchet_pawl.py so this module has no inter-module dependency." Same self-containment convention as the <a href="../fasteners/index.html#this-family-does-not-share-a-helper-module--and-thats-deliberate">fastener family</a> — each generator module stands alone rather than importing a sibling generator module. The tradeoff: the two files' shared sawtooth math has to be kept in sync by hand, and <code>internal_ratchet.py</code>'s ring-teeth builder cross-references this directly in its own docstring ("Pattern is identical to build_wheel_profile_points in ratchet_pawl.py...").</p>
-<p>Note the duplication isn't total: <code>internal_ratchet.py</code>'s ring builder uses <code>mathutils.geometry.tessellate_polygon</code> instead of <code>bmesh.ops.triangle_fill</code>, because the ring's inner tooth boundary is non-convex (teeth point inward) — <code>triangle_fill</code> treats each enclosed pocket as a separate region and breaks on a non-convex inner boundary like this one, while <code>tessellate_polygon</code> handles multi-contour polygons (outer CCW + inner-as-hole CW) correctly. If you're duplicating geometry helpers between ratchet files in the future, don't assume <code>create_filled_profile_with_hole</code>'s triangle-fill approach is always safe to copy — check whether the boundary you're filling is convex first.</p>
-<h2>Validation: no clamping, ever — but only in <code>ratchet_pawl.py</code></h2>
-<p><code>ratchet_pawl.py</code> is explicit and consistent about this: every geometric impossibility (<code>tooth_count &lt; 4</code>, a tooth depth that would collapse the wheel through its own center, an axle hole bigger than the wheel, a pivot hole too large for the arm, a pawl tip too wide for the tooth valley) is raised as a <code>ValueError</code> and surfaces as a hard <code>CANCELLED</code> — never silently corrected. This is a stricter policy than most other families in this library, several of which auto-clamp or auto-scale out-of-range inputs instead of blocking (compare <a href="../bearings/index.html#auto-corrected-wall-thickness">bearings</a> or the <a href="../springs/index.html">spring family</a>). <code>internal_ratchet.py</code> mostly follows the same raise/cancel discipline (<code>validate_freewheel()</code> returns a list of error strings that blocks <code>execute()</code> if non-empty) but has one exception — see <a href="internal_ratchet.html">internal_ratchet.md</a> for the one case there that warns instead of blocking.</p>
-<h2>FDM compensation vs. running clearance — two different things, don't conflate them</h2>
-<p>Both files use <code>*_compensation_mm</code> fields the same way as the rest of this library: always <strong>added</strong> to a hole's nominal diameter, because FDM holes print tight (e.g. <code>axle_hole_compensation_mm</code>, <code>pivot_hole_compensation_mm</code>, <code>bore_compensation_mm</code>).</p>
-<p><code>internal_ratchet.py</code> additionally has <code>clearance_mm</code> (default 0.3mm), which is a <strong>different kind of parameter</strong> — the radial running gap between the hub's outer surface and the ring's tooth tips, enforced as <code>hub_outer_r &lt;= tip_r - clearance_mm</code>. This is <strong>subtracted</strong> from the maximum allowed hub radius, not added to a hole — because it's reserving working clearance between two independently-printed moving parts, not compensating a single hole for shrinkage. If you're adding a new ratchet variant with moving parts that need running clearance (as opposed to a press-fit hole), model it the way <code>clearance_mm</code> does here, not as another additive hole compensation field. This is the same distinction the planetary gear family draws with <code>pip_gap</code> — see <a href="../gears/planetary_gear_set.html#pip_gap--not-the-same-thing-as-bore-compensation">../gears/planetary_gear_set.md</a>.</p>
-<h2>Tooth ramp angle is derived, never a free input</h2>
-<p><code>ratchet_pawl.py</code> doesn't let you dial in the back-face ramp angle directly — <code>back_face_angle_deg</code> is computed from tooth count, tooth depth, and the wheel radii (<code>compute_back_face_angle_deg()</code>), then shown as a read-only label in the panel. The module's own design-decision log explains this was a deliberate v1.1 change from an earlier version that treated it as a free input: constraining tooth spacing, a radial drive face, <em>and</em> an independent ramp angle simultaneously is an over-constrained system. "Standard convention for real ratchets — ramp angle is a consequence of tooth proportions, not an independent dial." <code>internal_ratchet.py</code> has no equivalent concept at all — it doesn't compute or report a back-face angle for the internal ring's teeth.</p>
-<h2>Primitives</h2>
+<nav class="section-index"><a href="#primitives">Primitives in this family</a><a href="#units-core-parameters">Units and Core Parameters</a><a href="#target-matching">Target Matching</a></nav>
+<details id="primitives">
+<summary>Primitives in this family</summary>
 <div class="grid">
-<a class="card" href="internal_ratchet.html"><img src="../assets/img/add_internal_ratchet.png" alt=""><h3>Internal Ratchet</h3><p>A bicycle-freewheel-style mechanism: an outer ring with inward-pointing teeth, an inner hub, and <code>pawl_count</code> pawls mounted on the hub pointing radially outward</p></a>
-<a class="card" href="ratchet_pawl.html"><img src="../assets/img/add_ratchet_mechanism.png" alt=""><h3>Ratchet Pawl</h3><p>Rigid, no-spring: <strong>+Z (CCW from above) wheel rotation = LOCK</strong>, -Z (CW) = FREE. See <a href="index.html">README.md</a> for this family's shared conventions, especially the</p></a>
+<a class="card" href="internal_ratchet.html"><img src="../assets/img/add_internal_ratchet.png" alt=""><h3>Internal Ratchet</h3><p>A bicycle-freewheel-style mechanism: an outer ring with inward-pointing teeth, an inner hub, and pawl_count pawls mounted on the hub pointing radially outward. </p></a>
+<a class="card" href="ratchet_pawl.html"><img src="../assets/img/add_ratchet_mechanism.png" alt=""><h3>Ratchet Pawl</h3><p>Rigid, no-spring: +Z (CCW from above) wheel rotation = LOCK, -Z (CW) = FREE. See README.md for this family's shared conventions, especially the lock-direction c</p></a>
 </div>
+</details>
+<details id="units-core-parameters">
+<summary>Units and Core Parameters</summary>
+<p>Ratchets use the same sizing convention as gears: set <strong>module</strong> (tooth size) and <strong>tooth count</strong>, or switch to outer-diameter mode and let module be worked out automatically. Tooth depth can be automatic or set by hand.</p>
+</details>
+<details id="target-matching">
+<summary>Target Matching</summary>
+<p>This family doesn't currently support Match Target.</p>
+</details>
+
 </main>
 <footer>
   <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
      <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
 </footer>
+<script>
+// Opens the <details> section matching the URL's #hash, so clicking an
+// index link actually shows that section instead of just scrolling next
+// to a still-collapsed one. Harmless no-op on pages with no <details> or
+// no hash. No framework, no dependency — a handful of lines is all this
+// needs.
+(function () {
+  function openFromHash() {
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+})();
+</script>
 </body>
 </html>
