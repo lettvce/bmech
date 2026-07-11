@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Helical Gear — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Gears</a> / Helical Gear</div>
+<header>
+  <h1>Helical Gear</h1>
+  <img class="hero-img" src="../assets/img/helical_gear.png" alt="Helical Gear render">
+</header>
+<main>
+<p><code>gears/external/helical_gear.py</code> → <code>OBJECT_OT_helical_gear</code> (<code>object.helical_gear</code>, "Helical Gear")</p>
+<p>External involute gear with twisted (helical) teeth for quieter, stronger meshing than a spur gear. See <a href="index.html">README.md</a> for family-wide conventions, especially the <strong>hand convention</strong> section — this is the primitive that introduces <code>hand</code>.</p>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>target</code></td><td>Object pointer</td><td>—</td><td>gears with <code>bmech_module</code></td><td>Match Target; runs <code>sync_helical_opposite</code> — copies module/PA/helix angle and <strong>inverts</strong> hand</td></tr>
+<tr><td><code>tooth_count</code></td><td>Int</td><td>20</td><td>5–200 (soft)</td><td></td></tr>
+<tr><td><code>module</code></td><td>Float (mm)</td><td>2.0</td><td>0.1–20.0 (soft)</td><td>Transverse module</td></tr>
+<tr><td><code>pressure_angle_deg</code></td><td>Float (°)</td><td>20.0</td><td>10–45</td><td></td></tr>
+<tr><td><code>helix_angle_deg</code></td><td>Float (°)</td><td>20.0</td><td>1–45</td><td>15–30° typical for FDM</td></tr>
+<tr><td><code>hand</code></td><td>Enum</td><td><code>RIGHT</code></td><td><code>RIGHT</code> / <code>LEFT</code></td><td>RIGHT = teeth twist CW looking from top</td></tr>
+<tr><td><code>width_mm</code></td><td>Float (mm)</td><td>10.0</td><td>1–50 (soft)</td><td></td></tr>
+<tr><td><code>bore_enable</code></td><td>Bool</td><td>True</td><td></td><td></td></tr>
+<tr><td><code>bore_diameter</code></td><td>Float (mm)</td><td>5.0</td><td>0.1–50 (soft)</td><td></td></tr>
+<tr><td><code>bore_compensation</code></td><td>Float (mm)</td><td>0.2</td><td>0.0–1.0 (soft)</td><td>Added to bore radius</td></tr>
+<tr><td><code>n_slices</code></td><td>Int</td><td>16</td><td>2–64 (soft)</td><td>Z divisions — more = smoother helix</td></tr>
+</tbody></table></div>
+<h2>Build method</h2>
+<p>Unlike the spur gear (flat profile + Solidify), the helical gear is built as a genuine 3D solid: one 2D involute profile is generated once, then extruded across <code>n_slices</code> Z-layers from 0 to <code>width_mm</code>, each layer rotated by</p>
+<pre><code>twist(z) = hand_sign * z * tan(helix_angle) / pitch_radius
+hand_sign = +1 for RIGHT, -1 for LEFT</code></pre>
+<p>Side walls are quads between consecutive slices; end caps are the first (reverse-wound) and last slice as flat n-gons. This is the entire hand implementation — <code>hand</code> only ever flips the sign on this one formula.</p>
+<p>Total twist across the full face width (<code>width_mm * tan(helix_angle) / pitch_radius</code>) and the normal module (<code>module * cos(helix_angle)</code>) are shown as read-only info lines in the panel.</p>
+<p>Bore is cut the same way as the spur gear's (<code>EXACT</code>-solver boolean DIFFERENCE, cutter extended <code>±BOOL_EPSILON</code> past both faces), but here as a genuinely separate boolean step since there's no Solidify modifier to apply first.</p>
+<h2>Panel warnings</h2>
+<ul><li><code>dedendum_radius &lt;= 0</code> → <strong>"Module too large — dedendum radius ≤ 0"</strong> (ERROR, blocks — silent <code>CANCELLED</code>, no <code>self.report()</code>).</li><li><code>bore_r &gt;= dedendum_radius</code> → <strong>"Bore larger than dedendum radius"</strong> (ERROR). Note the bore-skip logic in <code>execute()</code> uses strict <code>&lt;</code>, so this threshold and the actual skip condition line up exactly.</li></ul>
+<p>Unlike the herringbone gear, this operator does <strong>not</strong> call <code>self.report({'INFO'}, ...)</code> on success — no confirmation message beyond the created object.</p>
+<h2>Output</h2>
+<p>One object, stamped:</p>
+<pre><code>gear_matching.stamp_gear(obj, "helical", module, pressure_angle_deg,
+                          tooth_count=tooth_count,
+                          helix_angle_deg=helix_angle_deg, hand=hand)</code></pre>
+<p>Meshes with: another helical gear (<strong>opposite hand</strong>, same module/PA/helix angle), or a helical annulus gear (<strong>same hand</strong> — see <a href="helical_annulus_gear.html">helical_annulus_gear.md</a>).</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hex Nut — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Fasteners</a> / Hex Nut</div>
+<header>
+  <h1>Hex Nut</h1>
+  <img class="hero-img" src="../assets/img/hex_nut.png" alt="Hex Nut render">
+</header>
+<main>
+<p><code>fasteners/hex_nut.py</code> → <code>OBJECT_OT_hex_nut</code> (<code>object.hex_nut</code>, "Hex Nut")</p>
+<p>A hex thru-nut — internal thread cut all the way through a hex prism. Built <strong>subtractively</strong>: a helical groove cutter differenced out of the prism first, then a plain pilot bore differenced out second, then welded clean with a Merge by Distance pass — no separate thread ridge is ever unioned in. Reuses <code>threaded_fastener.py</code>'s thread math (<code>_thread_params</code>, <code>_build_helix</code>, <code>_external_profile</code> as the cutter) by duplication, same convention as <a href="hex_bolt.html">hex_bolt.md</a> — see <a href="index.html#this-family-does-not-share-a-helper-module--and-thats-deliberate">README.md</a>. This file contains the clearest statement in the codebase of <em>why</em> that duplication exists:</p>
+<blockquote><p>"Thread math is duplicated from threaded_fastener.py per this project's convention (each generator module is self-contained, no cross-file thread math imports)."</p></blockquote>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>target</code></td><td>Object pointer</td><td>—</td><td>mesh objects with <code>bmech_thread_diameter</code></td><td>Match Target; runs <code>fastener_matching.sync_thread_dims</code> — copies <code>thread_diameter_mm</code>/<code>pitch_mm</code>/<code>flank_angle_deg</code>/<code>truncation</code> all at once</td></tr>
+<tr><td><code>z_height_mm</code></td><td>Float (mm)</td><td>6.5</td><td>0.5–50 (soft)</td><td></td></tr>
+<tr><td><code>across_flats_mm</code></td><td>Float (mm)</td><td>13.0</td><td>1–100 (soft)</td><td></td></tr>
+<tr><td><code>thread_diameter_mm</code></td><td>Float (mm)</td><td>8.0</td><td>0.5–80 (soft)</td><td>Nominal <strong>major</strong> diameter of the internal thread — "the hole size"</td></tr>
+<tr><td><code>pitch_mm</code></td><td>Float (mm)</td><td>1.25</td><td>0.1–10 (soft)</td><td></td></tr>
+<tr><td><code>flank_angle_deg</code></td><td>Float (°)</td><td>60.0</td><td>1–179</td><td>60° metric/UNC, 55° BSP, 29° ACME</td></tr>
+<tr><td><code>truncation</code></td><td>Float</td><td>0.125</td><td>0.0–0.3</td><td></td></tr>
+<tr><td><code>resolution</code></td><td>Int</td><td>32</td><td>8–128 (soft)</td><td></td></tr>
+<tr><td><code>inner_compensation_mm</code></td><td>Float (mm)</td><td>0.0</td><td>0.0–0.5 (soft)</td><td>Added to thread major radius — printed holes come out tight</td></tr>
+<tr><td><code>fit_offset_mm</code></td><td>Float (mm)</td><td>0.0</td><td>0.0–0.5 (soft)</td><td>Added to thread diameter — a looser fit against a mating external thread whose own diameter is reduced by the same offset. Never synced by Match Target</td></tr>
+</tbody></table></div>
+<h2>Match Target</h2>
+<p>Same freeze behavior as <a href="hex_bolt.html#match-target">hex_bolt.md</a>: <code>thread_diameter_mm</code>, <code>pitch_mm</code>, <code>flank_angle_deg</code>, and <code>truncation</code> freeze together, all at once, whenever a valid target is set — a nut and the bolt it fits need all four thread dimensions to match exactly, so there's no partial-freeze case the way there is for gears. <code>z_height_mm</code>, <code>across_flats_mm</code>, <code>resolution</code>, <code>inner_compensation_mm</code>, and <code>fit_offset_mm</code> stay editable regardless — none of them are part of what makes a nut fit a given bolt.</p>
+<p><strong>The target picker only offers <code>EXTERNAL</code>-oriented objects</strong> — a nut (always <code>INTERNAL</code>) can target a <code>hex_bolt</code>, or a <code>threaded_fastener.py</code> raw thread currently built with <code>thread_type='EXTERNAL'</code>, but never another <code>hex_nut</code> or an <code>INTERNAL</code> raw thread. See <a href="hex_bolt.html#match-target">hex_bolt.md</a> and <a href="index.html#match-target-a-deliberate-exception-to-the-no-shared-module-rule">README.md</a> for why this diverges from the gear family's deliberately loose poll.</p>
+<p>See <a href="index.html#match-target-a-deliberate-exception-to-the-no-shared-module-rule">README.md</a> for why the Match Target machinery lives in a small shared <code>fastener_matching.py</code> despite this family's own "no shared module" rule for thread geometry math.</p>
+<h2>Build method — two different coincidence problems, two different fixes</h2>
+<p>This construction produces two DIFFERENT kinds of coincident surface, and conflating them — fixing both the same way — reintroduces whichever bug that one approach doesn't cover. They need to be understood separately:</p>
+<ol><li><strong>Difference the thread cutter FIRST</strong> (<code>_external_profile</code> + <code>_build_helix</code>, with <code>root_flat</code> passed into the profile's <code>crest_flat</code> slot — see the module docstring) out of the solid hex prism: <strong>exactly</strong> <code>major_r</code> radially (no outward padding), but <strong>half a pitch</strong> of overshoot past <strong>both</strong> <code>z=0</code> and <code>z=z_height_mm</code> axially.</li><li><strong>Cut a plain pilot bore SECOND</strong> (after the thread cutter, not before) through the same prism, sized to <code>minor_r + BOOL_EPSILON</code> — a hairline OVER the true minor diameter, not exactly equal to it. Z is padded <code>±BOOL_EPSILON</code> past both ends of <code>z_height_mm</code> to guarantee a full through-cut.</li><li><strong>Merge by Distance</strong> (<code>bmesh.ops.remove_doubles</code>, a small fixed tolerance) on the resulting mesh, which cleans up whatever coincident geometry remains from steps 1-2.</li></ol>
+<p><strong>Radial coincidence (<code>minor_r</code>):</strong> the pilot bore's wall and the thread cutter's own root-flat faces are both nominally at <code>minor_r</code>. An earlier version of this file cut the pilot bore <em>first</em>, sized to <em>exactly</em> <code>minor_r</code>, then differenced the thread cutter afterward — undersizing the bore the way <code>hex_bolt.py</code>'s <code>overlap</code> pattern would (shrinking it further) left a real, physical, uncut lip at the bore's mouth, narrower than the true minor diameter, since undersizing the bore before the thread cut leaves material the thread cutter doesn't reliably clear. Cutting the thread first and the pilot bore second — sized a hairline <em>over</em> <code>minor_r</code> rather than under it — avoids that lip while still breaking the exact radial coincidence.</p>
+<p><strong>Axial wind-up (<code>z=0</code> / <code>z=z_height_mm</code>):</strong> a single-start helix cut exactly flush to the real end faces starts its very first ring — also its own flat end cap — before the thread profile has completed even a quarter turn, leaving a flat UNTHREADED band at both mouths of the nut (every angle reads a uniform <code>minor_r</code> there, not the oscillating crest/root pattern a real thread has). This is a dimensional defect, not a topological one — it can pass a min-radius-only check completely undetected, since the flat band happens to sit exactly at <code>minor_r</code> too. It needs axial overshoot, so the helix is already fully wound up by the time it reaches the real boundary. The overshoot amount matters: a FULL pitch — the more obviously "safe" choice — is actually the worst one, because it places the same profile phase at <code>z=0</code> that would land there anyway (the crest's return to <code>minor_r</code>), exactly coincident with the pilot bore's own wall over an extended stretch, which produced a genuine TORN HOLE in one configuration tested (real non-manifold boundary edges from a missing face — not duplicate geometry, so Merge by Distance can't weld it shut). <strong>Half</strong> a pitch lands a different, non-<code>minor_r</code> phase at <code>z=0</code> instead, avoiding that extra coincidence while still providing wind-up room.</p>
+<p>The cut ordering (thread first, bore second) and the <code>+ BOOL_EPSILON</code> pilot-bore sizing were arrived at through direct iteration in Blender by the maintainer, not independently re-verified in this repo's own headless test suite before shipping — see <a href="index.html#boolean-solver-patterns-specific-to-this-family">README.md</a>.</p>
+<h2>Panel warnings</h2>
+<ul><li><code>flank_dz &lt;= 0</code> → <strong>"Truncation too high — no room for flanks at this pitch"</strong> (ERROR icon).</li><li><code>wall &lt;= 0.5</code> (where <code>wall = across_flats/2 - major_r</code>) → <strong>"Thin or negative wall — increase across flats or reduce thread Ø"</strong> (ERROR icon).</li></ul>
+<p><strong>Both are enforced in execute()</strong>, same pattern as <code>hex_bolt.py</code>: <code>flank_dz &lt;= 0 or wall &lt;= 0</code> reports <code>self.report({'ERROR'}, "Invalid geometry — check truncation and across-flats vs thread diameter")</code> and cancels. Again the execute() gate (<code>wall &lt;= 0</code>) is looser than the draw() warning (<code>wall &lt;= 0.5</code>) — a wall between 0 and 0.5mm builds despite the visible warning.</p>
+<h2>Output</h2>
+<p>One object, named <code>HexNut</code> directly (not a temp-prefixed intermediate name), stamped via <code>fastener_matching.stamp_thread</code>: <code>bmech_kind="hex_nut"</code>, <code>bmech_thread_diameter</code>, <code>bmech_pitch</code>, <code>bmech_flank_angle_deg</code>, <code>bmech_truncation</code> — the same stamping <code>hex_bolt.py</code> uses, read back by a <code>hex_bolt</code> (or another <code>hex_nut</code>) picking this one as its Match Target.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

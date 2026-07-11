@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gears — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / Gears</div>
+<header>
+  <h1>Gears</h1>
+  
+</header>
+<main>
+<p>This document covers everything that's true for <em>every</em> gear generator in <code>mechanisms_core/</code>. Primitive-specific docs (one file per generator, in this same folder) only cover what's different about that primitive — they assume you've read this first.</p>
+<p>All 15 gear primitives ship as separate operators, one Blender object (or, for gear sets, several) per call, appearing under <code>Shift-A &gt; Mechanisms &gt; Gears</code>.</p>
+<h2>Primitives in this family</h2>
+<p><code>mechanisms_core/gears/</code> splits into five subfamilies, matching the <code>Mechanisms &gt; Gears</code> menu structure in <code>menu.py</code>: <code>external/</code>, <code>ring/</code>, <code>planetary/</code>, <code>bevel/</code>, <code>rack/</code>. <code>gear_matching.py</code> (the Match Target system, see below) lives at <code>gears/</code> root since it's shared by every subfamily.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Primitive</th>
+<th>File</th>
+<th>kind stamp</th>
+</tr></thead><tbody>
+<tr><td>Spur gear</td><td><code>gears/external/spur_gear.py</code></td><td><code>spur</code></td></tr>
+<tr><td>Helical gear</td><td><code>gears/external/helical_gear.py</code></td><td><code>helical</code></td></tr>
+<tr><td>Herringbone gear</td><td><code>gears/external/herringbone_gear.py</code></td><td><code>herringbone</code></td></tr>
+<tr><td>Bevel gear</td><td><code>gears/bevel/bevel_gear.py</code></td><td><code>bevel</code></td></tr>
+<tr><td>Annulus (ring) gear</td><td><code>gears/ring/annulus_gear.py</code></td><td><code>annulus</code></td></tr>
+<tr><td>Helical annulus gear</td><td><code>gears/ring/helical_annulus_gear.py</code></td><td><code>helical_annulus</code></td></tr>
+<tr><td>Herringbone annulus gear</td><td><code>gears/ring/herringbone_annulus_gear.py</code></td><td><code>herringbone_annulus</code></td></tr>
+<tr><td>Straight rack</td><td><code>gears/rack/straight_rack.py</code></td><td><code>rack</code></td></tr>
+<tr><td>Helical rack</td><td><code>gears/rack/helical_rack.py</code></td><td><code>helical_rack</code></td></tr>
+<tr><td>Herringbone rack</td><td><code>gears/rack/herringbone_rack.py</code></td><td><code>herringbone_rack</code></td></tr>
+<tr><td>Planetary gear set</td><td><code>gears/planetary/planetary_gear_set.py</code></td><td><em>(none — see below)</em></td></tr>
+<tr><td>Helical planetary gear set</td><td><code>gears/planetary/helical_planetary_gear_set.py</code></td><td><em>(none)</em></td></tr>
+<tr><td>Herringbone planetary gear set</td><td><code>gears/planetary/herringbone_planetary_gear_set.py</code></td><td><em>(none)</em></td></tr>
+<tr><td>Cluster gear</td><td><code>gears/external/cluster_gear.py</code></td><td><em>(none)</em></td></tr>
+<tr><td>Compound gear train</td><td><code>gears/external/compound_gear.py</code></td><td><em>(none)</em></td></tr>
+</tbody></table></div>
+<p>The single-gear, ring-gear, and rack primitives (top 10 rows) are building blocks meant to mesh with each other and participate in the Match Target system below. The gear-set primitives (bottom 5 rows) are self-contained assemblies — they build several already-meshed gears in one call and don't stamp or read <code>bmech_*</code> properties themselves.</p>
+<h2>Units and core parameters</h2>
+<p>Everything is millimeters. Every single-gear primitive shares two core parameters:</p>
+<ul><li><strong><code>module</code></strong> (mm) — sets tooth size. Two gears only mesh if their modules match. For helical/herringbone gears, <code>module</code> is the <strong>transverse</strong> module (measured in the cross-section view); the normal module (what a real hob/cutter would be specified as) is <code>module * cos(helix_angle)</code> and is shown as a read-only info line in the operator panel.</li><li><strong><code>pressure_angle_deg</code></strong> — standard range 10–45°, default 20°. Must match between meshing gears. Larger pressure angles give stronger, wider-based teeth but need more radial clearance.</li></ul>
+<p>Tooth proportions are standard throughout the family:</p>
+<pre><code>ADDENDUM_COEFF = 1.0    # tooth height above pitch circle, in units of module
+DEDENDUM_COEFF = 1.25   # tooth depth below pitch circle, in units of module</code></pre>
+<p>so for an external gear, <code>addendum_radius = pitch_radius + module</code> and <code>dedendum_radius = pitch_radius - 1.25*module</code>, where <code>pitch_radius = module * tooth_count / 2</code>.</p>
+<p><strong>Annulus (internal/ring) gears swap these roles.</strong> The cutter that carves inward-pointing teeth into a ring is built with the same profile-builder code as an external tooth, but <code>ADDENDUM_COEFF</code> and <code>DEDENDUM_COEFF</code> swap which one is "outward" and which is "inward" — so for a ring gear, <code>tip_r = pitch_r - module</code> (teeth point inward) and <code>root_r_inner = pitch_r + 1.25*module</code> (tooth base meets the solid ring body). See <a href="annulus_gear.html">annulus_gear.md</a> for the full derivation.</p>
+<h2>Hand convention — the one rule most likely to bite you</h2>
+<p>Helical and herringbone gears (and racks) have a <code>hand</code> property (<code>RIGHT</code>/<code>LEFT</code>). The rule for which hand a mating part needs is <strong>not</strong> simply "external-external vs. external-internal" — it depends on the <em>relative angular position</em> of the two contact points, which happens to coincide with that split for gear-gear and gear-annulus pairs but not for gear-rack pairs:</p>
+<ul><li><strong>Two external gears on parallel shafts</strong> (helical↔helical or herringbone↔herringbone, spur excluded since it has no hand): mating gears need <strong>OPPOSITE</strong> hands. This is <code>gear_matching.sync_helical_opposite</code>. Geometrically: gear B's contact point (facing gear A) sits at gear B's own θ=180° position relative to gear A's own θ=0° contact point — that 180° relative offset is what flips the sign in the tooth-flank-slope derivation.</li><li><strong>External pinion inside a helical/herringbone annulus (ring) gear</strong>: mating parts need the <strong>SAME</strong> hand. This is <code>gear_matching.sync_helical_same</code>.</li><li><strong>Helical/herringbone rack meshing a helical/herringbone pinion</strong>: mating parts need the <strong>SAME</strong> hand — <code>gear_matching.sync_helical_same</code>, <strong>not</strong> <code>sync_helical_opposite</code> despite the rack being "external" tooth geometry like the first case above. A rack sits directly <em>below</em> its pinion, contacting at the pinion's own θ=-90° point — a 90°, not 180°, relative offset from a reference θ=0° — and that different offset does <strong>not</strong> produce the same sign flip the side-by-side gear-gear case does. Confirmed empirically (not just by rederiving the angle math): building a 30°-helix pinion with a same-hand rack produces 0 mm³ of mesh interpenetration; the opposite-hand combination produces hundreds of mm³ of gross overlap across the width. An earlier version of this library got this wrong by assuming "external tooth on the outside" was the deciding factor and applying the gear-gear rule to racks by analogy — it isn't; the deciding factor is the relative contact angle. See <a href="helical_rack.html">helical_rack.md</a> for the full derivation.</li></ul>
+<p>Herringbone parts specifically have <em>no net axial thrust</em> regardless of hand (that's the point of the herringbone V-shape) — but hand still has to match per the rules above, because it determines which way the V opens, not just which way it twists.</p>
+<p>Straight (non-helical) gears and racks — spur, straight rack, bevel, straight annulus — have no <code>hand</code> property at all.</p>
+<h2>The Match Target system (<code>gear_matching.py</code>)</h2>
+<p>Every gear operator that finishes successfully stamps custom properties (<code>bmech_kind</code>, <code>bmech_module</code>, <code>bmech_pressure_angle_deg</code>, and where applicable <code>bmech_tooth_count</code>, <code>bmech_helix_angle_deg</code>, <code>bmech_hand</code>) onto the object it creates, via <code>gear_matching.stamp_gear(...)</code>.</p>
+<p>Every gear operator also exposes a <strong>Match Target</strong> object picker, drawn via <code>layout.prop(context.window_manager, "bmech_gear_target", ...)</code>. This lives on <code>WindowManager</code>, <strong>not</strong> as a <code>PointerProperty</code> on the operator itself — <code>bpy.types.Operator</code> can't hold a <code>PointerProperty</code> to an <code>Object</code> (Blender silently drops that property and everything declared after it in the class on registration), which is exactly the mistake this system exists to avoid repeating. Each operator instead implements <code>bmech_sync_target(self, context)</code>, and a shared <code>update</code> callback on the WindowManager property (<code>gear_matching._on_target_change</code>) dispatches to whichever operator <code>context.active_operator</code> currently points at. See <a href="../CONVENTIONS.html#the-match-target-pattern--letting-one-parts-output-drive-anothers-properties">CONVENTIONS.md#the-match-target-pattern--letting-one-parts-output-drive-anothers-properties</a> for the full list of Blender-API gotchas this pattern runs into — that section is written to generalize to any future family that wants the same kind of cross-object matching, not just gears.</p>
+<p>The poll function (<code>gear_matching.gear_target_poll</code>) accepts any mesh object carrying a <code>bmech_module</code> property — it does <strong>not</strong> check <code>bmech_kind</code>, so nothing stops you from picking a bevel gear as the target for a rack. This is deliberate, not an oversight: cross-kind matches are sometimes mechanically real (a helical gear meshing with one half of a herringbone gear, both sharing module/pressure-angle/helix/hand) and sometimes represent a shared-hub relationship rather than a direct mesh (see the spur-gear case below) — the system only saves you from retyping numbers, meshing correctness is on you either way.</p>
+<p>*<em>Known footgun: targeting a ring (annulus) gear when building a rack that actually meshes with the </em>pinion<em> inside that ring.</em><em> Say a pinion meshes with both an annulus gear and a rack — you might reach for the annulus as the rack's target since "it has the same numbers anyway." <code>module</code>/<code>pressure_angle_deg</code>/<code>helix_angle_deg</code>/<code>hand</code> genuinely do come out identical either way, by transitivity (<code>sync_helical_same</code> is used for both the pinion↔ring pair and the rack↔pinion pair, so ring-hand = pinion-hand = rack-hand). But two other things silently use </em>whichever* target you picked, not "the pinion specifically":</p>
+<ul><li><strong>Position</strong> — the rack always drops itself <code>target</code>'s own pitch radius below <code>target.location</code>. Point it at the ring (pitch radius sized for the ring's own, usually much larger, tooth count) and the rack lands nowhere near the actual pinion.</li><li><strong><code>MATCH_GEAR</code> length mode</strong> — sizes the rack to span <code>target</code>'s own tooth count. Point it at the ring and the rack comes out sized for the ring's tooth count, not the pinion's.</li></ul>
+<p>Target the pinion directly when building a rack. Only target the ring gear itself when building something that meshes <em>with the ring</em> (another pinion, or a matching gear set).</p>
+<p>Picking a target runs one of four sync helpers, chosen by what kind of pair the operator represents:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Helper</th>
+<th>Copies</th>
+<th>Used by</th>
+</tr></thead><tbody>
+<tr><td><code>sync_module_pa</code></td><td>module, pressure angle</td><td>spur, straight rack, straight annulus</td></tr>
+<tr><td><code>sync_helical_opposite</code></td><td>+ helix angle, <strong>inverted</strong> hand</td><td>helical/herringbone external gears</td></tr>
+<tr><td><code>sync_helical_same</code></td><td>+ helix angle, <strong>same</strong> hand</td><td>helical/herringbone annulus gears, helical/herringbone racks</td></tr>
+<tr><td><code>sync_bevel</code></td><td>module, pressure angle, target's tooth count → this gear's <code>mate_teeth</code></td><td>bevel gears</td></tr>
+</tbody></table></div>
+<p><strong>Racks additionally phase-align in X against a target</strong>, via <code>gear_matching.rack_phase_align_x(target, tooth_count_rack)</code>, on top of the existing Y-drop-by-pitch-radius and X-centering. This is purely cosmetic, not a correctness fix — standard involute teeth are in conjugate contact at every point along the path of contact, so <em>every</em> rotational phase of a correctly-dimensioned pair is interference-free. Without it, whether the rack spawns with a gear tooth centered in a rack gap (nice-looking) or a gear tooth landing dead-center on a rack tooth (confusing-looking, though not actually wrong) is arbitrary, driven by the interaction between the target's tooth count and <code>tooth_count_rack</code>'s own parity — the existing X-centering formula already puts either a rack tooth-center or a rack gap-center at the target's local x=0 depending on whether <code>tooth_count_rack</code> is odd or even, so the phase fix has to know that parity too, not just the target's tooth count, to land on the right side of that distinction. See <a href="helical_rack.html#phase-alignment">helical_rack.md</a> for the full derivation, including a first version of this function that got the parity interaction wrong (verified by hand-checking a concrete example that it silently turned an already-correct alignment into an incorrect one for about half of all <code>tooth_count_rack</code> values).</p>
+<p><strong>A spur-gear target never drives helix angle or hand</strong>, even when the gear being created is helical or herringbone. <code>stamp_gear</code> never writes <code>bmech_helix_angle_deg</code>/<code>bmech_hand</code> for a <code>"spur"</code> kind, so <code>sync_helical_opposite</code>'s <code>if "bmech_helix_angle_deg" in target.keys()</code> guards simply skip for a spur target — only module and pressure angle get pulled in. This isn't a gap to fix: a plain spur gear and a helical gear can't correctly mesh on a standard parallel-shaft arrangement regardless of matched module/pressure-angle (the tooth angles don't align), so matching a helical/herringbone gear to a spur target represents "shares a pitch circle" (e.g. a compound gear with a spur section on the same hub), not "these teeth mesh directly" — helix angle and hand are the twisted section's own properties to set, not something a non-twisted target could meaningfully specify. <code>helical_gear.py</code>/<code>herringbone_gear.py</code>'s <code>draw()</code> reflects this directly: <code>module</code>/<code>pressure_angle_deg</code> are frozen whenever any target is set, but <code>helix_angle_deg</code>/<code>hand</code> are only frozen when the target actually has <code>bmech_helix_angle_deg</code> — i.e. when it's a helical/herringbone target, not a spur one.</p>
+<p>*<em>Even when a helical/herringbone target </em>does<em> drive <code>helix_angle_deg</code>, <code>hand</code> specifically stays editable if the two sides are different styles<strong> (one plain helical, one herringbone) — <code>gear_matching. hand_target_ambiguous(self_is_herringbone, target)</code>. A herringbone tooth is two mirrored helical halves (bottom twists one way, top the other); a plain helical tooth is a single constant-angle line. A plain helical gear can only mesh correctly against </strong>one</em><em> half of a herringbone gear at a time, and which hand is correct depends on which half — the sync can only assume one convention (matching the target's bottom half, per <code>herringbone_gear.py</code>'s own <code>hand</code> property being defined relative to its bottom half) as a default, so it's wrong to lock the field when the design might actually engage the top half instead. This is NOT the same condition as the spur-target case above — <code>helix_angle_deg</code>'s </em>magnitude* stays frozen in the cross-style case (it's unambiguous regardless of which half is engaged), only <code>hand</code> reopens. Same-style pairs (helical↔ helical, herringbone↔herringbone) have no such ambiguity — a herringbone meshes a herringbone across its full width by design — and freeze <code>hand</code> normally, including across the external/annulus boundary (an external helical pinion matching a helical annulus target is still same-style, so <code>hand</code> stays frozen there too).</p>
+<p>Gear-set primitives (planetary/cluster/compound) don't participate in this system at all — they build their own internally-consistent meshes in one shot and never call <code>stamp_gear</code> or read the target.</p>
+<h2>Bore holes and FDM compensation</h2>
+<p>Most single-gear primitives (not bevel, not gear-set shafts) expose <code>bore_enable</code> / <code>bore_diameter</code> / <code>bore_compensation</code>. <strong>Compensation is always added to the bore radius, never subtracted</strong> — printed holes come out undersized, and this project's convention is that all FDM dimensional compensation (external or internal) is additive, matching every other generator in this library. Default compensation is <code>0.2mm</code>.</p>
+<pre><code>bore_r = bore_diameter / 2 + bore_compensation</code></pre>
+<p>The operator silently skips cutting the bore (not clamps it) if <code>bore_r &gt;= dedendum_radius</code> — check the panel's error label rather than trusting the mesh will just come out with a smaller hole.</p>
+<p>Bevel gears have <strong>no bore feature at all</strong>: their center-fan end-cap construction already fills the hub area, so there's nothing for a boolean cutter to remove without also removing tooth material. Don't expect a <code>bore_diameter</code> field on that operator.</p>
+<p>Planetary/cluster/compound gear-set primitives use a related but distinct parameter, <strong><code>pip_gap</code></strong> — radial clearance added at tooth flanks so gears printed pre-meshed (print-in-place) don't fuse together. This is backlash clearance between teeth, not a bore-hole allowance; don't confuse the two.</p>
+<h2>Boolean/geometry implementation notes</h2>
+<p>These matter if you're reading or modifying the generator code, less so if you're just using the operators:</p>
+<ul><li>Internal-tooth features are cut with a <strong>boolean DIFFERENCE modifier, <code>solver='EXACT'</code></strong>, applied immediately and the cutter object deleted — never left as a live modifier — <strong>except all three annulus generators</strong> (<code>annulus_gear.py</code>, <code>helical_annulus_gear.py</code>, <code>herringbone_annulus_gear.py</code>), which were rewritten to skip the boolean entirely (see below). Planetary ring gears (<code>herringbone_planetary_gear_set.py</code>'s own ring cutter, and its plain/ helical siblings) still use the boolean approach.</li><li>Cutter meshes (where a boolean cutter is still used) are extruded <code>BOOL_EPSILON = 0.001mm</code> past the body's end faces on both sides, specifically so the cutter's cap faces are never exactly coplanar with the body's cap faces (coplanar faces are a common cause of EXACT-solver boolean failures).</li><li><strong>All three annulus generators were rewritten to skip the boolean entirely</strong> — direct bmesh construction (inner toothed wall, outer cylindrical wall, two caps), no cutter object, no <code>EXACT</code> solver call. Measured 10-180x faster across the three (295ms-5.8s boolean-based vs 3.7-208ms direct, for tooth counts 8-100) — the annulus family was the slowest in the whole gear family before this change. The two caps are the interesting part: they're built with <code>bmesh.ops.triangle_fill</code> fed the boundary edges of <strong>both</strong> the inner (toothed) loop and the outer (circular) loop together in one call, which triangulates the annular region between them directly (treating the inner loop as a hole), rather than hand-bridging the two loops with an index-matched strip of quads. A matched-angle bridge looks like the obvious approach (one outer point per inner-profile point, at the same angle) but doesn't work: the tooth profile inserts a dedendum-circle point at the same angle as its neighbor wherever <code>base_r &gt; ded_r</code> (a genuine straight undercut-flank segment, not a bug), and bridging to a same-angle outer point puts three points on the same ray through the origin — an unavoidably zero-area triangle regardless of how the resulting quad gets split. Confirmed by testing: a matched-angle outer ring reintroduces non-manifold edges and zero-area faces at low tooth counts (8/15/20); treating the outer ring as a fully independent, separately-spaced circle and letting <code>triangle_fill</code> reconcile the two loops does not. For the two twisted variants, the outer ring additionally stays PLAIN and UNTWISTED (only 2 Z-layers) — only the inner teeth twist. See <a href="annulus_gear.html#build-method">annulus_gear.md</a> for the full writeup and <a href="helical_annulus_gear.html#build-method">helical_annulus_gear.md</a> / <a href="herringbone_annulus_gear.html#build-method">herringbone_annulus_gear.md</a> for the twisted extensions.</li><li>All three annulus generators' pressure-angle clamps carry an extra <code>PA_TRIANGLE_FILL_MARGIN_DEG</code> (0.2°) below the theoretical self-intersection limit, not the limit itself. Right at that limit the tooth tip's flank points become near-coincident — the old boolean-based <code>EXACT</code> solver tolerated a profile sitting exactly there, but <code>triangle_fill</code>'s constrained triangulation does not, and produced hundreds of non-manifold edges without the margin.</li><li>Where a boolean cutter is STILL used (planetary rings), concave/ star-shaped end <strong>caps on that cutter</strong> use <code>bmesh.ops.triangle_fill</code> on its own single boundary loop, not a center-fan. This used to be reversed — center-fan from an added interior vertex, on the theory that triangle-fill could produce self-intersecting triangles on a concave polygon that the CGAL EXACT solver would then reject. That theory didn't hold up: <code>triangle_fill</code> was tested directly against these exact profiles (tooth counts 8 through 100) and produced 0 self-intersections, while the center-fan approach had a real, confirmed defect the fan reasoning missed — the same collinear dedendum-circle point described above degenerates a fan triangle to exactly zero area. That looked harmless (a zero-area triangle covers no area) but wasn't: its short edge is shared with a side-wall face, so the mesh depends on that face existing to stay edge-manifold, even though it contributes nothing to visible volume. Dropping it outright (an intermediate fix, since discarded) turned the edge into a non-manifold boundary instead — confirmed to produce hundreds of non-manifold edges on some tooth counts. <strong>Bevel gears used to hit this too</strong> — confirmed 28 zero-area cap faces at the default tooth count — but since a bevel gear's end caps are single closed loops (no inner/outer pair to bridge, unlike an annulus), the fix there is simpler than <code>triangle_fill</code>: cap each end with a single n-gon face (no center vertex at all), the same approach <code>helical_gear.py</code>/<code>herringbone_gear.py</code> already use for their own end caps. No per-point triangles means this class of degenerate face can't occur. See <a href="bevel_gear.html#cap-fix">bevel_gear.md</a> for the fix writeup. Cluster-gear shoulders still use the center-fan approach, untouched — not confirmed to hit the same condition, and it has no boolean run against its own mesh either, so a degenerate cap face there would be cosmetic at worst, not a build failure, same reasoning that applied to bevel gears before their fix.</li><li>Helical/herringbone <strong>gear</strong> twist is built by slicing the extrusion into <code>n_slices</code> (or <code>n_slices</code> per half, for herringbone) Z-layers and rotating each slice by <code>hand_sign * z * tan(helix_angle) / pitch_radius</code>, where <code>hand_sign</code> is <code>+1</code> for <code>RIGHT</code> and <code>-1</code> for <code>LEFT</code>. This is the entire hand implementation — there's no separate mirroring step.</li><li>Helical/herringbone <strong>rack</strong> twist is the same idea taken to the gear-of-infinite-radius limit: instead of rotating each Z slice by an angle, the profile is <strong>sheared</strong> in X by <code>hand_sign * z * tan(helix_angle)</code> (no division by pitch radius — the rack has none). A shear is affine (linear in Z), unlike a rotation, so a straight 3D edge between two Z-layers exactly reproduces every intermediate Z's sheared profile — no faceting approximation, no <code>n_slices</code> property needed. <code>helical_rack.py</code> builds exactly 2 layers (bottom, top); <code>herringbone_rack.py</code> builds exactly 3 (bottom, V-peak at width/2, top). See <a href="helical_rack.html#build-method">helical_rack.md</a> for the derivation.</li><li><code>unique_name("Gear")</code> pre-computes a Blender-style <code>.001</code>/<code>.002</code> suffix before object creation, because the addon needs the final name up front for scene bookkeeping rather than relying on Blender's own on-creation renaming.</li></ul>
+<h2>Validation conventions</h2>
+<ul><li>A hard geometric impossibility (dedendum/tip radius ≤ 0, bevel face width ≥ cone distance) is a <strong>CANCELLED</strong> operator with an ERROR-icon label in the panel; most of these cancel silently without an <code>self.report()</code> call, so check the panel, not just the status bar.</li><li>A soft engineering guideline being violated (bevel <code>face_width_mm &gt; cone_dist/3</code>, planetary tooth-count/planet-count not dividing evenly) is a <strong>WARNING</strong> — the operator still runs and still reports via <code>self.report({'WARNING'}, ...)</code>, but the geometry is built anyway. Read the panel warnings; they're not blocking, but they're not decorative either.</li></ul>
+<h2>Naming, units, and defaults at a glance</h2>
+<ul><li>Default <code>pressure_angle_deg</code> is <strong>20.0°</strong> everywhere.</li><li>Default <code>module</code> is <strong>2.0mm</strong> for helical/herringbone/bevel/annulus families, <strong>1.0mm</strong> for spur/rack/cluster/compound.</li><li>Minimum tooth count is <strong>5</strong> for most external gears, <strong>8</strong> for bevel gears (keeps cone-angle math and small-end teeth sane) and for annulus gears (<code>min=8</code> on <code>tooth_count</code>).</li><li>Gear-set primitives (planetary/cluster/compound) create <strong>multiple objects per operator call</strong> — see each primitive's doc for the exact count and naming scheme.</li></ul>
+<h2>Primitives</h2>
+<div class="grid">
+<a class="card" href="annulus_gear.html"><img src="../assets/img/annulus_gear.png" alt=""><h3>Annulus Gear</h3><p>Straight-tooth internal gear — involute teeth cut into the bore of a solid ring, meshing with a spur pinion running inside it. See <a href="index.html">README.md</a> for fa</p></a>
+<a class="card" href="bevel_gear.html"><img src="../assets/img/bevel_gear.png" alt=""><h3>Bevel Gear</h3><p>Straight-tooth bevel gear — a toothed frustum for shafts meeting at 90°, built via <strong>Tredgold's approximation</strong> (each axial slice is the standard flat involute </p></a>
+<a class="card" href="cluster_gear.html"><img src="../assets/img/add_cluster_gear.png" alt=""><h3>Cluster Gear</h3><p>Two involute spur gears of different sizes, stacked on one shared axle and printed as a single monolithic piece (smaller gear on top of the larger one). Common </p></a>
+<a class="card" href="compound_gear.html"><img src="../assets/img/add_compound_gear.png" alt=""><h3>Compound Gear</h3><p>Builds a full multi-stage gear train — up to 4 stages, each a driver/driven pair on a shared intermediate shaft, auto-positioned so each stage's pitch circles a</p></a>
+<a class="card" href="helical_annulus_gear.html"><img src="../assets/img/helical_annulus_gear.png" alt=""><h3>Helical Annulus Gear</h3><p>Helical internal gear — twisted involute teeth cut into the bore of a solid ring. See <a href="index.html">README.md</a> for family-wide conventions and [annulus_gear.md](a</p></a>
+<a class="card" href="helical_gear.html"><img src="../assets/img/helical_gear.png" alt=""><h3>Helical Gear</h3><p>External involute gear with twisted (helical) teeth for quieter, stronger meshing than a spur gear. See <a href="index.html">README.md</a> for family-wide conventions, espe</p></a>
+<a class="card" href="helical_planetary_gear_set.html"><img src="../assets/img/helical_planetary_gear_set.png" alt=""><h3>Helical Planetary Gear Set</h3><p>Same topology and assembly math as <a href="planetary_gear_set.html">planetary_gear_set.md</a> — read that first. This document only covers what's different: helical teeth o</p></a>
+<a class="card" href="helical_rack.html"><img src="../assets/img/helical_rack.png" alt=""><h3>Helical Rack</h3><p>A straight rack whose teeth are sheared along X as a linear function of Z — the gear-of-infinite-radius limit of <a href="helical_gear.html">helical_gear.md</a>'s twist. Mes</p></a>
+<a class="card" href="herringbone_annulus_gear.html"><img src="../assets/img/herringbone_annulus_gear.png" alt=""><h3>Herringbone Annulus Gear</h3><p>Herringbone internal gear — V-shaped involute teeth cut into the bore of a solid ring. See <a href="index.html">README.md</a> for family-wide conventions and [annulus_gear.</p></a>
+<a class="card" href="herringbone_gear.html"><img src="../assets/img/herringbone_gear.png" alt=""><h3>Herringbone Gear</h3><p>External involute gear with V-shaped (double-helical) teeth — two mirrored helical halves meeting at mid-width, canceling axial thrust so no thrust bearing is n</p></a>
+<a class="card" href="herringbone_planetary_gear_set.html"><img src="../assets/img/herringbone_planetary_gear_set.png" alt=""><h3>Herringbone Planetary Gear Set</h3><p>Same topology and assembly math as <a href="planetary_gear_set.html">planetary_gear_set.md</a>, same hand-derivation rule as [helical_planetary_gear_set.md](helical_planetar</p></a>
+<a class="card" href="herringbone_rack.html"><img src="../assets/img/herringbone_rack.png" alt=""><h3>Herringbone Rack</h3><p>A straight rack sheared into a V along X: the bottom half shears one way from <code>Z=0</code> to <code>Z=width/2</code>, the top half shears back the other way from <code>Z=width/2</code> to `</p></a>
+<a class="card" href="planetary_gear_set.html"><img src="../assets/img/planetary_gear_set.png" alt=""><h3>Planetary Gear Set</h3><p>Builds a complete, correctly-meshed epicyclic gear set — sun, N planets, and ring — in one operator call. Straight (spur) teeth. See <a href="index.html">README.md</a> for </p></a>
+<a class="card" href="spur_gear.html"><img src="../assets/img/add_spur_gear.png" alt=""><h3>Spur Gear</h3><p>Straight-tooth external involute gear. The baseline gear primitive — every other external-gear generator in this library (helical, herringbone, bevel) is a vari</p></a>
+<a class="card" href="straight_rack.html"><img src="../assets/img/add_rack.png" alt=""><h3>Straight Rack</h3><p>Straight involute rack — the "gear of infinite radius" that converts a mating spur/helical pinion's rotation into linear motion. See <a href="index.html">README.md</a> for </p></a>
+</div>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

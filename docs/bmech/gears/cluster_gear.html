@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cluster Gear — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Gears</a> / Cluster Gear</div>
+<header>
+  <h1>Cluster Gear</h1>
+  <img class="hero-img" src="../assets/img/add_cluster_gear.png" alt="Cluster Gear render">
+</header>
+<main>
+<p><code>gears/external/cluster_gear.py</code> → <code>OBJECT_OT_add_cluster_gear</code> (<code>object.add_cluster_gear</code>, "Add Cluster Gear")</p>
+<p>Two involute spur gears of different sizes, stacked on one shared axle and printed as a single monolithic piece (smaller gear on top of the larger one). Common in gear trains where two shafts need to be replaced by one compound shaft. Self-contained like the planetary sets — no <code>stamp_gear</code>, no Match Target. See <a href="index.html">README.md</a> for family-wide conventions.</p>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>bottom_teeth</code></td><td>Int</td><td>36</td><td>4–200 (soft)</td><td>Gear at the base</td></tr>
+<tr><td><code>top_teeth</code></td><td>Int</td><td>12</td><td>4–200 (soft)</td><td>Gear on top</td></tr>
+<tr><td><code>module</code></td><td>Float (mm)</td><td>1.0</td><td>0.1–50.0</td><td>Shared by both gears</td></tr>
+<tr><td><code>pressure_angle_deg</code></td><td>Float (°)</td><td>20.0</td><td>10–45</td><td></td></tr>
+<tr><td><code>width_bottom</code></td><td>Float (mm)</td><td>6.0</td><td>0.5–50 (soft)</td><td></td></tr>
+<tr><td><code>width_top</code></td><td>Float (mm)</td><td>6.0</td><td>0.5–50 (soft)</td><td></td></tr>
+<tr><td><code>bore_enable</code></td><td>Bool</td><td>True</td><td></td><td></td></tr>
+<tr><td><code>axle_hole_mm</code> (labeled "Bore Ø")</td><td>Float (mm)</td><td>5.0</td><td>0.1–50 (soft)</td><td></td></tr>
+<tr><td><code>axle_compensation_mm</code></td><td>Float (mm)</td><td>0.2</td><td>0.0–1.0 (soft)</td><td>Added to hole radius</td></tr>
+</tbody></table></div>
+<h2>The geometric constraint that makes this work</h2>
+<p>The two gears are fused at their junction plane (<code>Z = width_bottom</code>) by bridging the bottom gear's top edge loop to the top gear's bottom edge loop with a single triangulated "shoulder" face. <strong>This only produces valid geometry if the top gear's outer diameter is smaller than the bottom gear's dedendum diameter</strong> — i.e. the top gear must sit entirely within the bottom gear's top face at that junction, not overhang it. The panel doesn't check this directly; if you set <code>top_teeth</code>/<code>module</code> large enough to violate it, expect a broken or self-intersecting shoulder face rather than an error message.</p>
+<p>The one constraint the panel <em>does</em> check is the axle bore against both gears' dedendum radii: if <code>bore_r &gt;= min(dedendum radii of top and bottom gears)</code>, the panel shows an ERROR-icon label, <code>"Axle hole too large — max Ø %.2f mm for smallest gear"</code>. This is a warning-style label — it doesn't block <code>execute()</code>.</p>
+<h2>Build method</h2>
+<p>Reuses <code>spur_gear.build_gear_profile()</code> for both gear profiles (unlike the planetary-set files, which keep their own duplicate copies of the profile builder). The whole part — bottom gear, shoulder, top gear — is assembled as <strong>one continuous bmesh solid</strong>, not two separate objects boolean-unioned; no coincident/duplicate faces at the junction. If a bore is enabled, it's cut afterward as a single boolean-DIFFERENCE cylinder through the entire height (<code>EXACT</code> solver, <code>±BOOL_EPSILON</code> extension — same pattern as the rest of the family).</p>
+<h2>Output</h2>
+<p><strong>One object per call</strong>, <code>ClusterGear</code> / <code>ClusterGearMesh</code>. Success message: <code>"Cluster gear: %d / %d teeth, %.2f mm tall"</code>. Straight teeth only — no hand, no helix.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

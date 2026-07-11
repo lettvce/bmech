@@ -81,6 +81,12 @@
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover {
+    border-color: var(--accent);
   }
   .card h3 {
     margin: 0 0 0.4rem;
@@ -130,26 +136,26 @@
 <section>
   <h2>What's inside</h2>
   <div class="grid">
-    <div class="card">
+    <a class="card" href="gears/index.html">
       <h3>Gears</h3>
       <p>External (spur, helical, herringbone), ring/annulus, planetary sets, bevel — plus PiP clearance built in.</p>
-    </div>
-    <div class="card">
+    </a>
+    <a class="card" href="springs/index.html">
       <h3>Springs</h3>
       <p>Hairspring and serpentine spring generators.</p>
-    </div>
-    <div class="card">
+    </a>
+    <a class="card" href="ratchets/index.html">
       <h3>Ratchets</h3>
       <p>External ratchet &amp; pawl, internal freewheel ratchet.</p>
-    </div>
-    <div class="card">
+    </a>
+    <a class="card" href="fasteners/index.html">
       <h3>Fasteners</h3>
       <p>Threaded fasteners.</p>
-    </div>
-    <div class="card">
+    </a>
+    <a class="card" href="bearings/index.html">
       <h3>Bearings</h3>
       <p>Ball bearings.</p>
-    </div>
+    </a>
   </div>
 </section>
 

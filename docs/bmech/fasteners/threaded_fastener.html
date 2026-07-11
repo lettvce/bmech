@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Threaded Fastener — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Fasteners</a> / Threaded Fastener</div>
+<header>
+  <h1>Threaded Fastener</h1>
+  <img class="hero-img" src="../assets/img/add_threaded_fastener.png" alt="Threaded Fastener render">
+</header>
+<main>
+<p><code>fasteners/threaded_fastener.py</code> → <code>OBJECT_OT_add_threaded_fastener</code> (<code>object.add_threaded_fastener</code>, "Add Threaded Fastener")</p>
+<p>Generates a single thread-helix solid, meant to be combined with other geometry via a <strong>manual</strong> boolean in the same session — this operator never does the union/difference itself. It's the primitive both <a href="hex_bolt.html">hex_bolt.md</a> and <a href="hex_nut.html">hex_nut.md</a> build on (by duplicating its math, not importing it — see <a href="index.html#this-family-does-not-share-a-helper-module--and-thats-deliberate">README.md</a>).</p>
+<h2>The four mode combinations</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th><code>thread_type</code></th>
+<th><code>operation</code></th>
+<th>Meaning</th>
+<th>Output name</th>
+</tr></thead><tbody>
+<tr><td>EXTERNAL</td><td>ADDITIVE</td><td>Bolt-type ridge, union onto a shaft</td><td><code>ExternalThread</code></td></tr>
+<tr><td>EXTERNAL</td><td>SUBTRACTIVE</td><td>Cut external threads into a cylinder</td><td><code>ExternalThreadCutter</code></td></tr>
+<tr><td>INTERNAL</td><td>ADDITIVE</td><td>Nut-type ridge, union into a tube bore</td><td><code>InternalThread</code></td></tr>
+<tr><td>INTERNAL</td><td>SUBTRACTIVE</td><td>Tap a hole (difference from a block)</td><td><code>TapCutter</code></td></tr>
+</tbody></table></div>
+<p>All four share identical helix-sweep math — only which compensation field applies and the output name differ. The profile shape is picked by a compact XNOR: <code>if (thread_type == 'EXTERNAL') == (operation == 'ADDITIVE')</code> use the external (ridge-out) profile, else the internal (ridge-in) profile — i.e. External+Additive and Internal+Subtractive share a profile, and External+Subtractive and Internal+Additive share the other. That's because a cutter is always the <em>opposite</em> profile of its same-named additive counterpart.</p>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>target</code></td><td>Object pointer</td><td>—</td><td>fastener objects with the OPPOSITE orientation — see Match Target below</td><td>Match Target; runs <code>fastener_matching.sync_raw_thread</code></td></tr>
+<tr><td><code>thread_type</code></td><td>Enum</td><td><code>EXTERNAL</code></td><td><code>EXTERNAL</code>/<code>INTERNAL</code></td><td>Forced to the opposite of the target's orientation whenever a target is set — see below</td></tr>
+<tr><td><code>operation</code></td><td>Enum</td><td><code>ADDITIVE</code></td><td><code>ADDITIVE</code>/<code>SUBTRACTIVE</code></td><td></td></tr>
+<tr><td><code>diameter_mm</code></td><td>Float (mm)</td><td>8.0</td><td>0.5–100 (soft)</td><td>Nominal <strong>major</strong> diameter, crest-to-crest</td></tr>
+<tr><td><code>pitch_mm</code></td><td>Float (mm)</td><td>1.25</td><td>0.1–10 (soft)</td><td>Distance between thread crests</td></tr>
+<tr><td><code>flank_angle_deg</code></td><td>Float (°)</td><td>60.0</td><td>1–179</td><td>60° = metric/UNC, 55° = BSP, 29° = ACME</td></tr>
+<tr><td><code>truncation</code></td><td>Float</td><td>0.125</td><td>0.0–0.3</td><td>Crest flat as a fraction of pitch (ISO metric = 1/8). Root flat is always 2× this.</td></tr>
+<tr><td><code>height_mm</code></td><td>Float (mm)</td><td>12.0</td><td>0.5–200 (soft)</td><td>Total thread length</td></tr>
+<tr><td><code>resolution</code></td><td>Int</td><td>32</td><td>8–128 (soft)</td><td>Steps per revolution</td></tr>
+<tr><td><code>outer_compensation_mm</code></td><td>Float (mm)</td><td>0.0</td><td>0.0–0.5 (soft)</td><td>Added to major diameter. Use for External+Additive (bolt) — printed external features shrink.</td></tr>
+<tr><td><code>inner_compensation_mm</code></td><td>Float (mm)</td><td>0.0</td><td>0.0–0.5 (soft)</td><td>Added to major diameter. Use for Subtractive or Internal+Additive — printed holes come out tighter than designed.</td></tr>
+<tr><td><code>fit_offset_mm</code></td><td>Float (mm)</td><td>0.0</td><td>0.0–0.5 (soft)</td><td>Fit adjustment for a mating External/Internal pair — subtracted from diameter when <code>thread_type='EXTERNAL'</code>, added when <code>'INTERNAL'</code>, independent of <code>operation</code>. Never synced by Match Target</td></tr>
+</tbody></table></div>
+<p><code>_derive()</code> applies whichever compensation field matches the active mode — <code>outer_compensation_mm</code> only for External+Additive, else <code>inner_compensation_mm</code> — and always adds it to <code>major_r</code> before re-deriving <code>minor_r</code> from the (now-larger) major radius. See <a href="index.html#fdm-compensation-always-added-one-direction-per-field">README.md</a>. <code>fit_offset_mm</code> is applied separately and first, keyed only on <code>thread_type</code> (not <code>operation</code>, which controls how the thread gets built, not which side of a mating pair it represents) — see <a href="threaded_container.html">threaded_container.md</a>/<a href="threaded_lid.html">threaded_lid.md</a> for the same offset applied to a fixed-orientation pair.</p>
+<h2>Match Target</h2>
+<p>Unlike <code>hex_bolt.py</code>/<code>hex_nut.py</code> (each permanently one orientation), a raw thread can be built as EITHER, so picking a target does two things at once: copies <code>diameter_mm</code>/<code>pitch_mm</code>/<code>flank_angle_deg</code>/<code>truncation</code> (all four, frozen together, same as the hex generators — see <a href="hex_bolt.html#match-target">hex_bolt.md</a>), <strong>and</strong> forces <code>thread_type</code> to whichever orientation is opposite the target's own — an external target needs this built as <code>INTERNAL</code>, an internal target needs <code>EXTERNAL</code>. Both freeze in <code>draw()</code> when a target is set. <code>operation</code> (additive/ subtractive) is <strong>never</strong> frozen — it only controls how the resulting external or internal thread gets built (union vs. difference), not whether it fits, so it stays a free choice regardless of target.</p>
+<p><strong>The target picker itself only offers objects of the OPPOSITE orientation</strong> — pick a target while <code>thread_type='EXTERNAL'</code> and the dropdown only lists internal-kind objects (<code>hex_nut</code>, or another raw thread currently built as <code>INTERNAL</code>), and vice versa. This is a deliberate divergence from the gear family's loose-poll philosophy — see <a href="index.html#match-target-a-deliberate-exception-to-the-no-shared-module-rule">README.md</a> for why an external/internal thread pairing has no legitimate same- orientation case the way cross-kind gear matches sometimes do. Because this operator's own orientation is a <em>live</em> property rather than a fixed kind, the poll has to look up which operator is asking (<code>bpy.context.active_operator</code>) to know which orientation to filter for — this, like every other pick/reset/rebuild behavior in this pattern, cannot be exercised by a headless test; verify manually in the GUI that the dropdown actually excludes same-orientation objects before trusting it, especially after editing <code>fastener_matching.fastener_target_poll</code>.</p>
+<h2>Build method</h2>
+<p><code>_build_helix(bm, profile, pitch, height, res)</code> sweeps the 4-point trapezoidal thread profile (root → rising flank → crest → falling flank) around Z. Step count is <code>ceil((height - profile_span) * res / pitch) + 1</code> — rounded <strong>up</strong>, so the built helix can slightly overshoot the requested <code>height_mm</code>. This operator does nothing to correct that overshoot itself (unlike <code>hex_nut.py</code>, which clips it with an INTERSECT boolean) — if you need an exact height, plan for a small margin or trim afterward.</p>
+<p>Side walls are quads between consecutive swept rings, including a closing root-flat quad; the first and last rings are capped (first reversed) to seal the helix ends into a manifold solid.</p>
+<h2>Panel warnings</h2>
+<ul><li><code>flank_dz &lt;= 0</code> (truncation leaves no room for flanks at this pitch) → <strong>"Truncation too high — no room for flanks at this pitch"</strong> (ERROR icon).</li><li><code>flank_angle_deg &lt; 2.0</code> → <strong>"Flank angle near zero — thread depth will be very large"</strong> (ERROR icon).</li></ul>
+<p><strong>Neither of these blocks <code>execute()</code>.</strong> This operator has no hard validation gate at all — internal clamps (<code>max(flank_dz, 0.0)</code>, <code>max(half_angle, radians(0.5))</code>) keep the math from crashing, but the operator always builds <em>something</em>, even when the panel is telling you the result looks wrong. Contrast with <code>hex_bolt.py</code>/<code>hex_nut.py</code>, which both do enforce a hard gate on their versions of these checks.</p>
+<h2>Output</h2>
+<p>One object per call, at the 3D cursor, stamped via <code>fastener_matching.stamp_thread</code>: <code>bmech_kind</code> is <code>"external_thread"</code> or <code>"internal_thread"</code> depending on <code>thread_type</code> alone — <strong>not</strong> on <code>operation</code>. An <code>ExternalThreadCutter</code> (External+Subtractive) still stamps <code>"external_thread"</code>, even though its own current mesh shape uses the internal (ridge-in) profile as a cutter tool — the profile shape describes how this specific object cuts material away, but the RESULT it produces once you finish the boolean by hand is an external thread, which is what other parts need to match against, not this object's current shape. Same reasoning applies to <code>TapCutter</code> stamping <code>"internal_thread"</code>.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

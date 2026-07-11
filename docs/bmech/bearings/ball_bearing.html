@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ball Bearing — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Bearings</a> / Ball Bearing</div>
+<header>
+  <h1>Ball Bearing</h1>
+  <img class="hero-img" src="../assets/img/add_ball_bearing.png" alt="Ball Bearing render">
+</header>
+<main>
+<p><code>bearings/ball_bearing.py</code> → <code>OBJECT_OT_add_ball_bearing</code> (<code>object.add_ball_bearing</code>, "Add Ball Bearing")</p>
+<p>Generates an inner race, an outer race, and <code>ball_count</code> truncated-sphere balls — a complete, FDM-assemblable ball bearing. See <a href="index.html">README.md</a> for family-wide notes.</p>
+<h2>Pitch diameter is derived from ball packing, not typed in</h2>
+<pre><code>ball_center_r = (2*ball_radius_mm + gap_mm) / (2*sin(pi / ball_count))</code></pre>
+<p>You specify bore ID and outer OD directly; everything else (pitch circle, groove radius, wall thicknesses) is derived from those two plus the ball geometry.</p>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>bore_diameter_mm</code></td><td>Float (mm)</td><td>6.0</td><td>0.1–500 (soft)</td><td>Inner race ID (axle bore)</td></tr>
+<tr><td><code>outer_diameter_mm</code></td><td>Float (mm)</td><td>28.0</td><td>0.2–600 (soft)</td><td>Outer race OD</td></tr>
+<tr><td><code>ball_sizing_mode</code></td><td>Enum</td><td><code>RADIUS</code></td><td><code>RADIUS</code> (ball radius is the input, height shown read-only) / <code>HEIGHT</code> (truncated height is the input, radius shown read-only)</td><td></td></tr>
+<tr><td><code>ball_radius_mm</code></td><td>Float (mm)</td><td>3.0</td><td>0.5–50 (soft)</td><td></td></tr>
+<tr><td><code>ball_height_mm</code></td><td>Float (mm)</td><td>5.196</td><td>0.1–100 (soft)</td><td>Flat-to-flat height of the truncated ball</td></tr>
+<tr><td><code>overhang_angle_deg</code></td><td>Float (°)</td><td>30.0</td><td>1–89</td><td>Maximum printable overhang from horizontal — ball caps are cut at this latitude so no supports are needed</td></tr>
+<tr><td><code>ball_count</code></td><td>Int</td><td>8</td><td>min 3, soft 6–40</td><td>More balls = larger derived pitch circle</td></tr>
+<tr><td><code>gap_mm</code></td><td>Float (mm)</td><td>0.5</td><td>0.05–5 (soft)</td><td>Clearance between adjacent ball surfaces</td></tr>
+<tr><td><code>clearance_mm</code></td><td>Float (mm)</td><td>0.2</td><td>0.0–2 (soft)</td><td>Groove radius = <code>ball_r + clearance/2</code>. Increase if the bearing binds after printing.</td></tr>
+<tr><td><code>parent_under_empty</code></td><td>Bool</td><td>True</td><td></td><td></td></tr>
+</tbody></table></div>
+<h2>Truncated balls — why, and how they're sized</h2>
+<p>Balls aren't full spheres — both poles are cut flat at <code>overhang_angle_deg</code> from horizontal, specifically so the top/bottom caps sit flush with the race faces and print without support material. The ball zone itself is open at top and bottom (not enclosed by the races) so balls can physically be dropped in during FDM assembly.</p>
+<pre><code>z_cut  = ball_radius_mm * cos(overhang_rad)     # truncation half-height
+r_flat = ball_radius_mm * sin(overhang_rad)     # radius of the flat cap</code></pre>
+<p><code>ball_sizing_mode</code> just picks which of <code>ball_radius_mm</code> / <code>ball_height_mm</code> is the driving input — in HEIGHT mode, <code>ball_radius_mm = ball_height_mm / (2 * cos(overhang_rad))</code> is solved backward from the requested flat-to-flat height.</p>
+<h2>Auto-corrected wall thickness</h2>
+<p>Unlike most validation in this library, <code>_compute()</code> doesn't just flag a too-thin wall — it <strong>silently widens the geometry to fix it</strong>: if the inner or outer wall would fall under <code>MIN_WALL_MM = 0.8mm</code>, the bore is shrunk or the outer diameter is expanded (whichever is needed) until both walls clear that floor, before any geometry is built. The panel shows this happening via an INFO-icon note (<code>"Bore reduced to %.2f mm to maintain %.1f mm inner wall"</code> / <code>"OD expanded to %.2f mm to maintain %.1f mm outer wall"</code>) — if your bearing's bore or OD comes out different from what you typed, this is why; check the panel note rather than assuming the input was ignored.</p>
+<p>The panel's wall-thickness rows use a checkmark/error icon per wall (<code>&gt;= MIN_WALL_MM</code> = checkmark, else error), but because of the auto-correction above, the error state is effectively unreachable through normal use — it would only show if some other code path bypassed <code>_compute()</code>'s correction.</p>
+<p>There's also a separate <code>validate_bearing()</code> function defined in the module (raw error-string checks: ball radius ≤ 0, degenerate truncation, non-positive gap/bore, OD ≤ bore, wall-too-thin) that is <strong>never called</strong> by either <code>draw()</code> or <code>execute()</code> — it's dead code, superseded by the auto-scaling approach. Don't rely on it running; it doesn't.</p>
+<h2>Build method</h2>
+<p>Both races are 2D <code>(r, z)</code> profiles (bore/OD wall, then a semicircular groove arc spanning <code>±alpha_cut</code> around the ball contact latitude) revolved 360° into a bmesh (<code>RACE_SEGMENTS = 64</code> segments). Each ball is a UV-sphere-style mesh (<code>BALL_LAT = 16</code> rings × <code>BALL_LON = 32</code> segments) with both poles collapsed to a single flat-cap vertex ring at <code>±z_cut</code> instead of a true pole point — that's the "truncated sphere."</p>
+<p>Balls are placed evenly around the derived pitch circle: <code>(ball_center_r*cos(angle), ball_center_r*sin(angle))</code> for <code>angle = 2*pi*i/ball_count</code>.</p>
+<p>The only real cancellation path is a caught <code>ValueError</code>/<code>RuntimeError</code> around the three build calls — silent, no <code>self.report()</code> message.</p>
+<h2>Output</h2>
+<p><strong><code>2 + ball_count</code> objects per call</strong>: <code>BearingInnerRace</code>, <code>BearingOuterRace</code>, and <code>BearingBall.000</code>…<code>BearingBall.%03d</code> (zero-padded, sharing no mesh data — each ball is its own independent mesh, unlike the gear family's linked-copy planets). If <code>parent_under_empty</code>, all are parented under a new <code>BallBearing</code> empty (<code>PLAIN_AXES</code>, sized to <code>outer_r * 0.3</code>). Inner race is set active. Success message: <code>"Ball bearing: bore Ø%.2f mm, OD Ø%.2f mm, %d balls, width %.2f mm"</code>.</p>
+<p>No <code>bmech_*</code> stamping — this generator has no Match Target system.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

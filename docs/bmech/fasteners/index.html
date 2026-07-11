@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fasteners — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / Fasteners</div>
+<header>
+  <h1>Fasteners</h1>
+  
+</header>
+<main>
+<p>Covers everything true for every generator in <code>mechanisms_core/fasteners/</code>. Primitive-specific docs (one per generator, in this folder) assume you've read this first. See <a href="../CONVENTIONS.html">../CONVENTIONS.md</a> for the cross-family rules this family follows, and <a href="../gears/index.html">../gears/README.md</a> for a contrasting example of how a different family organizes its shared code.</p>
+<h2>Primitives in this family</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Primitive</th>
+<th>File</th>
+<th>Builds</th>
+</tr></thead><tbody>
+<tr><td>Raw threaded fastener</td><td><code>fasteners/threaded_fastener.py</code></td><td>A thread helix solid, for manual boolean combination</td></tr>
+<tr><td>Hex bolt</td><td><code>fasteners/hex_bolt.py</code></td><td>Head + shank + tip blank, chained revolve, with the external thread cut out of it, head unioned on last</td></tr>
+<tr><td>Hex nut</td><td><code>fasteners/hex_nut.py</code></td><td>Hex prism with an internal thread cut through it</td></tr>
+<tr><td>Threaded container</td><td><code>fasteners/threaded_container.py</code></td><td>Screw-top jar body — solid floor, open mouth, external thread cut into the existing neck wall</td></tr>
+<tr><td>Threaded lid</td><td><code>fasteners/threaded_lid.py</code></td><td>Screw-top jar lid — solid cap, open skirt, internal thread ADDED (unioned) onto the hollow bore wall above an unthreaded guide zone</td></tr>
+</tbody></table></div>
+<h2>This family does NOT share a helper module — and that's deliberate</h2>
+<p>Unlike the gear family (which centralizes shared logic in <code>gears/gear_matching.py</code> and has every gear import it), <strong>every fastener generator module is fully self-contained.</strong> <code>hex_bolt.py</code> and <code>hex_nut.py</code> each carry their own copies of <code>_thread_params</code>, <code>_build_helix</code>, and either <code>_external_profile</code> or <code>_internal_profile</code> — logic that originates in <code>threaded_fastener.py</code> and is duplicated <strong>verbatim</strong>, not imported. <code>hex_nut.py</code>'s source states the reason directly:</p>
+<blockquote><p>"Thread math is duplicated from threaded_fastener.py per this project's convention (each generator module is self-contained, no cross-file thread math imports)."</p></blockquote>
+<p><code>hex_bolt.py</code> and <code>hex_nut.py</code> also independently duplicate their own hex-prism/cylinder/boolean-union helpers between each other, extending the same convention beyond just thread math.</p>
+<p><strong>If you're adding a new fastener generator that needs thread geometry, copy <code>_thread_params</code>/<code>_build_helix</code>/the relevant profile function from <code>threaded_fastener.py</code> into your new file rather than importing them.</strong> This is the opposite instinct from the gear family, where reuse via import is preferred — know which family you're in before reaching for either pattern.</p>
+<h2>Match Target: a deliberate exception to the no-shared-module rule</h2>
+<p><code>hex_bolt.py</code> and <code>hex_nut.py</code> support Match Target — pick a nut as a bolt's target (or vice versa) and its <code>thread_diameter_mm</code>, <code>pitch_mm</code>, <code>flank_angle_deg</code>, and <code>truncation</code> all copy across at once, the same picker/freeze/rebuild-in-place UX the gear family established in <a href="../gears/index.html#the-match-target-system-gear_matchingpy">gears/gear_matching.py</a>. See <a href="../CONVENTIONS.html#the-match-target-pattern--letting-one-parts-output-drive-anothers-properties">CONVENTIONS.md#the-match-target-pattern--letting-one-parts-output-drive-anothers-properties</a> for the general Blender-API gotchas this pattern runs into regardless of family (picker-on-<code>WindowManager</code>, reset-in-<code>invoke</code>-not-<code>execute</code>, treating a reset-to-<code>None</code> as a no-op, rebuild-via-delete-and-re-execute instead of <code>bpy.ops.ed.undo()</code>, and the fact that none of the pick/reset/ rebuild behavior can be exercised by a headless test).</p>
+<p>This lives in a small shared module, <code>fasteners/fastener_matching.py</code> — which looks like it contradicts the "no shared module" rule stated above, but doesn't: that rule is specifically about <strong>thread geometry math</strong> (<code>_thread_params</code>, <code>_build_helix</code>, the profile builders), which is pure per-call computation with no reason it couldn't be duplicated safely. The Match Target <em>picker</em> is a single <code>WindowManager</code> property, a genuinely different kind of thing — it can't be meaningfully duplicated at all: two independent <code>register()</code> calls each doing <code>bpy.types.WindowManager.bmech_fastener_target = PointerProperty(...)</code> wouldn't coexist as two working copies, the second one to run would just silently replace the first's poll/update functions. <code>fastener_matching.py</code> holds only that picker/poll/sync/stamp machinery — no thread math at all — and is registered once from <code>fasteners/__init__.py</code>, the same way <code>gears/gear_matching.py</code> is registered once from <code>gears/__init__.py</code>.</p>
+<p><strong>No partial-match nuance, unlike gears.</strong> The gear family's Match Target freezing is kind-dependent (a spur target drives module/pressure-angle but never helix/hand; a herringbone-vs-helical pairing leaves <code>hand</code> editable even when driven — see <a href="../gears/index.html#the-match-target-system-gear_matchingpy">gears/README.md</a>). A bolt and the nut that fits it need <strong>all four</strong> thread dimensions (diameter, pitch, flank angle, truncation) to match simultaneously for the threads to physically engage — there's no case where only some of them matter — so <code>fastener_matching.sync_thread_dims</code> always copies all four together, and both operators' <code>draw()</code> freeze all four as one driven column, not field-by-field.</p>
+<p><strong>The poll is deliberately NOT loose here — the opposite of the gear family's own established reasoning.</strong> <code>gear_target_poll</code> accepts any object stamped with <code>bmech_module</code> regardless of kind, because cross-kind gear matches are sometimes legitimate (see <a href="../gears/index.html#the-match-target-system-gear_matchingpy">gears/README.md</a>). Threads have no equivalent legitimate same-orientation case: two external threads can never mate, and neither can two internal ones — it's a hard physical constraint of the domain, not a matter of user judgment the way gear meshing correctness is. <code>fastener_target_poll</code> enforces this directly: it only offers objects whose orientation (external/internal) is the <strong>opposite</strong> of whichever operator is asking.</p>
+<p>Enforcing that needs the poll to know which orientation the asking operator itself has: <code>hex_bolt.py</code> is permanently <code>EXTERNAL</code>, <code>hex_nut.py</code> permanently <code>INTERNAL</code>, but <code>threaded_fastener.py</code> can be either, decided live by its own <code>thread_type</code> property. Since a <code>PointerProperty</code> poll callback only receives <code>(self, object)</code> — no operator reference — <code>fastener_target_poll</code> reads <code>bpy.context.active_operator</code> directly to identify the caller (the same global-context pattern this system's own update callback already relies on) and looks up <code>bl_idname</code> to decide which orientation to require. If the asking operator can't be identified (headless mode, or some future fastener generator this poll doesn't know about yet), it falls back to permissive — same "don't hard-fail when context is unavailable" instinct as the rest of this pattern.</p>
+<p><code>threaded_fastener.py</code> participates fully as of this feature — it stamps <code>bmech_kind</code> as <code>"external_thread"</code>/<code>"internal_thread"</code> based on its own <code>thread_type</code> (not <code>operation</code>; a <code>SUBTRACTIVE</code> cutter still represents the orientation it will leave behind once you finish the boolean by hand). Picking a target on it does double duty: copies the four thread dimensions like the hex generators, <strong>and</strong> forces <code>thread_type</code> to the opposite of the target's orientation (<code>operation</code> stays free — it only controls how the resulting thread gets built, not whether it fits). See <a href="threaded_fastener.html#match-target">threaded_fastener.md</a> for the full writeup.</p>
+<h2>Thread nomenclature: nominal size is always major diameter</h2>
+<p>Every thread-based generator (<code>threaded_fastener.py</code>, <code>hex_bolt.py</code>, <code>hex_nut.py</code>) treats the user-facing diameter property as the <strong>major</strong> diameter, for both external (bolt) and internal (nut) threads — e.g. an M8 property means an 8.000mm major diameter on both the bolt and the nut that fits it. <code>hex_nut.py</code>'s source states this explicitly:</p>
+<blockquote><p>"Standard thread nomenclature: the nominal/basic size IS the major diameter, for both external (bolt) and internal (nut) threads... The minor diameter... is DERIVED from major_r via pitch + flank angle, not the other way around."</p></blockquote>
+<p>The minor diameter is <strong>never</strong> a user input anywhere in this family — always computed by <code>_thread_params(major_r, pitch_mm, flank_angle_deg, truncation)</code>:</p>
+<pre><code>half_angle  = max(radians(flank_angle_deg / 2), radians(0.5))   # guards tan(0)
+crest_flat  = truncation * pitch_mm
+root_flat   = 2 * truncation * pitch_mm
+flank_dz    = max((pitch_mm - crest_flat - root_flat) / 2, 0.0)  # clamped, not negative
+depth       = flank_dz / tan(half_angle)   if flank_dz &gt; 0  else 0
+minor_r     = major_r - depth</code></pre>
+<h2>FDM compensation: always added, one direction per field</h2>
+<p>Every compensation property in this family is <strong>added</strong> to a radius or diameter, never subtracted — consistent with the rest of this library. Which field you set depends on which side of the part is printed:</p>
+<ul><li><strong>External features that print undersized</strong> (a bolt's thread): compensation is added to grow the feature back out.</li><li><strong>Internal features that print tight</strong> (a nut's thread bore, a cut hole): compensation is added to open the hole back up.</li></ul>
+<p><code>threaded_fastener.py</code> exposes both <code>outer_compensation_mm</code> (External + Additive mode) and <code>inner_compensation_mm</code> (Subtractive or Internal + Additive modes) on the same operator, since one operator covers all four mode combinations. <code>hex_bolt.py</code> only exposes <code>outer_compensation_mm</code> (it only ever builds External + Additive). <code>hex_nut.py</code> only exposes <code>inner_compensation_mm</code>.</p>
+<h2>Boolean-solver patterns specific to this family</h2>
+<p>Fastener geometry leans on Blender's <code>EXACT</code> boolean solver far more heavily than the gear family. Both <code>hex_bolt.py</code> and <code>hex_nut.py</code> cut their threads <strong>subtractively</strong> — a helical groove cutter differenced out of a solid blank — rather than unioning a separate thread ridge onto an undersized core (<code>threaded_fastener.py</code>'s "Additive" modes still work that way, and are documented separately, but the two hex-part generators were rewritten off of it). A plain difference against a solid blank is a numerically easy case for the EXACT solver: the cutter naturally overlaps real material throughout, unlike a union of two independently-built, nearly-coincident curved surfaces. Some patterns that show up repeatedly and are worth knowing before editing this code:</p>
+<ul><li><strong>Cutter overlap is depth-scaled, not a fixed hairline epsilon — <code>hex_bolt.py</code> only.</strong> <code>hex_bolt.py</code> computes <code>overlap = max(0.02, min(0.2 * depth, 0.15))</code> and builds the thread cutter's crest reach slightly past the blank's true major radius before differencing it, and overshoots the cutter one extra pitch past <code>thread_length_mm</code> so the last crest doesn't dead-end flush at the blank's own flat step (a hard-stop that used to make the thread fail to start in a nut). Two nearly-coincident surfaces along a full helix length are numerically fragile for the EXACT solver — a hairline gap can be misread as a shared boundary and read as a no-op instead of a genuine cut, or a cutter's flat end cap landing exactly on a real face can leave the thread short of that face. A small but real volume of overlap/overshoot avoids both.</li><li><strong><code>hex_nut.py</code> mixes two different fixes for two different coincidences — it is NOT simply "exact dimensions, no padding."</strong> It differences the thread cutter FIRST (exactly <code>major_r</code> radially, half a pitch of axial overshoot past both <code>z=0</code> and <code>z=z_height_mm</code>), then cuts a plain pilot bore SECOND, sized to <code>minor_r + BOOL_EPSILON</code> — a hairline over the true minor diameter, not exactly equal to it. Treating both coincidences (the radial one at <code>minor_r</code>, the axial one at the end faces) the same way breaks one or the other:</li><li>The <strong>radial</strong> coincidence (pilot bore wall vs. thread cutter's root-flat faces, both nominally at <code>minor_r</code>) — an earlier version cut the bore <em>first</em>, sized to exactly <code>minor_r</code>, and found that undersizing it further the way <code>hex_bolt.py</code>'s <code>overlap</code> pattern would left a real, physical, uncut lip at the bore's mouth, narrower than the true minor diameter — not a cosmetic mesh artifact. Cutting the thread first and the pilot bore second, oversized by a hairline rather than undersized, avoids that lip while still breaking the coincidence.</li><li>The <strong>axial</strong> coincidence (a helix cut flush to the real end faces starts its own flat end cap before the thread profile has completed even a quarter turn) is a dimensional defect, not a mesh-topology one — the result is a flat UNTHREADED band at both mouths of the nut, and Merge by Distance has nothing to weld there since nothing is duplicated, just wrong-shaped. This needs axial overshoot instead, so the helix is already wound up into a repeating cycle before reaching the real boundary. Critically, the overshoot amount is <strong>half</strong> a pitch, not a full one: a full-pitch shift looks like more margin but actually lands the exact same profile phase (the crest's return to <code>minor_r</code>) at <code>z=0</code> that would be there anyway — exactly coincident with the pilot bore's own wall over an extended stretch, which produced a genuine TORN HOLE in one configuration tested (real non-manifold boundary edges from a missing face) that Merge by Distance cannot weld shut, since there's no duplicate geometry, just an absent one. Half a pitch lands a different, non-<code>minor_r</code> phase at <code>z=0</code> instead, avoiding that extra coincidence while still giving the helix enough room to fully engage.</li></ul>
+<p>The cut ordering and the <code>+ BOOL_EPSILON</code> pilot-bore sizing came from direct iteration in Blender by the maintainer, not from this repo's own headless verification suite — trust the working combination in the code over re-deriving it from this explanation if they ever disagree. See <a href="hex_nut.html#build-method--two-different-coincidence-problems-two-different-fixes">hex_nut.md</a> for the verified results (five thread sizes, M4–M12). If you're adding a new subtractive-thread generator: match the <em>category</em> of fix to the <em>category</em> of coincidence (load-bearing dimension → exact + merge; wind-up/phase → overshoot, and check whether your specific overshoot amount reproduces the boundary condition it was meant to avoid) rather than copying one pattern wholesale.</p>
+<ul><li><strong>Chained revolves, not stacked independently-capped primitives.</strong> <code>hex_bolt.py</code>'s <code>_add_chained_revolve</code> builds the shank→thread-blank→tip stack as one continuous solid sharing vertices at each junction, rather than three separately-capped cylinders touching end to end. Two independently-capped segments meeting at the same radius would produce duplicate coincident faces (each segment's own cap covering the identical disk) — a fragile degenerate case for the EXACT solver. Chaining through shared vertices means there's no internal face for this to happen to. The tip segment specifically is a flat perpendicular step down to <code>tip_r</code> at the thread's own end Z, then a straight non-tapered pin — not a cone, which would shrink the blank's diameter while the constant-diameter thread cutter is still cutting through it and cause the same hard-stop dead-end the cutter overshoot above fixes.</li><li><strong>Blocky joins last, cut-and-union sequencing matters.</strong> <code>hex_bolt.py</code> cuts the thread out of the blank before unioning the hex head on, specifically because a flush blocky join (hex prism onto a cylinder end) is far friendlier to the EXACT solver than the thread cut — sequencing the riskier operation earlier means any failure surfaces before the cheap, reliable step, not after.</li><li><strong>Re-normalize after union.</strong> <code>hex_bolt.py</code>'s <code>_bool_union</code> calls <code>recalc_face_normals</code> on the result after applying the modifier and deleting the operand, because EXACT-solver unions of complex meshes can come back with inconsistent face winding even when topologically solid. <code>_bool_diff</code> (used for all thread cuts in both files) hasn't needed this in practice, but if you see winding issues after a difference, this is the first thing to try.</li></ul>
+<h2>Validation: draw() warnings are often looser than the execute() gate</h2>
+<p><code>threaded_fastener.py</code>'s draw() shows ERROR-icon labels for degenerate truncation/flank-angle combinations, but <strong>nothing in its execute() ever cancels</strong> — the raw thread-helix operator always builds something, even if the panel is warning you it looks wrong. <code>hex_bolt.py</code> and <code>hex_nut.py</code>, by contrast, both <strong>do</strong> enforce a hard gate in execute() (<code>self.report({'ERROR'}, ...)</code> + <code>CANCELLED</code>) — but the threshold used there is looser than the one that triggers the draw() warning. E.g. <code>hex_bolt.py</code> shows an ERROR-icon "Head too small for thread diameter" warning once <code>head_wall &lt;= 0.5mm</code>, but only actually cancels execution at <code>head_wall &lt;= 0</code>. A wall between 0 and 0.5mm will build successfully despite the visible warning — read the number, not just the icon color.</p>
+<h2>Primitives</h2>
+<div class="grid">
+<a class="card" href="hex_bolt.html"><img src="../assets/img/hex_bolt.png" alt=""><h3>Hex Bolt</h3><p>A complete bolt — hex head, optional shank, external thread, optional tip. Built <strong>subtractively</strong>: a blank stack (shank → thread blank at the full major diamet</p></a>
+<a class="card" href="hex_nut.html"><img src="../assets/img/hex_nut.png" alt=""><h3>Hex Nut</h3><p>A hex thru-nut — internal thread cut all the way through a hex prism. Built <strong>subtractively</strong>: a helical groove cutter differenced out of the prism first, then </p></a>
+<a class="card" href="threaded_container.html"><img src="../assets/img/threaded_container.png" alt=""><h3>Threaded Container</h3><p>A screw-top jar body: solid floor, straight outer wall, open mouth at the top, with an <strong>external</strong> thread cut directly into the existing outer wall near the to</p></a>
+<a class="card" href="threaded_fastener.html"><img src="../assets/img/add_threaded_fastener.png" alt=""><h3>Threaded Fastener</h3><p>Generates a single thread-helix solid, meant to be combined with other geometry via a <strong>manual</strong> boolean in the same session — this operator never does the unio</p></a>
+<a class="card" href="threaded_lid.html"><img src="../assets/img/threaded_lid.png" alt=""><h3>Threaded Lid</h3><p>An inverted cup that screws onto a <a href="threaded_container.html">threaded_container</a> neck: solid cap at the top, open skirt below, with an <strong>internal</strong> thread ADDED (</p></a>
+</div>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

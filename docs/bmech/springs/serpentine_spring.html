@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Serpentine Spring — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Springs</a> / Serpentine Spring</div>
+<header>
+  <h1>Serpentine Spring</h1>
+  <img class="hero-img" src="../assets/img/add_serpentine_spring.png" alt="Serpentine Spring render">
+</header>
+<main>
+<p><code>springs/serpentine_spring.py</code> → <code>OBJECT_OT_add_serpentine_spring</code> (<code>object.add_serpentine_spring</code>, "Add Serpentine Spring")</p>
+<p>A flat zigzag spring — straight legs connected by rounded U-bends, compressing along one axis. See <a href="index.html">README.md</a> for family-wide notes.</p>
+<h2>Termination convention — odd vs. even module count</h2>
+<pre><code>Odd  module_count -&gt; U-termination (both open ends on the same Y side)
+Even module_count -&gt; S-termination (open ends on opposite Y sides)</code></pre>
+<p>This falls directly out of how bends alternate direction (see Build method below) — it isn't a separate setting, just a consequence of <code>module_count</code>'s parity. The panel surfaces it as an informational note when <code>module_count</code> is even.</p>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>input_mode</code></td><td>Enum</td><td><code>PITCH_MODE</code></td><td><code>PITCH_MODE</code> (Module Count + Pitch → Length computed) / <code>LENGTH_MODE</code> (Module Count + Length → Pitch computed)</td><td></td></tr>
+<tr><td><code>module_count</code></td><td>Int</td><td>5</td><td>min 1</td><td>Number of U-turn modules. <strong>Always</strong> a direct integer input in both modes — see below.</td></tr>
+<tr><td><code>spring_width</code></td><td>Float (mm)</td><td>20.0</td><td>min 1.0</td><td>Full Y-axis extent (center-to-center of bend centers)</td></tr>
+<tr><td><code>pitch</code></td><td>Float (mm)</td><td>4.0</td><td>min 0.8</td><td>Center-to-center distance between adjacent leg centerlines. Pitch Mode only.</td></tr>
+<tr><td><code>spring_length</code></td><td>Float (mm)</td><td>40.0</td><td>min 1.0</td><td>Total X-axis (compression-axis) extent. Length Mode only.</td></tr>
+<tr><td><code>strip_height</code></td><td>Float (mm)</td><td>2.0</td><td>min 0.4</td><td>Out-of-plane (Z) dimension — drives the Solidify modifier</td></tr>
+<tr><td><code>strip_thickness</code></td><td>Float (mm)</td><td>0.8</td><td>min 0.0</td><td>In-plane (X) cross-section — drives the outer/inner profile offset</td></tr>
+</tbody></table></div>
+<p>Note this is the one primitive in the whole library where <strong>no property has an upper bound</strong> (no <code>max</code>/<code>soft_max</code> anywhere) — every other generator sets at least a <code>soft_max</code> on its dimensional inputs.</p>
+<h2>Why <code>module_count</code> is always typed in directly</h2>
+<p>Per the module's own header comment: deriving or flooring <code>module_count</code> from a length+pitch combination would produce a mismatch between the length/pitch you asked for and what the spring actually builds. Rather than silently rounding, the generator always takes tooth — sorry, <em>module</em> — count as a direct input in both modes, and computes whichever of pitch/length is left over exactly.</p>
+<ul><li><strong>PITCH_MODE</strong>: <code>spring_length = module_count * pitch + strip_thickness</code> (computed, shown read-only).</li><li><strong>LENGTH_MODE</strong>: <code>pitch = (spring_length - strip_thickness) / module_count</code> (computed, shown read-only).</li></ul>
+<h2>Panel warnings — none of them actually block</h2>
+<ul><li><code>leg_length &lt;= 0</code> (derived from <code>spring_width - strip_thickness - 2*bend_radius</code>) → <strong>"Width too narrow — increase Width, decrease Pitch, or decrease Thickness"</strong> (ERROR icon). Does <strong>not</strong> cancel — <code>execute()</code> clamps <code>leg_length = max(leg_length, 0.01)</code> instead.</li><li><code>pitch &lt; strip_thickness</code> → <strong>"Pitch must exceed strip thickness"</strong> (ERROR icon). Does <strong>not</strong> cancel — <code>execute()</code> clamps <code>pitch = max(pitch, strip_thickness + 0.01)</code> instead.</li></ul>
+<p>The actual <code>CANCELLED</code> paths in this operator come from somewhere else entirely: an exception raised inside <code>build_spring_quadstrip()</code>, or a degenerate result with fewer than 3 vertices. Every ERROR-icon label in this file's panel is a soft warning, not a gate — unusual among this library's generators, most of which have at least one warning that matches its blocking behavior.</p>
+<h2>Build method</h2>
+<ol><li><strong>Centerline</strong>: <code>build_spring_centerline()</code> alternates straight legs (vertical runs at <code>y_bc_bot</code>/<code>y_bc_top</code>, inset from the true <code>spring_width</code> by <code>strip_thickness/2 + bend_radius</code> — a deliberate offset so that after the ribbon is offset outward in step 2, the <em>outer</em> edge lands exactly on <code>spring_width</code>, not the centerline) connected by semicircular bend arcs. Even-indexed legs bend <code>pi -&gt; 0</code>; odd-indexed legs bend <code>pi -&gt; 2*pi</code> — alternating which side each U-turn opens on is what produces the zigzag and drives the odd/even termination convention above. Bend arc segment count scales with bend radius (<code>max(8, round(pi*bend_radius/0.2))</code>, targeting ~0.2mm arc length per segment) rather than being a fixed constant.</li><li><strong>Offset</strong>: <code>offset_centerline()</code> walks the centerline and offsets it by <code>±strip_thickness/2</code> along the local perpendicular (estimated by central-difference tangents), producing synchronized outer/inner point loops. At sharp corners the averaged-normal offset produces a slight chamfer rather than a sharp miter — a known, accepted approximation, documented in the source as staying under 1mm at typical strip sizes.</li><li><strong>Quad strip</strong>: <code>build_spring_quadstrip()</code> builds flat quads directly between the outer and inner loops at Z=0, then triangulates and recalculates normals via a <code>bmesh</code> pass. <code>mesh.validate()</code> is checked afterward — if Blender had to auto-repair anything, a <code>print()</code> diagnostic is emitted (not a <code>self.report()</code>, so it won't show in the UI — check the system console if something looks subtly wrong).</li><li><strong>Thickness</strong>: unlike <code>hairspring.py</code>, the Z dimension here <strong>is</strong> a Solidify modifier (<code>"SpringThickness"</code>, <code>thickness=strip_height</code>, <code>offset=0.0</code> symmetric, <code>use_even_offset=True</code>, <code>use_rim=True</code>) applied non-destructively to the flat quad-strip, not baked into the mesh.</li><li>Origin reset to <code>ORIGIN_GEOMETRY</code> / <code>BOUNDS</code> after creation.</li></ol>
+<h2>Output</h2>
+<p>One object per call, <code>SerpentineSpring</code> (mesh data also named <code>SerpentineSpring</code>), with a live Solidify modifier attached. No parenting, no <code>bmech_*</code> stamping. Success message: <code>"Spring generated: %d modules, pitch=%.2f mm, bend_radius=%.2f mm"</code>.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Herringbone Annulus Gear — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Gears</a> / Herringbone Annulus Gear</div>
+<header>
+  <h1>Herringbone Annulus Gear</h1>
+  <img class="hero-img" src="../assets/img/herringbone_annulus_gear.png" alt="Herringbone Annulus Gear render">
+</header>
+<main>
+<p><code>gears/ring/herringbone_annulus_gear.py</code> → <code>OBJECT_OT_herringbone_annulus_gear</code> (<code>object.herringbone_annulus_gear</code>, "Herringbone Annulus Gear")</p>
+<p>Herringbone internal gear — V-shaped involute teeth cut into the bore of a solid ring. See <a href="index.html">README.md</a> for family-wide conventions and <a href="annulus_gear.html">annulus_gear.md</a> for the swapped addendum/dedendum geometry shared by all three annulus generators.</p>
+<h2>Hand convention</h2>
+<p>Same rule as the helical annulus gear: a herringbone annulus and its mating herringbone pinion need the <strong>SAME</strong> hand (unlike external-external herringbone pairs, which need opposite hands). Picking a target here runs <code>sync_helical_same</code>. See <a href="helical_annulus_gear.html#this-is-where-the-hand-convention-flips">helical_annulus_gear.md</a> for why this matters.</p>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>target</code></td><td>Object pointer</td><td>—</td><td>gears with <code>bmech_module</code></td><td>Match Target; runs <code>sync_helical_same</code></td></tr>
+<tr><td><code>tooth_count</code></td><td>Int</td><td>40</td><td>8–200 (soft)</td><td>Must exceed the mating pinion's tooth count</td></tr>
+<tr><td><code>module</code></td><td>Float (mm)</td><td>2.0</td><td>0.1–20.0 (soft)</td><td>Transverse module — must match the mating pinion</td></tr>
+<tr><td><code>pressure_angle_deg</code></td><td>Float (°)</td><td>20.0</td><td>10–45</td><td></td></tr>
+<tr><td><code>helix_angle_deg</code></td><td>Float (°)</td><td>20.0</td><td>1–45</td><td>Half-angle of the V; 15–30° typical for FDM</td></tr>
+<tr><td><code>hand</code></td><td>Enum</td><td><code>RIGHT</code></td><td><code>RIGHT</code> / <code>LEFT</code></td><td>Bottom half twists CW from below when RIGHT</td></tr>
+<tr><td><code>width_mm</code> (labeled "Total Width")</td><td>Float (mm)</td><td>14.0</td><td>2–80 (soft)</td><td>Full face width — each half is <code>width_mm/2</code></td></tr>
+<tr><td><code>ring_wall_mm</code></td><td>Float (mm)</td><td>5.0</td><td>0.5–30 (soft)</td><td>Radial wall thickness beyond the tooth root</td></tr>
+<tr><td><code>n_slices</code> (labeled "Slices per Half")</td><td>Int</td><td>12</td><td>2–48 (soft)</td><td>Total slices built = <code>2*n_slices - 1</code></td></tr>
+<tr><td><code>outer_segs</code></td><td>Int</td><td>64</td><td>16–256 (soft)</td><td>Facets on the outer cylindrical surface</td></tr>
+</tbody></table></div>
+<p>Note the property labels here ("Total Width", "Slices per Half") are more explicit than the plain "Width"/"Slices" labels on the helical annulus gear, because herringbone splits both properties' semantics across two mirrored halves.</p>
+<h2>Build method</h2>
+<p><strong>No boolean, no Solidify modifier</strong> — same direct-bmesh rewrite as the straight and helical annulus gears (<a href="annulus_gear.html#build-method">annulus_gear.md</a>, <a href="helical_annulus_gear.html#build-method">helical_annulus_gear.md</a>), extended to a V-shaped (herringbone) twist. This used to be a solid outer cylinder minus a boolean-DIFFERENCE herringbone cutter (<code>EXACT</code> solver).</p>
+<p><code>_build_herringbone_annulus_solid</code> builds:</p>
+<ul><li>The <strong>inner (toothed) wall</strong>: <code>2*n_slices - 1</code> V-twisted Z-layers of the tooth profile — bottom half twist rising <code>0 → peak_twist</code> over <code>[0, width_mm/2]</code>, top half falling <code>peak_twist → 0</code> over <code>[width_mm/2, width_mm]</code>, sharing the mid-slice at the peak (the top-half loop starts at <code>k=1</code> to avoid rebuilding that shared slice). Twist is relative to <code>z=0</code>/<code>width_mm</code> directly now — the old boolean cutter had to pad its Z range by <code>±BOOL_EPSILON</code> to avoid a coincident-cap boolean artifact, which no longer applies since there's no boolean. <code>peak_twist = (width_mm/2) * tan(helix_angle) / pitch_radius</code>.</li><li>The <strong>outer (cylindrical) wall</strong>: a PLAIN, UNTWISTED, independently- spaced circle (<code>outer_segs</code> points, only 2 Z-layers) — the outer surface doesn't twist, only the inner teeth do. As with the other two annulus generators, this is deliberately NOT built with one point per tooth-profile point at a matching angle (that reintroduces zero-area triangles at the tooth profile's collinear dedendum-circle point insertion).</li><li>The <strong>two end caps</strong>: <code>bmesh.ops.triangle_fill</code> fed the boundary edges of both the (twisted) inner ring and the (untwisted) outer ring together at each end.</li></ul>
+<p><strong>Pressure angle clamp has extra margin here too</strong>: <code>_derived()</code> clamps to <code>gear_matching.max_pressure_angle_deg(...) - PA_TRIANGLE_FILL_MARGIN_DEG</code> (0.2°), not the theoretical limit itself — <code>triangle_fill</code> is more fragile right at that boundary than the old <code>EXACT</code>-solver boolean was. Swept tooth counts 8-100 × pressure angles 10-45° × both hands: 96/96 clean.</p>
+<p><code>herringbone_planetary_gear_set.py</code>'s own ring gear is unaffected by this rewrite — it's a separate file with its own cutter function (<code>_make_herringbone_cutter_obj</code>), still boolean-based.</p>
+<h2>Panel warnings</h2>
+<p>Only <code>tip_r &lt;= 0</code> → <strong>"Module too large — tip radius ≤ 0"</strong> (ERROR, blocks). Info box additionally shows normal module, peak twist, and total slice count (<code>2*n_slices - 1</code>).</p>
+<p>No print-in-place clearance logic — produces a rigid single-part ring meant to be printed separately from its pinion.</p>
+<h2>Output</h2>
+<p>One object, stamped:</p>
+<pre><code>gear_matching.stamp_gear(body, "herringbone_annulus", module, pressure_angle_deg,
+                          tooth_count=tooth_count,
+                          helix_angle_deg=helix_angle_deg, hand=hand)</code></pre>
+<p>Meshes with a herringbone pinion (<a href="herringbone_gear.html">herringbone_gear.md</a>) of the same module, pressure angle, and helix angle, and the <strong>same</strong> hand.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Threaded Lid — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Fasteners</a> / Threaded Lid</div>
+<header>
+  <h1>Threaded Lid</h1>
+  <img class="hero-img" src="../assets/img/threaded_lid.png" alt="Threaded Lid render">
+</header>
+<main>
+<p><code>fasteners/threaded_lid.py</code> → <code>OBJECT_OT_threaded_lid</code> (<code>object.threaded_lid</code>, "Threaded Lid")</p>
+<p>An inverted cup that screws onto a <a href="threaded_container.html">threaded_container</a> neck: solid cap at the top, open skirt below, with an <strong>internal</strong> thread ADDED (unioned) onto the skirt's already-hollow inner wall, anchored at the ceiling (plus a small axial gap) and extending DOWN for <code>thread_length_mm</code>, above an unthreaded <strong>guide zone</strong> (down to the real mouth) that lets the container's neck pass through freely before engaging the thread. <code>thread_diameter_mm</code> plays double duty as both "OD of the container this lid fits" and the thread's own major diameter, matching hex_bolt.py/hex_nut.py's convention so <code>fastener_matching.sync_thread_dims</code> works unmodified.</p>
+<p><strong>[REDESIGN] Every earlier version of this file cut the thread SUBTRACTIVELY out of a pre-built solid plug</strong>, mirroring hex_nut.py's recipe — which required the thread's own region of the skirt to be built solid first, a separate pilot bore, and a careful overshoot/clip dance at both ends of the cut. This version instead builds the WHOLE skirt hollow from the start and ADDS the thread as a standalone helical ridge, unioned onto the wall. See <a href="#why-additive-and-the-tradeoff-that-comes-with-it">Why additive, and the tradeoff that comes with it</a> below for why this is a deliberate choice, not an oversight.</p>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>target</code></td><td>Object pointer</td><td>—</td><td>fastener objects with the OPPOSITE (external) orientation</td><td>Match Target; runs <code>fastener_matching.sync_thread_dims</code></td></tr>
+<tr><td><code>thread_diameter_mm</code></td><td>Float (mm)</td><td>60.0</td><td>5–300 (soft)</td><td>OD of the container this lid fits, AND thread major diameter</td></tr>
+<tr><td><code>wall_thickness_mm</code></td><td>Float (mm)</td><td>3.0</td><td>0.4–20 (soft)</td><td>Skirt wall AND cap thickness</td></tr>
+<tr><td><code>thread_length_mm</code></td><td>Float (mm)</td><td>8.0</td><td>1–90 (soft), clamped up further — see Validation</td><td>How far DOWN from the ceiling the thread extends</td></tr>
+<tr><td><code>guide_length_mm</code></td><td>Float (mm)</td><td>4.0</td><td>1–90 (soft)</td><td>Unthreaded lead-in below the thread, down to the real mouth — lets the container's neck self-align before engaging the thread</td></tr>
+<tr><td><code>pitch_mm</code></td><td>Float (mm)</td><td>4.0</td><td>0.5–20 (soft)</td><td>Jar/bottle threads run much coarser than fastener threads</td></tr>
+<tr><td><code>flank_angle_deg</code></td><td>Float (°)</td><td>90.0</td><td>1–179</td><td>Wider than the 60° fastener convention</td></tr>
+<tr><td><code>truncation</code></td><td>Float</td><td>0.25</td><td>0–0.3</td><td>See <a href="threaded_container.html#why-the-default-truncation-is-higher-than-the-fastener-convention">threaded_container.md</a> for why this is higher than the fastener default</td></tr>
+<tr><td><code>inner_compensation_mm</code></td><td>Float (mm)</td><td>0.0</td><td>0–0.5 (soft)</td><td>FDM: internal features print tight — added to thread major radius</td></tr>
+<tr><td><code>fit_offset_mm</code></td><td>Float (mm)</td><td>0.0</td><td>0–0.5 (soft)</td><td>FDM: added to thread diameter for a looser fit against a mating <a href="threaded_container.html">threaded_container</a>, whose own diameter is reduced by the same offset. Never synced by Match Target</td></tr>
+<tr><td><code>resolution</code></td><td>Int</td><td>64</td><td>8–256 (soft)</td><td></td></tr>
+</tbody></table></div>
+<p><code>height_mm</code> is <strong>not a property</strong> — it's a pure derived sum (<code>wall_thickness_mm + thread_length_mm + guide_length_mm</code>), shown read-only in the panel's info box. There is no longer a fixed "total height" budget the other three have to fit inside; adding cap, thread, or guide length simply grows the part.</p>
+<p><code>thread_diameter_mm</code>/<code>pitch_mm</code>/<code>flank_angle_deg</code>/<code>truncation</code> freeze together in a driven column whenever a target is set, same all-four freeze behavior as <a href="hex_bolt.html#match-target">hex_bolt.md</a>. <code>wall_thickness_mm</code>/<code>thread_length_mm</code>/<code>guide_length_mm</code>/<code>resolution</code>/ <code>inner_compensation_mm</code>/<code>fit_offset_mm</code> are never driven — fit is this part's own printing-tolerance choice, not something the mating container could meaningfully specify.</p>
+<p><code>fit_offset_mm</code> folds into <code>major_r</code> (<code>_derived()</code> and <code>_clamp()</code> both add <code>fit_offset_mm / 2.0</code> alongside <code>inner_compensation_mm</code>) before any of the usual truncation/thread-length clamping runs, so a large fit offset is subject to the same margin protections as a large <code>inner_compensation_mm</code> — it can't push <code>minor_r</code> to zero or below any more than compensation can.</p>
+<p><strong>The target picker only offers <code>EXTERNAL</code>-oriented objects</strong> — <code>hex_bolt</code>, <code>threaded_container</code>, or a <code>threaded_fastener.py</code> raw thread currently built with <code>thread_type='EXTERNAL'</code>. See <a href="index.html#match-target-a-deliberate-exception-to-the-no-shared-module-rule">README.md</a>.</p>
+<h2>Why additive, and the tradeoff that comes with it</h2>
+<p><code>hex_bolt.py</code>'s own docstring records that this codebase tried additive (union) threading once before and abandoned it: unioning a separately-built helical ridge onto an undersized core is a numerically harder case for the <code>EXACT</code> boolean solver than differencing a cutter out of solid material, because a plain difference against a solid blank always has genuine material to remove, while a union of two independently-built, nearly-coincident curved surfaces can read as a hairline touch and cancel material instead of merging. See <a href="../../blender_extension_lessons.txt">blender_extension_lessons.txt</a>'s "EXACT boolean solver" section for the general form of this lesson.</p>
+<p>This file uses additive anyway, as a deliberate choice: the earlier subtractive design's real complexity wasn't the cut direction itself, it was the overshoot/clip dance needed because the cutter had to terminate <em>flush with other pre-existing boundaries</em> (the ceiling above, the clearance-zone wall below) without leaving a visible seam. An additive ridge has no such boundary to land on — it only needs to touch the surrounding wall at all, and is allowed to hard-start/hard-stop in open bore air at both ends (see the module docstring's <code>[REDESIGN]</code> note). The one piece of the old numerical-fragility problem that <em>does</em> still apply — the ridge's root radius touching the wall at exactly <code>major_r</code> being a hairline coincidence, not a genuine volumetric overlap — is handled the same way <code>hex_bolt.py</code>'s old additive mode handled it: a depth-scaled radial <code>overlap</code> pushes the ridge's root past <code>major_r</code>, so the union has real volume to merge.</p>
+<p>Swept empirically (972 configurations across thread diameter, wall thickness, thread length, guide length, pitch, flank angle, and truncation) with 0 crashes and 0 mesh defects (non-manifold edges, zero-area faces, zero volume) after the fixes below — including the <code>crest_flat</code>-vs-<code>root_flat</code> fix, which a manifold-only sweep like this one cannot catch by itself (a mesh with the crest/root duty cycle inverted is still perfectly manifold; see the profile-argument fix below, verified instead via ray-casting and real thread-to-thread engagement).</p>
+<h2>Build method</h2>
+<p>Base profile (2D, r vs z, revolved 360° around Z) — z=0 is the <strong>ceiling</strong> (top of the physical lid), z=<code>height_mm</code> is the real <strong>mouth</strong> (the open end the container's neck enters through), the reverse of this file's own previous z convention, adopted so <code>height_mm</code> falls out as a pure sum of its three parts without needing a separate "skirt depth minus cap" subtraction anywhere:</p>
+<ol><li><code>(0, 0)</code> pole — center of the solid cap's top exterior surface</li><li>→ <code>(outer_r, 0)</code> — flat exterior top surface, pole to ring</li><li>→ <code>(outer_r, height)</code> — down the full outer wall</li><li>→ <code>(major_r, height)</code> — across the mouth's own annular rim (<code>outer_r</code> to <code>major_r</code>), the real opening the neck enters through</li><li>→ <code>(major_r, wall_thickness_mm)</code> — up the already-hollow, unthreaded- in-the-base-mesh bore wall from the mouth rim to the ceiling's underside</li><li>→ <code>(0, wall_thickness_mm)</code> pole — flat interior ceiling disc, closing the bottom of the solid cap</li><li>→ <code>closed=True</code> back to point 1: both ends are poles on the same central axis, so no face is built there at all — the cap (z=0 to <code>wall_thickness_mm</code>, r=0 to <code>outer_r</code>) is one uniformly solid region.</li></ol>
+<p>This produces a solid cap sitting above a fully hollow skirt — there is no separate "solid plug" region and no pre-hollowed pilot bore distinction anymore, since the thread is added onto this one uniform wall rather than cut out of a thicker one. Six checkpoints total, down from eight in the previous subtractive design.</p>
+<p><strong>The additive thread ridge</strong>: a standalone helical solid built with <code>_external_profile</code> (crest pointing outward — here that's the ridge's ATTACHMENT radius, not a cutter's reach), <code>root_flat</code> swapped into the <code>crest_flat</code> slot (same convention as every other thread cutter in this family), root radius <code>major_r + overlap</code>, crest (tip) radius <code>minor_r</code>. Built directly at <code>thread_length_mm</code> tall with no axial overshoot — additive material terminating in open bore air needs no overshoot/clip treatment, unlike a subtractive cutter that has to avoid leaving a seam in real material. Positioned starting at <code>wall_thickness_mm + ceiling_eps</code> (a small pitch-scaled gap below the interior ceiling disc, avoiding an exact-coincidence hairline touch with that pre-existing face), then unioned onto the base object.</p>
+<p><code>overlap = max(0.02, min(0.2 * depth, 0.15))</code> — the same depth-scaled radial padding <code>hex_bolt.py</code>'s own (since-abandoned) additive mode used, so the ridge's root has genuine volumetric overlap with the wall instead of a hairline touch at exactly <code>major_r</code>.</p>
+<p><strong>[BUG, fixed] <code>crest_flat</code> goes in <code>_external_profile</code>'s argument slot here — not <code>root_flat</code>, despite every subtractive cutter in this family passing <code>root_flat</code> into that exact slot.</strong> <code>_build_helix</code> fills its cross-section from a constant floor (here, <code>minor_r</code>) up to a ceiling that peaks at <code>major_r</code> for the argument's own plateau length. For a cutter subtracted from a solid plug, passing <code>root_flat</code> there makes the <em>removed</em> (valley) region span <code>root_flat + 2*flank_dz</code> — correct, since the valley should be the wide one — leaving a properly tapered tooth behind as the complement. But this file doesn't cut a complement out of solid material; it unions this exact swept shape directly as the ridge. Passing <code>root_flat</code> there built a solid that's fully deployed (reaching <code>minor_r</code>) across <code>root_flat</code>'s own span and absent across <code>crest_flat</code>'s span — precisely inverted from a real ridge, which must be fully deployed only across <code>crest_flat</code>'s short span and retract flush with the wall (no protrusion at all) across <code>root_flat</code>'s long span. Confirmed two ways: (1) ray-casting radially outward from the bore's own axis at a fixed height across 360 angles showed the <code>root_flat</code> version blocking 75% of the sweep (matching <code>2*flank_dz + root_flat</code>) and open for only 25% (matching <code>crest_flat</code>) — backwards; swapping to <code>crest_flat</code> restored the expected 50/50 split. (2) Building a matching <code>threaded_container</code> and boolean-intersecting it with the lid at a fine sweep of relative axial/angular phases: the <code>root_flat</code> version never dropped below ~5% of its own peak interference volume at any phase (never truly "meshed"); the <code>crest_flat</code> version reaches <strong>exactly 0.0</strong> interference at the correctly threaded phase and rises smoothly away from it in both directions — the signature of a real, functioning thread pair, not just a manifold mesh.</p>
+<p><code>ceiling_eps = max(0.05, 0.05 * pitch_mm)</code> — small, pitch-scaled axial gap between the ridge's own start and the interior ceiling disc.</p>
+<p><strong>Recalc face normals unconditionally after the union</strong> — per <code>blender_extension_lessons.txt</code>, EXACT-solver unions can come back with inconsistent face winding even on a genuinely manifold/solid result; <code>_bool_op</code> does this every time regardless of whether a defect is suspected.</p>
+<p><strong>[BUG, fixed] <code>_build_helix</code> crashes outright (not just a mesh defect) if <code>thread_length_mm</code> is too small relative to the thread's own profile span.</strong> <code>_build_helix</code> computes <code>steps = ceil((height - profile_span) * res / pitch) + 1</code>, where <code>profile_span = 2*fdz + crest_flat</code> is the axial height one full crest-to-crest repeat occupies. Once <code>thread_length_mm &lt;= profile_span</code> this goes to zero or negative rings and <code>_build_helix</code> throws <code>IndexError</code> building <code>rings[0]</code> — confirmed empirically (e.g. <code>thread_length_mm=4</code> with <code>pitch_mm=8</code> crashes every time, well within both properties' own valid ranges). Fixed in <code>_clamp()</code> (see below) by clamping <code>thread_length_mm</code> up to <code>profile_span + 0.5 * pitch_mm</code> whenever it's smaller — a half-pitch margin comfortably guarantees several real ring steps.</p>
+<h2>Validation: clamped, not cancelled</h2>
+<p><code>execute()</code> calls <code>self._clamp()</code> first — same <a href="../CONVENTIONS.html#conventions-that-apply-across-every-family-not-just-gears">clamp-over-cancel rule</a> as <a href="threaded_container.html#validation-clamped-not-cancelled">threaded_container.md</a>. Only two silent-correction steps remain (down from three in every earlier version) plus the crash-prevention floor above — since <code>height_mm</code> is now a pure derived sum rather than a fixed budget the other properties have to fit inside, there is no longer any "wall_thickness_mm vs. total height" conflict to reconcile at all:</p>
+<ol><li><code>truncation</code> clamped UP (via <code>_min_truncation_for_max_depth</code>) whenever the resulting thread depth would push <code>minor_r</code> below a <code>max(1.0, major_r * 0.05)</code> margin. Depends only on <code>major_r</code> — wall thickness plays no part, same as every earlier version.</li><li><code>guide_length_mm</code> clamped up to <code>max(1.0, 0.25 * pitch_mm)</code> — the same margin the earlier subtractive design used for its clearance zone. The original numerical mechanism (a razor-thin exact-coincidence wall) doesn't apply the same way to an additive ridge, but the margin is kept anyway as the only guard against a guide zone too thin for the container's neck to actually self-align in.</li><li><code>thread_length_mm</code> clamped up to <code>(2*fdz + crest_flat) + 0.5 * pitch_mm</code> whenever smaller — see the <code>[BUG, fixed]</code> note above; this is a crash fix, not a quality-only floor.</li></ol>
+<p><strong>One case still cancels</strong>: if <code>truncation</code> would need to exceed 0.3 to keep <code>minor_r</code> positive with margin (a pitch too coarse for the thread diameter at any truncation) — no meaningful single "closest valid value" to fall back to.</p>
+<p><code>draw()</code> shows these as <code>INFO</code>-icon labels at the bottom of the panel (purely defensive/informational post-clamp), except the thread-length warning, which is a genuine, non-clamped, separate concern from the crash floor above:</p>
+<ul><li><code>fdz &lt;= 0</code> → "Truncation too high — no room for flanks at this pitch" (can't actually occur, kept defensively).</li><li><code>minor_r &lt;= 0</code> → "Thread too deep for this diameter — minor Ø ≤ 0".</li><li><code>thread_length_mm &lt; 1.5 * pitch_mm</code> (and not the above) → <strong>"Thread length &lt; 1.5 pitches — weak engagement..."</strong> (<code>ERROR</code> icon, still non-blocking — confirmed in the earlier subtractive design that exactly 1.0 pitch is a mesh defect there; kept here as a weak-engagement heads-up independent of the crash-prevention clamp, which uses a different threshold based on the profile's own geometry rather than a flat pitch multiple).</li></ul>
+<h2>Output</h2>
+<p>One object, named <code>ThreadedLid</code>, stamped via <code>fastener_matching.stamp_thread</code>: <code>bmech_kind="threaded_lid"</code>, <code>bmech_thread_diameter</code>, <code>bmech_pitch</code>, <code>bmech_flank_angle_deg</code>, <code>bmech_truncation</code>. <code>fastener_matching.fastener_orientation</code> maps this kind to <code>INTERNAL</code>. Meshes with a <a href="threaded_container.html">threaded_container</a> of the same four thread values.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

@@ -62,6 +62,25 @@ working in this repo: treat "add docs for the new mechanism" as an
 implicit, unstated part of any task that adds or changes a generator
 operator, the same way you'd treat "keep the tests passing."
 
+## The live site is generated from these docs — regenerate it in the same change
+
+The `.md` files in this folder are the source of truth for both the repo
+(browsable on GitHub as-is) and the public site at `lettvce.com/bmech/`.
+The site's HTML pages are **generated** from this markdown by
+`docs/build_site.py`, not hand-written and not duplicated by hand anywhere
+— duplicating content in two places is exactly what this convention system
+exists to avoid (see "Documentation is not optional" above).
+
+**Whenever you edit, add, or remove a `.md` file under `docs/bmech/`, run
+`python docs/build_site.py` and commit the regenerated HTML in the same
+change.** This is a convention, not a CI-enforced check — there's no
+build step blocking a push with stale generated HTML, so it relies on
+actually doing it, the same way "write the docs alongside the code" above
+does. If you're an AI agent working in this repo: treat "regenerate the
+site" as an implicit, unstated part of any task that touches a `docs/bmech/
+**/*.md` file, the same way you'd treat "update the primitive doc" as part
+of adding a generator.
+
 ## Families
 
 | Family | Status | Entry point |

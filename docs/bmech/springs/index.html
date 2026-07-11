@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Springs — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / Springs</div>
+<header>
+  <h1>Springs</h1>
+  
+</header>
+<main>
+<p>Two primitives, <code>springs/hairspring.py</code> and <code>springs/serpentine_spring.py</code>. Both generate a single flat, printable spring mesh from a swept ribbon cross-section — otherwise they don't share code, math, or a common geometry model (one's a spiral, one's a zigzag). See <a href="../CONVENTIONS.html">../CONVENTIONS.md</a> for the family/primitive pattern this doc follows.</p>
+<h2>Primitives in this family</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Primitive</th>
+<th>File</th>
+<th>Shape</th>
+</tr></thead><tbody>
+<tr><td>Hairspring</td><td><code>springs/hairspring.py</code></td><td>Archimedean spiral ribbon</td></tr>
+<tr><td>Serpentine spring</td><td><code>springs/serpentine_spring.py</code></td><td>Zigzag with rounded U-bends</td></tr>
+</tbody></table></div>
+<h2>Conventions</h2>
+<ul><li>Both fully self-contained — no shared helper module, no <code>bmech_*</code> stamping, no Match Target system. Neither file imports from the other or from any sibling <code>mechanisms_core</code> module.</li><li>Both build a <strong>flat 2D ribbon path</strong> (a centerline offset into outer/inner edges) rather than sweeping a profile curve — the ribbon's thickness dimensions are direct geometry inputs, not a Solidify modifier, except where noted below.</li><li><strong>Neither generator has a print-shrinkage FDM compensation property</strong> — no <code>*_compensation_mm</code> field anywhere in this family. The <code>strip_width</code>/<code>strip_thickness</code>/<code>strip_height</code> properties on both primitives carry FDM-driven <em>minimum</em> values (print-line-width floors like 0.4mm/0.2mm), but those are clamped inputs, not additive shrink-compensation offsets the way the fastener and gear families use the term. Don't go looking for a compensation field here — there isn't one.</li><li>Validation in both files follows the same soft pattern: <code>draw()</code> shows ERROR-icon labels for degenerate combinations of inputs, but neither file actually cancels on most of them — values get silently clamped in <code>execute()</code> instead (e.g. a too-small gap or too-narrow leg length is floored to a small positive number rather than blocking the operator). Check each primitive's doc for the one or two cases that genuinely do cancel.</li><li>Both output exactly <strong>one object per call</strong>, at the 3D cursor (no parenting-empty option, unlike bearings/planetary gear sets — there's only ever one part to place).</li></ul>
+<h2>Primitives</h2>
+<div class="grid">
+<a class="card" href="hairspring.html"><img src="../assets/img/add_hairspring.png" alt=""><h3>Hairspring</h3><p>A flat Archimedean-spiral ribbon — the kind of spring used in mechanical clock balance wheels. See <a href="index.html">README.md</a> for family-wide notes.</p></a>
+<a class="card" href="serpentine_spring.html"><img src="../assets/img/add_serpentine_spring.png" alt=""><h3>Serpentine Spring</h3><p>A flat zigzag spring — straight legs connected by rounded U-bends, compressing along one axis. See <a href="index.html">README.md</a> for family-wide notes.</p></a>
+</div>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

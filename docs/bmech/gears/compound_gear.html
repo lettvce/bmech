@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compound Gear — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Gears</a> / Compound Gear</div>
+<header>
+  <h1>Compound Gear</h1>
+  <img class="hero-img" src="../assets/img/add_compound_gear.png" alt="Compound Gear render">
+</header>
+<main>
+<p><code>gears/external/compound_gear.py</code> → <code>OBJECT_OT_add_compound_gear</code> (<code>object.add_compound_gear</code>, "Add Compound Gear")</p>
+<p>Builds a full multi-stage gear train — up to 4 stages, each a driver/driven pair on a shared intermediate shaft, auto-positioned so each stage's pitch circles are tangent along X. Self-contained like the other gear-set primitives — no <code>stamp_gear</code>, no Match Target. See <a href="index.html">README.md</a> for family-wide conventions.</p>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>stage_count</code></td><td>Int</td><td>2</td><td>1–4</td><td></td></tr>
+<tr><td><code>s1_driver</code> … <code>s4_driver</code> (labeled "Driver Teeth")</td><td>Int</td><td>12 (all stages)</td><td>4–200 (soft)</td><td>Per-stage driver tooth count</td></tr>
+<tr><td><code>s1_driven</code> … <code>s4_driven</code> (labeled "Driven Teeth")</td><td>Int</td><td>36, 36, 24, 24</td><td>4–200 (soft)</td><td>Per-stage driven tooth count</td></tr>
+<tr><td><code>module</code></td><td>Float (mm)</td><td>1.0</td><td>0.1–50.0</td><td>Shared by every gear in the train</td></tr>
+<tr><td><code>pressure_angle_deg</code></td><td>Float (°)</td><td>20.0</td><td>10–45</td><td></td></tr>
+<tr><td><code>width_mm</code></td><td>Float (mm)</td><td>6.0</td><td>0.5–50 (soft)</td><td>Shared by every gear</td></tr>
+<tr><td><code>bore_enable</code></td><td>Bool</td><td>True</td><td></td><td></td></tr>
+<tr><td><code>axle_hole_mm</code> (labeled "Bore Ø")</td><td>Float (mm)</td><td>5.0</td><td>0.1–50 (soft)</td><td></td></tr>
+<tr><td><code>axle_compensation_mm</code></td><td>Float (mm)</td><td>0.2</td><td>0.0–1.0 (soft)</td><td>Added to hole radius</td></tr>
+<tr><td><code>parent_under_empty</code></td><td>Bool</td><td>True</td><td></td><td>Parents all created gears to a new Empty</td></tr>
+</tbody></table></div>
+<p>All 4 stages' driver/driven properties share identical labels in the UI ("Driver Teeth" / "Driven Teeth") — they're distinguished only by which per-stage box they appear in, and internally by property name (<code>s1_driver</code>…<code>s4_driver</code>, <code>s2_driven</code>…<code>s4_driven</code>).</p>
+<h2>Ratio math</h2>
+<p>Per stage <code>i</code>: <code>ratio_i = driven_teeth_i / driver_teeth_i</code> (step-down when</p>
+<blockquote><p>1). Overall train ratio is the product of every active stage's ratio.</p></blockquote>
+<p>Center distance per stage is <code>module*(driver_teeth + driven_teeth)/2</code>, and stages are laid out end-to-end along X: each stage's driver sits where the previous stage's driven gear ended.</p>
+<p>The panel shows each stage's own ratio (<code>"Stage %d — 1 : %.3f"</code>) plus the overall ratio and total X span.</p>
+<h2>Z layout is a display convention, not a physical shaft offset</h2>
+<p>Each stage occupies its own Z plane, offset from the previous stage by <code>width_mm + STAGE_GAP_MM</code> (<code>STAGE_GAP_MM = 1.0</code>). This exists purely so the whole train is visually inspectable in the viewport — a real compound gear train's stages don't literally sit at different Z heights the way this generator draws them; within a single stage, its driver and driven gear genuinely do share one shaft and one Z plane (mesh along X, pitch circles tangent), but the gap <em>between</em> stages is a display simplification, not a claim about how you'd actually build the shafts.</p>
+<h2>Bore safety check</h2>
+<p>Same pattern as <a href="cluster_gear.html">cluster_gear.md</a>: the minimum dedendum radius is computed across <strong>every</strong> driver/driven tooth count in every active stage, and if <code>bore_r &gt;= min_dedendum</code>, the panel shows <code>"Axle hole too large — max Ø %.2f mm for smallest gear"</code> (ERROR-icon, non-blocking).</p>
+<h2>Build method</h2>
+<p>Reuses <code>spur_gear.build_gear_profile()</code> for every gear (like cluster_gear, unlike the planetary-set files). Each gear is its own solid object (<code>_build_solid_gear</code>) — unlike cluster_gear's fused single mesh, there's no shoulder-bridging here, and unlike the planetary sets' boolean bore, the bore hole here (when enabled) is built directly into the same bmesh as annular top/bottom faces via <code>triangle_fill</code>, not as a separate boolean cutter object.</p>
+<h2>Naming and object count</h2>
+<p><strong><code>2 * stage_count</code> gear objects per call</strong>, plus one optional parent Empty if <code>parent_under_empty</code> is True (default 4 gears + 1 empty at the default <code>stage_count=2</code>):</p>
+<ul><li>First stage's driver → <code>GearInput</code></li><li>Last stage's driven → <code>GearOutput</code></li><li>Every other driver/driven → <code>GearS%dDriver</code> / <code>GearS%dDriven</code></li></ul>
+<p>If <code>parent_under_empty</code>, all gears are parented to a new <code>CompoundGear</code> empty (PLAIN_AXES, sized to <code>max(total_span*0.1, 5.0)</code>), with <code>matrix_parent_inverse</code> set so parenting doesn't move anything.</p>
+<p>Success message: <code>"Compound gear: %d stage%s, 1 : %.3f overall ratio"</code>. Straight teeth only — no hand, no helix, no boolean bore cutters anywhere in this generator.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

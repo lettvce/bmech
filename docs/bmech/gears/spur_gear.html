@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spur Gear — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Gears</a> / Spur Gear</div>
+<header>
+  <h1>Spur Gear</h1>
+  <img class="hero-img" src="../assets/img/add_spur_gear.png" alt="Spur Gear render">
+</header>
+<main>
+<p><code>gears/external/spur_gear.py</code> → <code>OBJECT_OT_add_spur_gear</code> (<code>object.add_spur_gear</code>, "Add Spur Gear")</p>
+<p>Straight-tooth external involute gear. The baseline gear primitive — every other external-gear generator in this library (helical, herringbone, bevel) is a variation on the same tooth-profile math built in this file. See <a href="index.html">README.md</a> for conventions shared across the whole family.</p>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>target</code></td><td>Object pointer</td><td>—</td><td>gears with <code>bmech_module</code></td><td>Match Target; runs <code>sync_module_pa</code></td></tr>
+<tr><td><code>module</code></td><td>Float (mm)</td><td>1.0</td><td>0.1–50.0</td><td></td></tr>
+<tr><td><code>tooth_count</code></td><td>Int</td><td>20</td><td>5–500</td><td></td></tr>
+<tr><td><code>pressure_angle_deg</code></td><td>Float (°)</td><td>20.0</td><td>10–45</td><td></td></tr>
+<tr><td><code>width_mm</code></td><td>Float (mm)</td><td>6.0</td><td>0.1–100 (soft)</td><td>Solidify modifier depth</td></tr>
+<tr><td><code>bore_enable</code></td><td>Bool</td><td>True</td><td></td><td></td></tr>
+<tr><td><code>bore_diameter</code></td><td>Float (mm)</td><td>5.0</td><td>0.1–50 (soft)</td><td></td></tr>
+<tr><td><code>bore_compensation</code></td><td>Float (mm)</td><td>0.2</td><td>0.0–1.0 (soft)</td><td>Added to bore radius</td></tr>
+</tbody></table></div>
+<h2>Build method</h2>
+<p>Unlike every other gear primitive in the library, the spur gear is built as a <strong>flat 2D n-gon profile + Solidify modifier</strong>, not a hand-extruded solid mesh. <code>build_gear_profile()</code> produces a closed polygon (tooth flanks are involute curves sampled at <code>INVOLUTE_POINTS=15</code> points, tooth spaces are dedendum-circle arcs), which is filled as a single face and thickened with a <code>SOLIDIFY</code> modifier (<code>thickness=width_mm</code>, <code>offset=0.0</code>).</p>
+<p>If <code>bore_enable</code>, the Solidify modifier is applied first (so the bore boolean operates on a real solid, not a modifier stack), then a cylinder cutter is boolean-subtracted (<code>EXACT</code> solver) using the same <code>bore_r = bore_diameter/2 + bore_compensation</code> convention as the rest of the family.</p>
+<h2>Panel warnings</h2>
+<ul><li><code>pitch_r*cos(pressure_angle) &gt; dedendum_radius</code> → <strong>"Undercut likely"</strong> (INFO-severity warning, not blocking) — thin tooth count / large pressure angle combinations can undercut the tooth root.</li><li><code>dedendum_radius &lt;= 0</code> → <strong>"Module too large — dedendum radius is zero or negative"</strong> (ERROR, blocks — <code>execute()</code> returns <code>CANCELLED</code>).</li><li><code>bore_r &gt;= dedendum_radius</code> (with bore enabled) → <strong>"Bore too large for dedendum radius"</strong> (ERROR).</li></ul>
+<h2>Output</h2>
+<p>One object, name <code>Gear</code> (or <code>Gear.001</code>, etc. via <code>unique_name</code>), stamped <code>gear_matching.stamp_gear(obj, "spur", module, pressure_angle_deg, tooth_count=tooth_count)</code>. No <code>hand</code> or <code>helix_angle_deg</code> fields — spur gears are straight-toothed.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

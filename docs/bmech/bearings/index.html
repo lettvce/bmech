@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bearings — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / Bearings</div>
+<header>
+  <h1>Bearings</h1>
+  
+</header>
+<main>
+<p>Currently one primitive: <code>bearings/ball_bearing.py</code>. This README exists so the family/primitive doc pattern is already in place when a second bearing type (roller, thrust, etc.) is added — see <a href="../CONVENTIONS.html">../CONVENTIONS.md</a> for the pattern itself.</p>
+<h2>Primitives in this family</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Primitive</th>
+<th>File</th>
+</tr></thead><tbody>
+<tr><td>Ball bearing</td><td><code>bearings/ball_bearing.py</code></td></tr>
+</tbody></table></div>
+<h2>Conventions</h2>
+<ul><li>Fully self-contained — imports only <code>bpy</code>, <code>bmesh</code>, <code>math</code>. No shared helper module (there's nothing to share yet with only one primitive).</li><li>Wall-thickness safety is <strong>auto-corrected, not just validated</strong>: the bore and outer diameter are silently nudged (bore shrunk / OD expanded) to guarantee both races keep at least <code>MIN_WALL_MM = 0.8mm</code> of material, and the panel shows an INFO-icon note when this happens. This is a different pattern from most other families' geometry validation, which cancels or warns rather than auto-adjusting the user's inputs — see <a href="ball_bearing.html#auto-corrected-wall-thickness">ball_bearing.md</a> for detail.</li><li><code>clearance_mm</code> and <code>gap_mm</code> here are <strong>fit clearances baked directly into geometry</strong> (added to a groove radius or a ball-packing gap), not a print-shrinkage compensation offset in the sense used elsewhere in this library (compare to the fastener family's <code>*_compensation_mm</code> fields). There is no separate "shrink compensation" property on this generator.</li></ul>
+<h2>Primitives</h2>
+<div class="grid">
+<a class="card" href="ball_bearing.html"><img src="../assets/img/add_ball_bearing.png" alt=""><h3>Ball Bearing</h3><p>Generates an inner race, an outer race, and <code>ball_count</code> truncated-sphere balls — a complete, FDM-assemblable ball bearing. See <a href="index.html">README.md</a> for famil</p></a>
+</div>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

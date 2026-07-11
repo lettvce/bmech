@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hex Bolt — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Fasteners</a> / Hex Bolt</div>
+<header>
+  <h1>Hex Bolt</h1>
+  <img class="hero-img" src="../assets/img/hex_bolt.png" alt="Hex Bolt render">
+</header>
+<main>
+<p><code>fasteners/hex_bolt.py</code> → <code>OBJECT_OT_hex_bolt</code> (<code>object.hex_bolt</code>, "Hex Bolt")</p>
+<p>A complete bolt — hex head, optional shank, external thread, optional tip. Built <strong>subtractively</strong>: a blank stack (shank → thread blank at the full major diameter → tip) is cut with a helical groove cutter, and the hex head is unioned on last. Reuses <code>threaded_fastener.py</code>'s thread math (<code>_thread_params</code>, <code>_build_helix</code>, <code>_internal_profile</code> as the cutter) <strong>verbatim by duplication</strong>, not by import — see <a href="index.html#this-family-does-not-share-a-helper-module--and-thats-deliberate">README.md</a>.</p>
+<h2>Axial layout (Z, head at z=0)</h2>
+<pre><code>hex head    [0, hex_length_mm]
+shank       [hex_top, hex_top + shank_length_mm]              (if shank_enable)
+thread      [shank_top, shank_top + thread_length_mm]
+tip         [thread_top, thread_top + tip_length_mm]          (if tip_enable)</code></pre>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>target</code></td><td>Object pointer</td><td>—</td><td>mesh objects with <code>bmech_thread_diameter</code></td><td>Match Target; runs <code>fastener_matching.sync_thread_dims</code> — copies <code>thread_diameter_mm</code>/<code>pitch_mm</code>/<code>flank_angle_deg</code>/<code>truncation</code> all at once</td></tr>
+<tr><td><code>hex_length_mm</code></td><td>Float (mm)</td><td>5.5</td><td>0.5–30 (soft)</td><td>Head height</td></tr>
+<tr><td><code>hex_across_flats_mm</code></td><td>Float (mm)</td><td>13.0</td><td>1–100 (soft)</td><td></td></tr>
+<tr><td><code>shank_enable</code></td><td>Bool</td><td>True</td><td></td><td></td></tr>
+<tr><td><code>shank_length_mm</code></td><td>Float (mm)</td><td>10.0</td><td>0.1–200 (soft)</td><td></td></tr>
+<tr><td><code>shank_diameter_mm</code></td><td>Float (mm)</td><td>8.0</td><td>0.1–80 (soft)</td><td>Usually equal to thread Ø</td></tr>
+<tr><td><code>thread_length_mm</code></td><td>Float (mm)</td><td>20.0</td><td>0.5–200 (soft)</td><td></td></tr>
+<tr><td><code>thread_diameter_mm</code></td><td>Float (mm)</td><td>8.0</td><td>0.5–80 (soft)</td><td>Nominal <strong>major</strong> diameter</td></tr>
+<tr><td><code>pitch_mm</code></td><td>Float (mm)</td><td>1.25</td><td>0.1–10 (soft)</td><td></td></tr>
+<tr><td><code>flank_angle_deg</code></td><td>Float (°)</td><td>60.0</td><td>1–179</td><td>60° metric/UNC, 55° BSP, 29° ACME</td></tr>
+<tr><td><code>truncation</code></td><td>Float</td><td>0.125</td><td>0.0–0.3</td><td></td></tr>
+<tr><td><code>resolution</code></td><td>Int</td><td>32</td><td>8–128 (soft)</td><td></td></tr>
+<tr><td><code>outer_compensation_mm</code></td><td>Float (mm)</td><td>0.0</td><td>0.0–0.5 (soft)</td><td>Added to thread major radius — printed external features shrink</td></tr>
+<tr><td><code>fit_offset_mm</code></td><td>Float (mm)</td><td>0.0</td><td>0.0–0.5 (soft)</td><td>Subtracted from thread diameter — a looser fit against a mating internal thread (e.g. <a href="hex_nut.html">hex_nut</a>) whose own diameter is increased by the same offset. Never synced by Match Target</td></tr>
+<tr><td><code>tip_enable</code></td><td>Bool</td><td>True</td><td></td><td></td></tr>
+<tr><td><code>tip_length_mm</code></td><td>Float (mm)</td><td>3.0</td><td>0.1–30 (soft)</td><td></td></tr>
+<tr><td><code>tip_diameter_mm</code></td><td>Float (mm)</td><td>0.0</td><td>0.0–80 (soft)</td><td>0 = sharp point, &gt;0 = flat dog-point tip. Silently clamped to just under the thread's minor Ø (see below)</td></tr>
+</tbody></table></div>
+<h2>Match Target</h2>
+<p>Picking a target freezes <code>thread_diameter_mm</code>, <code>pitch_mm</code>, <code>flank_angle_deg</code>, and <code>truncation</code> together, all at once, in a driven column in <code>draw()</code> — unlike the gear family, there's no partial-match case here (a spur-target that only drives module/pressure-angle while leaving helix/hand editable, say): a bolt and the nut that fits it need <strong>all four</strong> thread dimensions to match exactly for the threads to physically engage, so all four freeze or unfreeze together depending on whether any valid target is set. <code>thread_length_mm</code>, <code>resolution</code>, <code>outer_compensation_mm</code>, and <code>fit_offset_mm</code> are never driven — length/resolution/compensation/fit are this part's own choices, not something the mating fastener could meaningfully specify.</p>
+<p><strong>Unlike the gear family, the poll here is deliberately NOT loose.</strong> A bolt (always <code>EXTERNAL</code> orientation) can only target <code>INTERNAL</code>-oriented objects — <code>hex_nut</code> objects, or a <code>threaded_fastener.py</code> raw thread currently built with <code>thread_type='INTERNAL'</code> — never another <code>hex_bolt</code> or an <code>EXTERNAL</code> raw thread, since there's no physical case where two external threads mate (unlike some cross-kind gear matches, which can be mechanically legitimate). See <a href="index.html#match-target-a-deliberate-exception-to-the-no-shared-module-rule">README.md</a> for the full reasoning and the mechanism (<code>bpy.context.active_operator</code> lookup inside the poll) this restriction depends on — and why that mechanism can't be verified by a headless test.</p>
+<h2>Build method</h2>
+<ol><li><strong>Blank stack</strong> (<code>_add_chained_revolve</code>): shank → thread blank (cylinder at the full <code>major_r</code>, not an undersized core) → tip built as one continuous solid of revolution sharing vertices at every junction, not three independently-capped primitives touching end to end. Independently-capped segments meeting at the same radius would leave duplicate coincident faces (both segments' own caps covering the identical disk) — a fragile case for the <code>EXACT</code> boolean solver. Chaining through shared vertices means the case can't arise. <code>tip_diameter_mm = 0</code> collapses the tip's final ring to a single shared pole vertex (a true point) rather than a zero-radius ring. The tip segment is a <strong>flat perpendicular step</strong> down to <code>tip_r</code> at the thread's own end Z, then a straight non-tapered pin — not a cone. A cone would shrink the blank's diameter while the thread cutter (next step) is still cutting a constant-diameter helix through it, so the thread would run out against a shrinking target and dead-end right at the tip instead of stopping cleanly.</li><li><strong>Thread cut</strong>: a helical groove cutter (<code>_internal_profile</code> + <code>_build_helix</code>, with <code>root_flat</code> passed into the profile's <code>crest_flat</code> slot — see the module docstring) is differenced out of the thread-blank segment. The cutter's crest reach pokes slightly past <code>major_r</code> (<code>overlap = max(0.02, min(0.2*depth, 0.15))</code>) so the difference has genuine volume to remove instead of a hairline touch the <code>EXACT</code> solver could read as a no-op, and it runs one full pitch past <code>thread_length_mm</code> so the last crest doesn't dead-end flush at the blank's flat step — see <a href="index.html#boolean-solver-patterns-specific-to-this-family">README.md</a>. <code>tip_diameter_mm</code> is clamped here too: silently reduced to just under the thread's minor Ø (mutating the property itself, like gear <code>pressure_angle_deg</code> clamping) so the tip always works as an unthreaded lead-in pin instead of building too fat to matter.</li><li><strong>Hex head</strong> (<code>_add_hex_prism</code>) built separately and unioned on <strong>last</strong> — a flush blocky join is far friendlier to the <code>EXACT</code> solver than the thread cut, so the riskier step happens first and any failure surfaces before the cheap reliable one. <code>_bool_union</code> re-runs <code>recalc_face_normals</code> afterward, since EXACT-solver unions can come back with inconsistent winding even when topologically solid.</li></ol>
+<h2>Panel warnings</h2>
+<ul><li><code>flank_dz &lt;= 0</code> → <strong>"Truncation too high — no room for flanks at this pitch"</strong> (ERROR icon).</li><li><code>head_wall &lt;= 0.5</code> (where <code>head_wall = across_flats/2 - thread_diameter/2</code>) → <strong>"Head too small for thread diameter"</strong> (ERROR icon).</li></ul>
+<p><strong>Unlike the raw threaded fastener, these ARE enforced</strong> — <code>execute()</code> re-checks <code>flank_dz &lt;= 0 or head_wall &lt;= 0</code> and, if true, reports <code>self.report({'ERROR'}, "Invalid geometry — check truncation and head size vs thread diameter")</code> and returns <code>CANCELLED</code>. Note the execute() gate (<code>head_wall &lt;= 0</code>) is looser than the draw() warning threshold (<code>head_wall &lt;= 0.5</code>) — a head wall between 0 and 0.5mm shows a visible warning but still builds successfully.</p>
+<h2>Output</h2>
+<p>One object, renamed <code>HexBolt</code>, stamped via <code>fastener_matching.stamp_thread</code>: <code>bmech_kind="hex_bolt"</code>, <code>bmech_thread_diameter</code>, <code>bmech_pitch</code>, <code>bmech_flank_angle_deg</code>, <code>bmech_truncation</code>. These properties are what a <code>hex_nut</code> (or a future <code>hex_bolt</code> targeting this one) reads back via Match Target — see the section above.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

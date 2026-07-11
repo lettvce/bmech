@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bevel Gear — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Gears</a> / Bevel Gear</div>
+<header>
+  <h1>Bevel Gear</h1>
+  <img class="hero-img" src="../assets/img/bevel_gear.png" alt="Bevel Gear render">
+</header>
+<main>
+<p><code>gears/bevel/bevel_gear.py</code> → <code>OBJECT_OT_bevel_gear</code> (<code>object.bevel_gear</code>, "Bevel Gear")</p>
+<p>Straight-tooth bevel gear — a toothed frustum for shafts meeting at 90°, built via <strong>Tredgold's approximation</strong> (each axial slice is the standard flat involute profile, uniformly scaled toward the cone apex — not a true spherical involute). See <a href="index.html">README.md</a> for family-wide conventions.</p>
+<p>Bevel gears in this library have <strong>no <code>hand</code> property</strong> (straight teeth only, no spiral-bevel support) and <strong>no bore feature</strong> — the two biggest differences from every other single-gear primitive.</p>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>target</code></td><td>Object pointer</td><td>—</td><td>gears with <code>bmech_module</code></td><td>Match Target; runs <code>sync_bevel</code> — copies module/PA, and sets <code>mate_teeth</code> to the target's own <code>tooth_count</code></td></tr>
+<tr><td><code>tooth_count</code></td><td>Int</td><td>16</td><td>8–120 (soft)</td><td>This gear's own tooth count</td></tr>
+<tr><td><code>mate_teeth</code></td><td>Int</td><td>16</td><td>8–120 (soft)</td><td>Tooth count of the <strong>mating</strong> gear — sets this gear's cone angle</td></tr>
+<tr><td><code>module</code></td><td>Float (mm)</td><td>2.0</td><td>0.1–20.0 (soft)</td><td>Module at the large end (back face)</td></tr>
+<tr><td><code>pressure_angle_deg</code></td><td>Float (°)</td><td>20.0</td><td>10–45</td><td></td></tr>
+<tr><td><code>face_width_mm</code></td><td>Float (mm)</td><td>8.0</td><td>1–60 (soft)</td><td>Tooth length along the cone slant — keep ≤ cone distance / 3</td></tr>
+<tr><td><code>n_slices</code></td><td>Int</td><td>12</td><td>2–64 (soft)</td><td>Axial divisions — more = smoother taper</td></tr>
+</tbody></table></div>
+<p>Note the minimum tooth count here is <strong>8</strong>, not the 5 used by spur/helical/herringbone — keeps the cone-angle math and small-end tooth size sane at the apex.</p>
+<p><strong>[BUG, fixed] <code>mate_teeth</code>/<code>module</code>/<code>pressure_angle_deg</code> weren't frozen in <code>draw()</code> when a target was set</strong> — <code>sync_bevel</code> itself always updated them correctly on pick, but the panel never grayed them out the way every other gear generator does (see <a href="spur_gear.html">spur_gear.md</a>'s own <code>module_row.enabled = not has_target</code>), so a target pick looked like it silently did nothing, and the driven values could be immediately overwritten by hand with no visual cue that they were supposed to be locked. <code>tooth_count</code> stays outside the frozen column deliberately — it's this gear's own choice, not something <code>sync_bevel</code> touches (the target's <code>tooth_count</code> becomes this gear's <code>mate_teeth</code>, not its own <code>tooth_count</code>).</p>
+<h2>Making a mating pair</h2>
+<p>Two bevel gears mesh at 90° with coincident apices when their cone angles are complementary: <code>delta_1 + delta_2 = 90°</code>. This library derives cone angle from <code>atan(tooth_count / mate_teeth)</code>, so <strong>to build the mating gear, create a second bevel gear with <code>tooth_count</code> and <code>mate_teeth</code> swapped</strong> — or just point its <code>target</code> at the first gear and let <code>sync_bevel</code> do the swap for you automatically.</p>
+<pre><code>delta         = atan(tooth_count / mate_teeth)      # this gear's cone half-angle
+pitch_r       = module * tooth_count / 2             # at the large end
+cone_dist L   = pitch_r / sin(delta)                 # apex-to-back-face slant distance
+z_apex        = L * cos(delta) = pitch_r * mate_teeth / tooth_count
+z_top         = face_width_mm * cos(delta)           # axial height of the small end
+scale_top     = (L - face_width_mm) / L               # uniform XY scale at the small end</code></pre>
+<h2>Build method</h2>
+<p>One 2D involute profile is built once at full size (the large end). For each of <code>n_slices</code> axial layers from <code>z=0</code> to <code>z=z_top</code>, every vertex of that profile is uniformly scaled by <code>(z_apex - z) / z_apex</code> and placed at height <code>z</code> — this uniform per-slice scaling <strong>is</strong> Tredgold's approximation. No twist, no hand.</p>
+<p>End caps at both <code>z=0</code> and <code>z=z_top</code> are each a single n-gon face — no center vertex, no boolean. This is explicitly why there's no bore feature: the cap already covers the hub area under the root circle, so there's no boolean step to hook a bore into without also cutting into tooth material.</p>
+<h3>Cap fix</h3>
+<p>This used to fan each end cap from an added center vertex (like <code>cluster_gear.py</code>'s shoulders still do). That degenerates: the shared <code>_build_gear_profile</code> inserts a dedendum-circle point at the same angle as the adjacent involute departure point wherever <code>base_r &gt; ded_r</code> — a real undercut-flank segment, not a bug, but it puts that profile point and the newly-added center vertex on the same ray through the origin, making the fan triangle there exactly zero area. Confirmed before the fix: 28 zero-area cap faces at the default <code>tooth_count=16</code>, across both caps at every slice count and pressure angle tried — <code>non_manifold</code> was always 0 even with the defect present (a zero-area triangle still shares its short edge with exactly one real neighboring face, so edge-manifoldness was never actually broken), which is why this was cosmetic rather than a hard build failure and was safely deferred while higher-severity issues in other generators were fixed first.</p>
+<p>Unlike the annulus family's caps (which bridge an inner AND outer loop and need <code>bmesh.ops.triangle_fill</code> to do that correctly — see <a href="index.html#booleangeometry-implementation-notes">README.md</a>), a bevel gear's cap is a single closed loop with nothing to bridge, so the fix is simpler: a single n-gon face per cap, matching how <code>helical_gear.py</code>/ <code>herringbone_gear.py</code> already cap their own extrusions. No per-point triangles means this class of degenerate face can't occur regardless of tooth count or pressure angle. Verified clean (0 zero-area faces, 0 non-manifold edges) across tooth counts {8, 12, 16, 20, 30, 45, 60} × mate-tooth ratios {8, 16, 24, 45} × pressure angles {14.5°, 20°, 25°, 30°} — 112 combinations, all clean.</p>
+<h2>Panel warnings</h2>
+<ul><li><code>face_width_mm &gt;= cone_dist</code> → <strong>"Face width ≥ cone distance — gear vanishes"</strong> (ERROR, blocks — <code>execute()</code> reports <code>self.report({'ERROR'}, ...)</code> and returns <code>CANCELLED</code>. This is the only bevel-gear check that produces an explicit error report rather than a silent cancel).</li><li><code>face_width_mm &gt; cone_dist / 3</code> (and not the above) → <strong>"Face width &gt; L/3 — small-end teeth very small"</strong> (ERROR-icon label, but <strong>not blocking</strong> — <code>execute()</code> calls <code>self.report({'WARNING'}, ...)</code> and still builds the gear). <code>cone_dist / 3</code> is called out in the source as "the standard engineering limit" for bevel gears.</li></ul>
+<p>The info box also shows: cone angle, mate cone angle (<code>90° - delta</code>), pitch/tip/root diameter at the large end, cone distance, height, tip scale, pitch diameter at the small end, and the <code>N:Nm</code> ratio.</p>
+<h2>Output</h2>
+<p>One object, stamped:</p>
+<pre><code>gear_matching.stamp_gear(obj, "bevel", module, pressure_angle_deg,
+                          tooth_count=tooth_count)</code></pre>
+<p>Note <code>mate_teeth</code> and <code>hand</code> are <strong>not</strong> stamped — unlike helical/ herringbone gears, the bevel-matching system relies entirely on <code>sync_bevel</code> reading the target object's live <code>bmech_tooth_count</code> at pick-time, not on any stamped mate/cone data on the gear itself.</p>
+<p>On success: <code>self.report({'INFO'}, "Bevel gear: %d/%d teeth, δ=%.1f°, module %.1f, face %.1f mm")</code>.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

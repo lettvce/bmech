@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ratchet Pawl — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Ratchets</a> / Ratchet Pawl</div>
+<header>
+  <h1>Ratchet Pawl</h1>
+  <img class="hero-img" src="../assets/img/add_ratchet_mechanism.png" alt="Ratchet Pawl render">
+</header>
+<main>
+<p><code>ratchets/ratchet_pawl.py</code> — three operators sharing one set of geometry helpers: <code>MESH_OT_add_ratchet_wheel</code> (<code>mesh.add_ratchet_wheel</code>, "Add Ratchet Wheel"), <code>MESH_OT_add_ratchet_pawl</code> (<code>mesh.add_ratchet_pawl</code>, "Add Ratchet Pawl"), and <code>OBJECT_OT_add_ratchet_mechanism</code> (<code>object.add_ratchet_mechanism</code>, "Add Ratchet &amp; Pawl") — the combined operator that builds a matched, auto-positioned pair.</p>
+<p>Rigid, no-spring: <strong>+Z (CCW from above) wheel rotation = LOCK</strong>, -Z (CW) = FREE. See <a href="index.html">README.md</a> for this family's shared conventions, especially the lock-direction convention (which flips for the internal ratchet) and the "no clamping, ever" validation policy.</p>
+<h2>Shared constants</h2>
+<p><code>HOLE_SEGMENTS = 32</code> (hole circle resolution), <code>PIVOT_BIAS_ANGLE_DEG = 35.0</code> (tangent-vs-radial blend for the auto pivot solve, see below), <code>PIVOT_PAD_MM = 2.0</code> (minimum wall thickness kept around any pivot/axle hole).</p>
+<h2>Operator 1: Add Ratchet Wheel</h2>
+<h3>Properties</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>sizing_mode</code></td><td>Enum</td><td><code>MODULE</code></td><td><code>MODULE</code> (module + tooth count, matches the gear family's convention) / <code>OUTER_DIAMETER</code> (outer diameter + tooth count, module back-solved)</td><td></td></tr>
+<tr><td><code>tooth_count</code></td><td>Int</td><td>12</td><td>4–200 (soft)</td><td></td></tr>
+<tr><td><code>module</code></td><td>Float (mm)</td><td>3.0</td><td>0.1–20 (soft)</td><td></td></tr>
+<tr><td><code>outer_diameter_mm</code></td><td>Float (mm)</td><td>40.0</td><td>2–500 (soft)</td><td></td></tr>
+<tr><td><code>tooth_depth_auto</code></td><td>Bool</td><td>True</td><td></td><td>Derives <code>tooth_depth_mm = 0.6 * module</code></td></tr>
+<tr><td><code>tooth_depth_mm</code></td><td>Float (mm)</td><td>1.8</td><td>0.1–50 (soft)</td><td>Only used when auto is off</td></tr>
+<tr><td><code>width_mm</code></td><td>Float (mm)</td><td>6.0</td><td>0.5–200 (soft)</td><td></td></tr>
+<tr><td><code>bore_enable</code></td><td>Bool</td><td>True</td><td></td><td></td></tr>
+<tr><td><code>axle_hole_diameter_mm</code></td><td>Float (mm)</td><td>5.0</td><td>0.1–100 (soft)</td><td></td></tr>
+<tr><td><code>axle_hole_compensation_mm</code></td><td>Float (mm)</td><td>0.0</td><td>-2.0–2.0 (soft)</td><td>Added to hole diameter</td></tr>
+</tbody></table></div>
+<p>The panel shows a read-only <strong>"Back Face Angle (derived)"</strong> label — see <a href="index.html#tooth-ramp-angle-is-derived-never-a-free-input">README.md</a>.</p>
+<h3>Tooth profile</h3>
+<p><code>build_wheel_profile_points()</code> builds a closed CCW loop with exactly 2 vertices per tooth (root, tip) — an earlier version used a two-segment back face to independently satisfy uniform spacing, a radial drive face, and a free-standing ramp angle at once; v1.1 dropped the third constraint (ramp angle became derived) and simplified to a single straight back-face segment per tooth, tip_i → root_(i+1).</p>
+<h3>Validation (raises, always cancels — see family README)</h3>
+<p><code>validate_wheel_params()</code>: <code>tooth_count &gt;= 4</code>; <code>tooth_depth_mm &lt; root_radius</code> (else "would collapse the wheel through its own center"); <code>axle_hole_diameter_mm &lt; 2*root_radius</code> (else "axle hole is bigger than the wheel"). All three are checked live in <code>draw()</code> (shown as an ERROR label if any fails) and re-checked in <code>execute()</code>, where a failure returns <code>CANCELLED</code>.</p>
+<h3>Output</h3>
+<p>One object, <code>RatchetWheel</code>. Several read-only geometry values are stashed as ID properties on the object for the combined operator (and anything else) to read back later: <code>root_radius</code>, <code>outer_radius</code>, <code>tooth_depth_mm</code>, <code>sector_angle_deg</code>, <code>tooth_count</code>, <code>back_face_angle_deg</code>.</p>
+<h2>Operator 2: Add Ratchet Pawl</h2>
+<h3>Properties</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>pawl_arm_length_mm</code></td><td>Float (mm)</td><td>25.0</td><td>2–300 (soft)</td><td></td></tr>
+<tr><td><code>pawl_arm_width_mm</code></td><td>Float (mm)</td><td>6.0</td><td>1–50 (soft)</td><td></td></tr>
+<tr><td><code>pawl_tip_width_mm</code></td><td>Float (mm)</td><td>3.0</td><td>0.1–50 (soft)</td><td></td></tr>
+<tr><td><code>pivot_hole_diameter_mm</code></td><td>Float (mm)</td><td>5.0</td><td>0–50 (soft)</td><td></td></tr>
+<tr><td><code>pivot_hole_compensation_mm</code></td><td>Float (mm)</td><td>0.0</td><td>-2.0–2.0 (soft)</td><td></td></tr>
+<tr><td><code>width_mm</code></td><td>Float (mm)</td><td>6.0</td><td>0.5–200 (soft)</td><td></td></tr>
+<tr><td><code>tip_engagement_depth_mm</code></td><td>Float (mm)</td><td>1.0</td><td>0–20 (soft)</td><td>How far the tip projects into the tooth valley at full engagement. Informational only here — only the combined operator's auto-positioning solve actually consumes it.</td></tr>
+<tr><td><code>pivot_location</code></td><td>Vector (mm)</td><td>(0,0,0)</td><td></td><td>World-space pivot placement. Not part of the original spec — added so this operator is independently usable; the combined operator overrides it with its own solve.</td></tr>
+<tr><td><code>pivot_rotation_deg</code></td><td>Float (°)</td><td>0.0</td><td>-360–360 (soft)</td><td></td></tr>
+</tbody></table></div>
+<h3>Pawl shape</h3>
+<p><code>build_pawl_profile_points()</code> builds a 7-point wedge in the pawl's local frame, pivot at the origin, arm along +X: a pivot pad (<code>hole_radius + PIVOT_PAD_MM</code> wide) so the pivot hole has material on all sides, a taper starting at 30% of arm length, and a wedge tip (<code>max(tip_width_mm, 1.0)</code> long, guarding against a degenerate zero-length wedge) ending at the true tooth-valley contact point.</p>
+<h3>Validation</h3>
+<p>Checks <code>pawl_arm_length_mm &gt; pivot_hole_diameter_mm + pivot_hole_compensation_mm</code> and <code>hole_dia &lt; pawl_arm_width_mm</code>, both shown in <code>draw()</code> and enforced in <code>execute()</code> (<code>CANCELLED</code> on failure).</p>
+<p><strong>One check is deliberately NOT performed here</strong>: whether <code>pawl_tip_width_mm</code> fits the wheel's tooth-valley width. That requires wheel geometry this standalone operator doesn't have — it's only checked inside the combined operator below.</p>
+<h3>Output</h3>
+<p>One object, <code>Pawl</code>. ID properties <code>pawl_arm_length_mm</code>, <code>pivot_hole_diameter_mm</code> stashed on it.</p>
+<h2>Operator 3: Add Ratchet &amp; Pawl (combined)</h2>
+<p>Builds a matched wheel + pawl pair with the pawl's pivot <strong>auto-solved</strong> so its tip lands correctly on a real tooth drive face.</p>
+<h3>Properties</h3>
+<p>All the wheel and pawl properties above, minus <code>width_mm</code> (unified into a single shared field — "one field, can't diverge" per the source comment), plus:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>center_distance_solve_mode</code></td><td>Enum</td><td><code>AUTO</code></td><td><code>AUTO</code> (solve pivot from <code>pawl_arm_length_mm</code> + <code>engagement_side</code>) / <code>MANUAL</code> (use <code>pawl_pivot_location</code> directly)</td><td></td></tr>
+<tr><td><code>pawl_pivot_location</code></td><td>Vector (mm)</td><td>(0,0,0)</td><td></td><td>Manual mode only</td></tr>
+<tr><td><code>engagement_side</code></td><td>Enum</td><td><code>+X</code></td><td><code>+X</code>/<code>-X</code>/<code>+Y</code>/<code>-Y</code> (pawl sits on that side of the wheel) / <code>CUSTOM</code> (uses <code>engagement_angle_deg</code>)</td><td></td></tr>
+<tr><td><code>engagement_angle_deg</code></td><td>Float (°)</td><td>0.0</td><td>-360–360 (soft)</td><td></td></tr>
+<tr><td><code>parent_under_empty</code></td><td>Bool</td><td>True</td><td></td><td>Groups both parts under a new <code>RatchetMechanism</code> empty</td></tr>
+</tbody></table></div>
+<p>Note <code>tip_engagement_depth_mm</code>'s minimum here is <strong>0.01</strong>, not the 0.0 used by the standalone pawl operator — the auto-solve divides by/compares against this value, so it can't be exactly zero here.</p>
+<h3>The auto-positioning solve — a heuristic, not a rigorous statics derivation</h3>
+<p>The module's own design-decision log is direct about this: it's a tangent-biased heuristic, not a moment/statics calculation. <code>solve_pawl_pivot()</code>:</p>
+<ol><li>Maps <code>engagement_side</code> to a target angle around the wheel, then <strong>snaps to the nearest actual tooth drive-face angle</strong> — "so the contact point lands exactly on a real drive face instead of in mid-air between teeth."</li><li>Computes the lock-direction tangent at that contact point (per the +Z=LOCK convention) and the outward radial direction.</li><li>Blends them: <code>pivot_dir = normalize(-tangent_lock*cos(bias) + radial_dir*sin(bias))</code> with <code>bias = PIVOT_BIAS_ANGLE_DEG = 35°</code> — the pivot sits mostly <em>against</em> the lock-direction surface velocity (so the wheel's push rotates the pawl arm further into engagement rather than out of it) plus a constant outward lean so the pivot clears the wheel body.</li><li><code>pivot_world = contact_world + pawl_arm_length_mm * pivot_dir</code>.</li></ol>
+<p>Raises <code>ValueError</code> (→ <code>CANCELLED</code>) if <code>tip_engagement_depth_mm &gt;= tooth_depth_mm</code> (tip can't project deeper than the tooth itself), or if the resulting pivot still ends up inside/at the wheel's outer radius (<code>pawl_arm_length_mm</code> too short).</p>
+<h3>Validation — one genuine non-blocking warning in this whole file</h3>
+<p>Almost everything here follows the raise/cancel discipline described in <a href="index.html#validation-no-clamping-ever--but-only-in-ratchet_pawlpy">README.md</a>: wheel geometry checks, pawl structural checks, and the <strong>cross-part check unique to this operator</strong> — <code>pawl_tip_width_mm &gt;= estimate_valley_width_mm(...)</code> ("Tip too wide for tooth valley") — all cancel on failure.</p>
+<p>The one exception: in <strong>MANUAL</strong> pivot mode, if the manually-placed pivot ends up more than 0.5mm away from where <code>pawl_arm_length_mm</code> says it should be, <code>execute()</code> issues <code>self.report({'WARNING'}, ...)</code> but still builds the mechanism — "the tip won't land exactly on the drive face" is a warning you can act on or ignore, not a blocking error, since you explicitly chose manual placement.</p>
+<h3>Output</h3>
+<p><strong>2 or 3 objects</strong>: <code>RatchetWheel</code> + <code>Pawl</code>, plus (default on) a <code>RatchetMechanism</code> empty parenting both. Pawl is set active. Success message reports tooth count, derived back-face angle, and which side the pawl engages on.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

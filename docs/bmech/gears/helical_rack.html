@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Helical Rack — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Gears</a> / Helical Rack</div>
+<header>
+  <h1>Helical Rack</h1>
+  <img class="hero-img" src="../assets/img/helical_rack.png" alt="Helical Rack render">
+</header>
+<main>
+<p><code>gears/rack/helical_rack.py</code> → <code>OBJECT_OT_helical_rack</code> (<code>object.helical_rack</code>, "Helical Rack")</p>
+<p>A straight rack whose teeth are sheared along X as a linear function of Z — the gear-of-infinite-radius limit of <a href="helical_gear.html">helical_gear.md</a>'s twist. Meshes with a helical pinion of the same module, pressure angle, and helix angle, and the <strong>same</strong> hand — <strong>not</strong> the opposite hand the external-external gear-gear rule would suggest. See <a href="index.html#hand-convention--the-one-rule-most-likely-to-bite-you">README.md</a> for why a rack is the exception: it contacts its pinion at a different relative angular position (directly below, θ=-90°) than two side-by-side external gears do (θ=180° apart), and that's what flips the sign.</p>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>target</code></td><td>Object pointer</td><td>—</td><td>gears with <code>bmech_module</code></td><td>Match Target; runs <code>sync_helical_same</code>, and if the target has <code>bmech_tooth_count</code>, also updates <code>tooth_count_rack</code></td></tr>
+<tr><td><code>module</code></td><td>Float (mm)</td><td>1.0</td><td>0.1–50.0</td><td>Must match the mating pinion's module</td></tr>
+<tr><td><code>pressure_angle_deg</code></td><td>Float (°)</td><td>20.0</td><td>10–45</td><td></td></tr>
+<tr><td><code>helix_angle_deg</code></td><td>Float (°)</td><td>20.0</td><td>1–45</td><td>Tooth shear angle; 15–30° typical for FDM</td></tr>
+<tr><td><code>hand</code></td><td>Enum</td><td><code>RIGHT</code></td><td><code>RIGHT</code> / <code>LEFT</code></td><td>Teeth shear toward +X as Z increases when <code>RIGHT</code></td></tr>
+<tr><td><code>length_mode</code></td><td>Enum</td><td><code>TOOTH_COUNT</code></td><td><code>TOOTH_COUNT</code> / <code>MATCH_GEAR</code></td><td>Same semantics as <a href="straight_rack.html#length_mode">straight_rack.md</a></td></tr>
+<tr><td><code>tooth_count_rack</code></td><td>Int</td><td>10</td><td>2–1000</td><td>Used directly in <code>TOOTH_COUNT</code> mode; fallback in <code>MATCH_GEAR</code> mode if no target is set</td></tr>
+<tr><td><code>width_mm</code></td><td>Float (mm)</td><td>10.0</td><td>1–100 (soft)</td><td>Full extent along the shear (Z) axis</td></tr>
+</tbody></table></div>
+<p>No bore properties, no <code>n_slices</code> — see Build method below for why.</p>
+<h2>Hand and Match Target freezing</h2>
+<p>Same freeze pattern as <a href="helical_gear.html">helical_gear.md</a>: <code>module</code>/ <code>pressure_angle_deg</code> freeze whenever any target is set; <code>helix_angle_deg</code> freezes only when the target itself stamps <code>bmech_helix_angle_deg</code> (a spur-gear target never drives it, matching <code>sync_helical_same</code>'s own guard); <code>hand</code> freezes with <code>helix_angle_deg</code> <strong>except</strong> when <code>gear_matching.hand_target_ambiguous(False, target)</code> is true — i.e. when this rack (plain-helical style) is matched against a herringbone target, since a plain helical rack only meshes one half of a herringbone pinion's V, and which hand is correct depends on which half. See <a href="index.html#the-match-target-system-gear_matchingpy">README.md</a> for the full rationale — this rack follows exactly the same logic <code>helical_gear.py</code> uses for gear-gear pairs.</p>
+<h2>Build method</h2>
+<p>*<em>No <code>n_slices</code> property, unlike every helical/herringbone </em>gear<em>.</em><em> A helical gear twists by </em>rotating<em> each Z-slice's profile by an angle that grows nonlinearly relative to straight-line interpolation between slices, so more slices measurably improve the approximation to the true curved helical surface. A helical rack instead </em>shears* the profile — <code>x' = x + hand_sign * z * tan(helix_angle)</code>, a transform that is <strong>linear in z</strong>. A straight 3D edge between the bottom-layer vertex <code>(x, y, 0)</code> and the top-layer vertex <code>(x + shear(width), y, width)</code> passes exactly through <code>(x + shear(z), y, z)</code> for every z in between (parametrize <code>t = z/width</code>: both the edge and <code>shear(z)</code> scale identically with <code>t</code>). This is an exact affine identity, not an approximation, so <strong>exactly two Z-layers</strong> — bottom and top — reproduce the sheared surface with no faceting error at any resolution. Adding an <code>n_slices</code> property here would misleadingly suggest a smoothness/accuracy tradeoff that doesn't exist for this shape.</p>
+<p><code>shear(z) = z * tan(helix_angle)</code> — note there's no division by pitch radius, unlike the gear's <code>twist_angle(z) = z * tan(helix_angle) / pitch_radius</code>. The rack is the pitch-radius-→-∞ limit of the gear case: the <em>arc-length</em> displacement of any profile point (<code>radius * twist_angle(z)</code>) converges to the radius-independent constant <code>z * tan(helix_angle)</code> as radius grows without bound, since displacement at any fixed radius on the pitch circle is what a rack tooth's true straight-line motion represents.</p>
+<p>Otherwise reuses <code>straight_rack.py</code>'s tooth-profile math verbatim (<code>build_rack_tooth_profile</code>/<code>build_rack_profile</code>, duplicated here per this family's per-file mesh-helper convention — see <a href="index.html#the-match-target-system-gear_matchingpy">README.md</a>), tiled across X, then two straight-side-quad layers connect the sheared bottom and top n-gon faces.</p>
+<p>Swept tooth counts 2–50 × pressure angles 14.5–30° × helix angles 5–44° × both hands: 0 non-manifold edges, 0 zero-area faces (checked on the evaluated mesh — see <a href="straight_rack.html#build-method">straight_rack.md</a> for why the raw pre-modifier/pre-eval mesh isn't the right thing to check; this generator has no modifiers at all, everything is baked bmesh geometry, but the same "evaluate before trusting" habit caught this reliably).</p>
+<h2>Hand fix — why this needed correcting after initial release</h2>
+<p>The first version of this file reused <code>sync_helical_opposite</code> (the external-external gear-gear rule) on the assumption that a rack, having external tooth geometry, follows the same hand rule as two side-by-side external gears. It doesn't. The two cases contact at <em>different relative angular positions</em> on the pinion — two side-by-side gears contact at a θ=180°-apart pair of points (each gear's contact point faces the other), while a rack sitting directly below its pinion contacts at the pinion's own θ=-90° point (a 90°, not 180°, offset from a θ=0° reference). That difference changes the sign of the tooth-flank-slope relationship the hand rule depends on.</p>
+<p>This was caught by direct empirical testing, not just re-deriving the angle math: building a 30°-helix pinion together with a rack of the <em>same</em> module/PA/helix at each hand value and computing the actual mesh intersection volume (<code>bmesh.ops.boolean</code> <code>INTERSECT</code>, <code>EXACT</code> solver) gave <strong>0 mm³</strong> for same-hand and <strong>~376 mm³</strong> of gross tooth interpenetration for opposite-hand. Independently, extracting real mesh vertices from the gear confirmed its tooth flank at the rack-facing contact point shifts by measured <code>dx/dz ≈ +tan(helix_angle)</code> for <code>hand='RIGHT'</code> — exactly matching this file's own <code>shear(z)</code> formula with no sign flip needed there. The fix was entirely in <code>bmech_sync_target</code> (swap <code>sync_helical_opposite</code> for <code>sync_helical_same</code>) and the hand-property/docs wording — the shear math itself was already correct.</p>
+<h2>Phase alignment</h2>
+<p>Beyond the Y-drop-by-pitch-radius and X-centering every rack does when a target is set (see <a href="straight_rack.html#length_mode">straight_rack.md</a>), a rack also applies <code>gear_matching.rack_phase_align_x(target, tooth_count_rack)</code> — an extra X shift so the rack spawns with a gear tooth centered in a rack <em>gap</em> (and vice versa) rather than an arbitrary phase.</p>
+<p><strong>This is cosmetic, not a correctness fix.</strong> Standard (zero-profile-shift) involute teeth are in conjugate contact at every point along the path of contact — every rotational phase of a correctly-dimensioned pair is interference-free. Without this shift, whether the rack spawns looking "nicely meshed" (tooth-into-gap) or "tooth stabbing into tooth" (not actually wrong, just a confusing snapshot to hand a user) is arbitrary, driven by whichever tooth-count/tooth-count-parity combination the user happened to pick.</p>
+<p><strong>Why <code>tooth_count_rack</code>'s parity has to be part of the calculation, not just the target's tooth count</strong> — a mistake made and caught in this file's own first draft: the <em>existing</em> X-centering formula (<code>half_rack_length - tooth_pitch/2</code>) already puts either a rack tooth-center or a rack gap-center at the target's local x=0, depending on whether <code>tooth_count_rack</code> is odd or even (a rack tooth sits there for odd counts, a gap for even). A first version of <code>rack_phase_align_x</code> computed a shift purely from the gear's own tooth phase, blind to that parity. Hand-checking a concrete case caught it: a module=2, 40-tooth gear's own tooth phase happens to sit exactly at the meshing point (θ=-90° is an exact multiple of that gear's tooth-pitch angle) — but for a 10-tooth rack (even), the <em>pre-existing</em> centering formula independently puts a rack <em>gap</em> at that same point already, meaning the two effects already canceled into perfect gap-alignment with <strong>zero</strong> shift needed. The naive gear-only formula didn't know that, and would have added a half-tooth-pitch shift that moved this already-correct pairing into tooth-on-tooth instead — while doing nothing wrong for an 11-tooth (odd) rack against the same gear, where the parity-blind and parity-aware formulas happen to agree. Verified after the fix across gear tooth counts {17, 20, 39, 40, 41} × rack tooth counts {5, 10, 11, 20, 21} (a mix of odd/ even/coprime-with-40 combinations chosen to stress exactly this parity interaction): all 25 combinations land with a rack tooth center exactly <code>tooth_pitch/2</code> away from the nearest gear tooth center — true gap alignment, not tooth-on-tooth, at every single tooth count parity tested. Confirmed unchanged for the helical and herringbone variants too (checked at their own θ=0 reference slice, since the same-hand fix keeps the shear in sync with the gear's twist across the full width once aligned at one slice).</p>
+<h2>Output</h2>
+<p>One object, name <code>HelicalRack</code> (or <code>HelicalRack.001</code>, etc.), stamped:</p>
+<pre><code>gear_matching.stamp_gear(obj, "helical_rack", module, pressure_angle_deg,
+                          helix_angle_deg=helix_angle_deg, hand=hand)</code></pre>
+<p>Meshes with a helical pinion (<a href="helical_gear.html">helical_gear.md</a>) of the same module, pressure angle, and helix angle, and the <strong>same</strong> hand.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Threaded Container — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Fasteners</a> / Threaded Container</div>
+<header>
+  <h1>Threaded Container</h1>
+  <img class="hero-img" src="../assets/img/threaded_container.png" alt="Threaded Container render">
+</header>
+<main>
+<p><code>fasteners/threaded_container.py</code> → <code>OBJECT_OT_threaded_container</code> (<code>object.threaded_container</code>, "Threaded Container")</p>
+<p>A screw-top jar body: solid floor, straight outer wall, open mouth at the top, with an <strong>external</strong> thread cut directly into the existing outer wall near the top — no separate raised neck boss. <code>thread_diameter_mm</code> plays double duty as both the container's own OD and the thread's major diameter, matching hex_bolt.py/hex_nut.py's naming convention so <code>fastener_matching.sync_thread_dims</code> works unmodified. See <a href="index.html#match-target-a-deliberate-exception-to-the-no-shared-module-rule">README.md</a> for the family's Match Target system this participates in.</p>
+<h2>Properties</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>target</code></td><td>Object pointer</td><td>—</td><td>fastener objects with the OPPOSITE (internal) orientation</td><td>Match Target; runs <code>fastener_matching.sync_thread_dims</code></td></tr>
+<tr><td><code>thread_diameter_mm</code></td><td>Float (mm)</td><td>60.0</td><td>5–300 (soft)</td><td>Container OD AND thread major diameter</td></tr>
+<tr><td><code>wall_thickness_mm</code></td><td>Float (mm)</td><td>3.0</td><td>0.4–20 (soft)</td><td>Side wall AND floor thickness</td></tr>
+<tr><td><code>height_mm</code></td><td>Float (mm)</td><td>60.0</td><td>1–500 (soft)</td><td>Total outer height, floor to rim</td></tr>
+<tr><td><code>thread_length_mm</code></td><td>Float (mm)</td><td>10.0</td><td>1–100 (soft)</td><td>How far down from the rim the thread extends</td></tr>
+<tr><td><code>pitch_mm</code></td><td>Float (mm)</td><td>4.0</td><td>0.5–20 (soft)</td><td>Jar/bottle threads run much coarser than fastener threads</td></tr>
+<tr><td><code>flank_angle_deg</code></td><td>Float (°)</td><td>30.0</td><td>1–179</td><td>Shallower buttress-style default than the 60° fastener convention</td></tr>
+<tr><td><code>truncation</code></td><td>Float</td><td>0.25</td><td>0–0.3</td><td>Higher default than the 0.125 fastener convention — see Build method for why</td></tr>
+<tr><td><code>outer_compensation_mm</code></td><td>Float (mm)</td><td>0.0</td><td>0–0.5 (soft)</td><td>FDM: external features shrink — added to thread major radius</td></tr>
+<tr><td><code>fit_offset_mm</code></td><td>Float (mm)</td><td>0.0</td><td>0–0.5 (soft)</td><td>FDM: subtracted from thread diameter for a looser fit against a mating <a href="threaded_lid.html">threaded_lid</a>, whose own diameter is increased by the same offset. Never synced by Match Target</td></tr>
+<tr><td><code>resolution</code></td><td>Int</td><td>64</td><td>8–256 (soft)</td><td></td></tr>
+</tbody></table></div>
+<p><code>thread_diameter_mm</code>/<code>pitch_mm</code>/<code>flank_angle_deg</code>/<code>truncation</code> freeze together in a driven column whenever a target is set — same all-four freeze behavior as <a href="hex_bolt.html#match-target">hex_bolt.md</a>, since a container and its mating lid need all four to match simultaneously. <code>wall_thickness_mm</code>/<code>height_mm</code>/<code>thread_length_mm</code>/<code>resolution</code>/ <code>outer_compensation_mm</code>/<code>fit_offset_mm</code> are never driven — fit, like compensation, is this part's own printing-tolerance choice, not something a mating fastener could meaningfully specify.</p>
+<p><code>fit_offset_mm</code> folds into <code>outer_r</code> (<code>_derived()</code> and <code>_clamp()</code> both subtract <code>fit_offset_mm / 2.0</code> alongside adding <code>outer_compensation_mm</code>) before any of the usual wall-thickness/truncation/thread-length clamping runs, so a large fit offset is subject to the same margin protections a large negative OD change would be.</p>
+<p><strong>The target picker only offers <code>INTERNAL</code>-oriented objects</strong> — <code>hex_nut</code>, <code>threaded_lid</code>, or a <code>threaded_fastener.py</code> raw thread currently built with <code>thread_type='INTERNAL'</code>. See <a href="index.html#match-target-a-deliberate-exception-to-the-no-shared-module-rule">README.md</a> for why this family's poll is deliberately NOT loose the way the gear family's is.</p>
+<h2>Why the default truncation is higher than the fastener convention</h2>
+<p>Jar/bottle threads use a much coarser pitch than fastener threads (4mm here vs. ~1.25mm for hex_bolt.py's default), and thread depth scales with <code>pitch</code> for a given flank angle and truncation (<code>depth = flank_dz / tan(half_angle)</code>, and <code>flank_dz</code> scales with pitch). At the fastener family's usual <code>truncation=0.125</code>, a 4mm pitch at 30° flank angle produces a thread over 4.6mm deep — deeper than any reasonable container wall. <code>truncation=0.25</code> cuts that to about 1.9mm, safely under the default 3mm wall. If you increase <code>pitch_mm</code>, raise <code>truncation</code> too (up to its 0.3 maximum) or increase <code>wall_thickness_mm</code> to keep <code>depth &lt; wall_thickness_mm</code> — the panel's ERROR label ("Thread too deep for this wall — would break through to interior") fires at <code>depth &gt;= wall_thickness_mm</code>, with a warning starting at 70% of that.</p>
+<h2>Build method</h2>
+<p>Base body: the same "C"-shaped chained-revolve technique <code>threaded_lid.py</code> uses (see that file's module docstring for the shared <code>_add_chained_revolve</code> helper, including its <code>closed</code>/<code>cap_start</code>/ <code>cap_end</code> flags) — outer-bottom pole, up the outer wall, across the open top rim, down the inner wall, inner-floor pole. Both ends are poles, so no boolean is needed for the basic hollow shape.</p>
+<p>Thread cut: identical technique to <code>hex_bolt.py</code>'s external thread — a helical groove cutter (<code>_internal_profile</code>, crest pointing inward, used subtractively), <code>root_flat</code> swapped into the <code>crest_flat</code> argument slot, a depth-scaled radial <code>overlap</code> so the cut has genuine volume to remove rather than a hairline touch at the wall's own true major radius, cut into the EXISTING solid wall near the top — no base-shape rework needed, unlike <a href="threaded_lid.html">threaded_lid.md</a>, because the container's outer wall is already solid at exactly the thread's major radius.</p>
+<p><strong>Cleanup pass required, unlike hex_bolt.py.</strong> This cut leaves a small, fixed number of zero-area sliver faces (two numerically-identical vertices within one triangle) from the EXACT solver — confirmed empirically to be independent of the cutter's axial overshoot amount (tested 0 to 2 full pitches, defect count never changed) and independent of exactly where the top boundary sits, ruling out a wind-up/coincidence theory; only mesh resolution changed the count. <code>bmesh.ops. dissolve_degenerate</code> (the dedicated tool for exactly this artifact class) run once after the boolean removes them completely — verified 0 zero-area, 0 non-manifold, correct positive volume afterward across a 54-combination parameter sweep.</p>
+<h2>Validation: clamped, not cancelled</h2>
+<p><code>execute()</code> calls <code>self._clamp()</code> first, before any geometry is built — following <a href="../CONVENTIONS.html#conventions-that-apply-across-every-family-not-just-gears">CONVENTIONS.md's clamp-over-cancel rule</a>, the same pattern <code>gear_matching.clamp_pressure_angle</code> and <code>hex_bolt.py</code>'s own <code>tip_diameter_mm</code> clamp use. Rather than cancelling when a combination is invalid, three properties get silently corrected in order:</p>
+<ol><li><code>wall_thickness_mm</code> is clamped down to <code>min(outer_r, height_mm) - 0.1</code> whenever it would leave no interior cavity.</li><li><code>truncation</code> is clamped UP (via <code>_min_truncation_for_max_depth</code>, solving the closed-form relationship between thread depth and <code>pitch_mm</code>/<code>flank_angle_deg</code>/<code>truncation</code>) whenever the resulting thread depth would exceed 70% of the (now-valid) wall thickness. Truncation, not wall thickness or thread diameter, is what gets adjusted here — it specifically controls how much a thread's own crest/root flats blunt its depth, while the size properties are what the user actually came to set.</li><li><code>thread_length_mm</code> is clamped down to fit within <code>height_mm - floor_z</code>.</li></ol>
+<p><strong>Only one case still cancels</strong>: if <code>truncation</code> would need to exceed its own max (0.3) to keep depth in check — a pitch too coarse for the wall thickness at any truncation — <code>_clamp()</code> returns a message, <code>self.report({'ERROR'}, ...)</code> fires, and <code>execute()</code> returns <code>CANCELLED</code>. This is the one combination with no meaningful single "closest valid value" to fall back to (matching <code>bevel_gear.py</code>'s own <code>face_width_mm &gt;= cone_dist</code> precedent for the same kind of genuinely irreconcilable case).</p>
+<p><code>draw()</code> still shows the same conditions as <code>INFO</code>-icon labels at the bottom of the panel, after the derived-values box — but they're now purely defensive/informational, since <code>_clamp()</code> means they should rarely or never actually fire once a build completes:</p>
+<ul><li><code>inner_r &lt;= 0</code> or <code>floor_z &gt;= height_mm</code> → "Wall too thick for this OD/height — no interior cavity".</li><li><code>fdz &lt;= 0</code> → "Truncation too high — no room for flanks at this pitch" (can't actually occur — <code>truncation</code>'s own max of 0.3 keeps <code>fdz &gt; 0</code> always; kept as a defensive display, costs nothing).</li><li><code>depth &gt;= wall_thickness_mm * 0.7</code> → "Thread depth near wall thickness limit".</li><li><code>thread_length_mm &gt; (height_mm - floor_z)</code> → "Thread length near container height limit".</li></ul>
+<h2>Output</h2>
+<p>One object, named <code>ThreadedContainer</code>, stamped via <code>fastener_matching.stamp_thread</code>: <code>bmech_kind="threaded_container"</code>, <code>bmech_thread_diameter</code>, <code>bmech_pitch</code>, <code>bmech_flank_angle_deg</code>, <code>bmech_truncation</code>. <code>fastener_matching.fastener_orientation</code> maps this kind to <code>EXTERNAL</code>. Meshes with a <a href="threaded_lid.html">threaded_lid</a> of the same four thread values.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>

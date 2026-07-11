@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Helical Planetary Gear Set — bmech</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .breadcrumb {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  header {
+    padding: 2rem 1.5rem 3rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  .hero-img {
+    display: block;
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    margin: 1.5rem auto 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin-top: 2.5rem;
+  }
+  h3 { color: var(--accent); font-size: 1.05rem; }
+  p, li { color: var(--text); }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--border);
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    font-size: 0.92rem;
+  }
+  th { background: var(--panel); color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+  }
+  .card h3 { margin: 0 0 0.4rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="breadcrumb"><a href="../index.html">bmech</a> / <a href="index.html">Gears</a> / Helical Planetary Gear Set</div>
+<header>
+  <h1>Helical Planetary Gear Set</h1>
+  <img class="hero-img" src="../assets/img/helical_planetary_gear_set.png" alt="Helical Planetary Gear Set render">
+</header>
+<main>
+<p><code>gears/planetary/helical_planetary_gear_set.py</code> → <code>OBJECT_OT_helical_planetary_gear_set</code> (<code>object.helical_planetary_gear_set</code>, "Helical Planetary Gear Set")</p>
+<p>Same topology and assembly math as <a href="planetary_gear_set.html">planetary_gear_set.md</a> — read that first. This document only covers what's different: helical teeth on all three members, which introduces a hand-derivation rule specific to three-body epicyclic sets.</p>
+<h2>Properties</h2>
+<p>Same as the spur planetary set, plus:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td><code>helix_angle_deg</code></td><td>Float (°)</td><td>20.0</td><td>1–45</td><td>Applies to all three members</td></tr>
+<tr><td><code>hand</code> (labeled "Sun Hand")</td><td>Enum</td><td><code>RIGHT</code></td><td><code>RIGHT</code> / <code>LEFT</code></td><td>Sets the <strong>sun's</strong> hand only — planet and ring are derived</td></tr>
+<tr><td><code>n_slices</code></td><td>Int</td><td>16</td><td>2–64 (soft)</td><td>Z divisions for the helical twist, applies to all three members</td></tr>
+</tbody></table></div>
+<p><code>sun_teeth</code>, <code>planet_teeth</code>, <code>planet_count</code>, <code>module</code>, <code>pressure_angle_deg</code>, <code>width_mm</code>, <code>ring_wall_mm</code>, <code>pip_gap</code>, <code>outer_segs</code> are identical to the spur set.</p>
+<h2>Hand is chosen once, for the sun — everything else follows</h2>
+<p>You only ever set the hand of the <strong>sun</strong> gear. Planet and ring hands are derived automatically from the two mesh rules in <a href="index.html#hand-convention--the-one-rule-most-likely-to-bite-you">README.md</a>:</p>
+<pre><code>sun-planet is external-external  → planet = OPPOSITE of sun
+planet-ring is external-internal → ring   = SAME as planet
+                                  → ring   = OPPOSITE of sun</code></pre>
+<p>In code this is <code>sun_sign = ±1</code> from the <code>hand</code> enum, then <code>planet_sign = -sun_sign</code>, <code>ring_sign = planet_sign</code>. The panel shows this as a one-line summary: <code>"R→L→L"</code> when sun is RIGHT, <code>"L→R→R"</code> when sun is LEFT.</p>
+<h2>Planet phasing is unchanged by the helix</h2>
+<p>The planet orbital-rotation formula (<code>-theta_i * sun_teeth/planet_teeth + pi/planet_teeth</code>) and the ring's fixed <code>-pi/ring_teeth</code> phase correction are <strong>identical</strong> to the spur set — helix twist doesn't change the z=0 phase of any member, only how each member's teeth wind along Z above that phase.</p>
+<h2>Build method</h2>
+<p>Sun and planet: same per-slice twist extrusion as a standalone helical gear (<code>helical_gear.py</code>), just parameterized by <code>sun_sign</code> / <code>planet_sign</code> instead of a user-facing <code>hand</code> property. Ring: solid cylinder minus a twisted annulus cutter (same approach as <a href="helical_annulus_gear.html">helical_annulus_gear.md</a>), using <code>ring_sign</code>.</p>
+<p>Info box additionally shows normal module (<code>module*cos(helix_angle)</code>) and the sun's total twist across its face width, in degrees.</p>
+<h2>Output</h2>
+<p><strong><code>2 + planet_count</code> objects per call</strong>: <code>HelPlanetaryRing</code>, <code>HelPlanetarySun</code>, and <code>HelPlanetaryPlanet.001</code>…<code>.00N</code> (linked-mesh copies, same as the spur set). Success message: <code>"Helical planetary: %d/%d/%d teeth (sun/planet/ring), %.1f° helix, %d planets"</code>.</p>
+</main>
+<footer>
+  <p><a href="https://github.com/lettvce/bmech">GitHub</a> ·
+     <a href="mailto:blakewysocki421@gmail.com">Contact</a></p>
+</footer>
+</body>
+</html>
