@@ -14,3 +14,7 @@ __pycache__/
 # Personal working notes, not part of the shipped repo
 blender_extension_lessons.txt
 LAUNCH_CHECKLIST.txt
+
+# Standalone/experimental work, not part of the public bmech release
+screw_jack/
+Prototype Scripts/boolean_free_threading/
