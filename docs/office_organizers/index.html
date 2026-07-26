@@ -422,13 +422,13 @@ const TYPES = [
     // There's no better orientation to recommend for this shape.
   },
   {
-    id: "tray_cubbies", label: "Tray Cubbies", fn: "generate_tray_cubbies",
+    id: "tray_cubbies", label: "Tray w/ Cubbies", fn: "generate_tray_cubbies",
     filename: "tray_cubbies.stl",
     sliders: [
       { id: "side_width_mm", label: "Side Width", unit: "mm", min: 4, max: 110, step: 1, def: 36 },
-      { id: "middle_width_mm", label: "Middle Width", unit: "mm", min: 4, max: 140, step: 1, def: 36 },
-      { id: "row_count", label: "Rows Per Side", unit: "", min: 1, max: 6, step: 1, def: 2, int: true },
-      { id: "height_mm", label: "Height", unit: "mm", min: 20, max: 100, step: 1, def: 40 },
+      { id: "middle_width_mm", label: "Middle Width", unit: "mm", min: 4, max: 140, step: 1, def: 100 },
+      { id: "row_count", label: "Rows Per Side", unit: "", min: 1, max: 6, step: 1, def: 3, int: true },
+      { id: "height_mm", label: "Height", unit: "mm", min: 10, max: 40, step: 1, def: 20 },
     ],
     fixed: { wall_thickness_mm: 1.6, base_thickness_mm: 2.4 },
     paramsFn: "tray_cubbies_params",
@@ -441,7 +441,7 @@ const TYPES = [
     // fit row_count rows into a requested overall depth_mm.
     modeGroups: [
       {
-        key: "depthMode", label: "Depth defined by", default: "ROW_DEPTH",
+        key: "depthMode", label: "Depth defined by", default: "OVERALL_DEPTH",
         options: [
           {
             id: "ROW_DEPTH", label: "Row Depth + Rows",
@@ -455,7 +455,7 @@ const TYPES = [
           {
             id: "OVERALL_DEPTH", label: "Overall Depth + Rows",
             sliders: [
-              { id: "depth_mm", label: "Depth", unit: "mm", min: 20, max: 350, step: 5, def: 49 },
+              { id: "depth_mm", label: "Depth", unit: "mm", min: 20, max: 350, step: 5, def: 150 },
             ],
             buildKwargs(v, fixed) {
               const wall = fixed.wall_thickness_mm;
