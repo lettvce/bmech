@@ -41,4 +41,7 @@ automatically — no manual packaging needed.
 
 ## License
 
-GPL-3.0-or-later
+The extension's own source code is GPL-3.0-or-later.
+
+**Models generated with this extension are CC0** — dedicated to the public
+domain. Print them, sell them, remix them, no attribution required.
