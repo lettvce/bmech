@@ -204,36 +204,115 @@ const TYPES = [
     id: "desk_caddy", label: "Desk Caddy", fn: "generate_desk_caddy",
     filename: "desk_caddy.stl",
     sliders: [
-      { id: "width_mm", label: "Width", unit: "mm", min: 100, max: 300, step: 5, def: 150 },
       { id: "depth_mm", label: "Depth", unit: "mm", min: 30, max: 100, step: 2, def: 50 },
       { id: "compartment_count", label: "Compartments", unit: "", min: 1, max: 8, step: 1, def: 4, int: true },
       { id: "front_height_mm", label: "Front Height", unit: "mm", min: 8, max: 60, step: 1, def: 20 },
       { id: "height_mm", label: "Back Height", unit: "mm", min: 10, max: 80, step: 1, def: 35 },
     ],
     fixed: { wall_thickness_mm: 2.0, base_thickness_mm: 2.0 },
+    paramsFn: "desk_caddy_params",
+    modeGroups: [
+      {
+        key: "widthMode", label: "Width defined by", default: "OVERALL_WIDTH",
+        options: [
+          {
+            id: "OVERALL_WIDTH", label: "Overall Width + Compartments",
+            sliders: [
+              { id: "width_mm", label: "Width", unit: "mm", min: 100, max: 300, step: 5, def: 150 },
+            ],
+            readouts: [{ key: "cell_width_mm", label: "Cell Width", unit: "mm" }],
+          },
+          {
+            id: "CELL_WIDTH", label: "Cell Width + Compartments",
+            sliders: [
+              { id: "cell_width_mm", label: "Cell Width", unit: "mm", min: 4, max: 70, step: 1, def: 27 },
+            ],
+            buildKwargs(v, fixed) {
+              const width_mm = v.cell_width_mm * v.compartment_count
+                              + (v.compartment_count + 1) * fixed.wall_thickness_mm;
+              return { width_mm };
+            },
+            readouts: [{ key: "width_mm", label: "Overall Width", unit: "mm", fromKw: true }],
+          },
+        ],
+      },
+    ],
   },
   {
     id: "drawer_divider", label: "Drawer Divider", fn: "generate_drawer_divider",
     filename: "drawer_divider.stl",
     sliders: [
       { id: "col_count", label: "Columns", unit: "", min: 1, max: 6, step: 1, def: 3, int: true },
-      { id: "col_width_mm", label: "Column Width", unit: "mm", min: 15, max: 60, step: 1, def: 36 },
       { id: "row_count", label: "Rows", unit: "", min: 1, max: 4, step: 1, def: 2, int: true },
-      { id: "row_depth_mm", label: "Row Depth", unit: "mm", min: 15, max: 60, step: 1, def: 46 },
       { id: "height_mm", label: "Height", unit: "mm", min: 20, max: 80, step: 1, def: 40 },
     ],
     fixed: { wall_thickness_mm: 1.6, base_thickness_mm: 2.4 },
+    // col_count/row_count are structural UI inputs (how many equal-size
+    // columns/rows to generate), never valid generate_drawer_divider()
+    // kwargs themselves - only col_widths_mm/row_depths_mm (built by the
+    // mode groups below from col_count/row_count) are. This explicit
+    // buildKwargs keeps them from leaking straight through into the
+    // Python call the way the default "pass every shared slider through
+    // as-is" behavior would.
     buildKwargs(v) {
-      return {
-        col_widths_mm: Array(v.col_count).fill(v.col_width_mm),
-        row_depths_mm: Array(v.row_count).fill(v.row_depth_mm),
-        height_mm: v.height_mm,
-      };
+      return { height_mm: v.height_mm };
     },
     paramsFn: "drawer_divider_params",
-    readouts: [
-      { key: "width_mm", label: "Overall Width", unit: "mm" },
-      { key: "depth_mm", label: "Overall Depth", unit: "mm" },
+    // Two INDEPENDENT toggles - width and depth can each be driven by
+    // either parameterization regardless of the other's choice.
+    modeGroups: [
+      {
+        key: "widthMode", label: "Width defined by", default: "COL_WIDTH",
+        options: [
+          {
+            id: "COL_WIDTH", label: "Column Width + Columns",
+            sliders: [
+              { id: "col_width_mm", label: "Column Width", unit: "mm", min: 15, max: 60, step: 1, def: 36 },
+            ],
+            buildKwargs(v) {
+              return { col_widths_mm: Array(v.col_count).fill(v.col_width_mm) };
+            },
+            readouts: [{ key: "width_mm", label: "Overall Width", unit: "mm" }],
+          },
+          {
+            id: "OVERALL_WIDTH", label: "Overall Width + Columns",
+            sliders: [
+              { id: "width_mm", label: "Width", unit: "mm", min: 30, max: 380, step: 5, def: 114 },
+            ],
+            buildKwargs(v, fixed) {
+              const col_width_mm = (v.width_mm - (v.col_count + 1) * fixed.wall_thickness_mm)
+                                  / v.col_count;
+              return { col_widths_mm: Array(v.col_count).fill(col_width_mm) };
+            },
+          },
+        ],
+      },
+      {
+        key: "depthMode", label: "Depth defined by", default: "ROW_DEPTH",
+        options: [
+          {
+            id: "ROW_DEPTH", label: "Row Depth + Rows",
+            sliders: [
+              { id: "row_depth_mm", label: "Row Depth", unit: "mm", min: 15, max: 60, step: 1, def: 46 },
+            ],
+            buildKwargs(v) {
+              return { row_depths_mm: Array(v.row_count).fill(v.row_depth_mm) };
+            },
+            readouts: [{ key: "depth_mm", label: "Overall Depth", unit: "mm" }],
+          },
+          {
+            id: "OVERALL_DEPTH", label: "Overall Depth + Rows",
+            sliders: [
+              { id: "depth_mm", label: "Depth", unit: "mm", min: 30, max: 250, step: 5, def: 97 },
+            ],
+            buildKwargs(v, fixed) {
+              const row_depth_mm = (v.depth_mm - (v.row_count + 1) * fixed.wall_thickness_mm)
+                                  / v.row_count;
+              return { row_depths_mm: Array(v.row_count).fill(row_depth_mm) };
+            },
+          },
+        ],
+      },
     ],
   },
   {
@@ -253,60 +332,49 @@ const TYPES = [
     paramsFn: "file_sorter_params",
     altFace: true, // thin ascending dividers print layer-weak on this
                    // base - see recommended_alt_face()'s docstring
-    // Mode toggle, same pattern as the real Blender extension's own
-    // wall_cubby_height_mode/tray_depth_mode: pick which parameterization
-    // drives the shape, the other becomes a derived readout instead of
-    // an input. depthMode is mutable at runtime (selectDepthMode below).
-    depthMode: "SLOT_DEPTH",
-    modes: [
+    sliders: [
+      { id: "width_mm", label: "Width", unit: "mm", min: 60, max: 300, step: 5, def: 230 },
+      { id: "slot_count", label: "Slots", unit: "", min: 2, max: 10, step: 1, def: 5, int: true },
+      { id: "min_wall_height_mm", label: "Front Wall Height", unit: "mm", min: 15, max: 100, step: 1, def: 25 },
+      { id: "step_rise_mm", label: "Step Rise", unit: "mm", min: 0, max: 25, step: 1, def: 15 },
+      { id: "wall_thickness_mm", label: "Wall Thickness", unit: "mm", min: 1, max: 2.4, step: 0.1, def: 2.0 },
+      { id: "base_thickness_mm", label: "Base Thickness", unit: "mm", min: 1.2, max: 6, step: 0.1, def: 3.0 },
+    ],
+    readouts: [
+      { key: "overall_height_mm", label: "Overall Height", unit: "mm" },
+    ],
+    modeGroups: [
       {
-        id: "SLOT_DEPTH", label: "Slot Depth + Slots",
-        sliders: [
-          { id: "width_mm", label: "Width", unit: "mm", min: 60, max: 300, step: 5, def: 230 },
-          { id: "pocket_depth_mm", label: "Slot Depth", unit: "mm", min: 10, max: 80, step: 1, def: 27.6 },
-          { id: "slot_count", label: "Slots", unit: "", min: 2, max: 10, step: 1, def: 5, int: true },
-          { id: "min_wall_height_mm", label: "Front Wall Height", unit: "mm", min: 15, max: 100, step: 1, def: 25 },
-          { id: "step_rise_mm", label: "Step Rise", unit: "mm", min: 0, max: 25, step: 1, def: 15 },
-          { id: "wall_thickness_mm", label: "Wall Thickness", unit: "mm", min: 1, max: 2.4, step: 0.1, def: 2.0 },
-          { id: "base_thickness_mm", label: "Base Thickness", unit: "mm", min: 1.2, max: 6, step: 0.1, def: 3.0 },
-        ],
-        // depth_mm (the real generator's own overall-depth input) is
-        // DERIVED here from the more intuitive "how deep is each pocket"
-        // + slot count instead - same pattern as drawer_divider's
-        // col_width/col_count. n_dividers = slot_count+1 (one more wall
-        // than pockets, matching file_sorter_params' own formula).
-        buildKwargs(v) {
-          const depth_mm = v.pocket_depth_mm * v.slot_count
-                          + (v.slot_count + 1) * v.wall_thickness_mm;
-          return {
-            width_mm: v.width_mm, depth_mm, slot_count: v.slot_count,
-            min_wall_height_mm: v.min_wall_height_mm,
-            step_rise_mm: v.step_rise_mm,
-            wall_thickness_mm: v.wall_thickness_mm,
-            base_thickness_mm: v.base_thickness_mm,
-          };
-        },
-        readouts: [
-          { key: "depth_mm", label: "Overall Depth", unit: "mm", fromKw: true },
-          { key: "overall_height_mm", label: "Overall Height", unit: "mm" },
-        ],
-      },
-      {
-        id: "OVERALL_DEPTH", label: "Overall Depth + Slots",
-        sliders: [
-          { id: "width_mm", label: "Width", unit: "mm", min: 60, max: 300, step: 5, def: 230 },
-          { id: "depth_mm", label: "Depth", unit: "mm", min: 60, max: 200, step: 5, def: 150 },
-          { id: "slot_count", label: "Slots", unit: "", min: 2, max: 10, step: 1, def: 5, int: true },
-          { id: "min_wall_height_mm", label: "Front Wall Height", unit: "mm", min: 15, max: 100, step: 1, def: 25 },
-          { id: "step_rise_mm", label: "Step Rise", unit: "mm", min: 0, max: 25, step: 1, def: 15 },
-          { id: "wall_thickness_mm", label: "Wall Thickness", unit: "mm", min: 1, max: 2.4, step: 0.1, def: 2.0 },
-          { id: "base_thickness_mm", label: "Base Thickness", unit: "mm", min: 1.2, max: 6, step: 0.1, def: 3.0 },
-        ],
-        buildKwargs(v) { return { ...v }; }, // every key already matches
-                                             // generate_file_sorter()'s
-                                             // own signature directly
-        readouts: [
-          { key: "overall_height_mm", label: "Overall Height", unit: "mm" },
+        key: "depthMode", label: "Depth defined by", default: "SLOT_DEPTH",
+        options: [
+          {
+            id: "SLOT_DEPTH", label: "Slot Depth + Slots",
+            sliders: [
+              { id: "pocket_depth_mm", label: "Slot Depth", unit: "mm", min: 10, max: 80, step: 1, def: 27.6 },
+            ],
+            // depth_mm (the real generator's own overall-depth input) is
+            // DERIVED here from the more intuitive "how deep is each
+            // pocket" + slot count instead - same pattern as
+            // drawer_divider's col_width/col_count. n_dividers =
+            // slot_count+1 (one more wall than pockets, matching
+            // file_sorter_params' own formula).
+            buildKwargs(v) {
+              const depth_mm = v.pocket_depth_mm * v.slot_count
+                              + (v.slot_count + 1) * v.wall_thickness_mm;
+              return { depth_mm };
+            },
+            readouts: [
+              { key: "depth_mm", label: "Overall Depth", unit: "mm", fromKw: true },
+            ],
+          },
+          {
+            id: "OVERALL_DEPTH", label: "Overall Depth + Slots",
+            sliders: [
+              { id: "depth_mm", label: "Depth", unit: "mm", min: 60, max: 200, step: 5, def: 150 },
+            ],
+            // no buildKwargs needed - depth_mm's slider id already
+            // matches generate_file_sorter()'s own kwarg name directly
+          },
         ],
       },
     ],
@@ -348,14 +416,43 @@ const TYPES = [
       { id: "side_width_mm", label: "Side Width", unit: "mm", min: 4, max: 110, step: 1, def: 36 },
       { id: "middle_width_mm", label: "Middle Width", unit: "mm", min: 4, max: 140, step: 1, def: 36 },
       { id: "row_count", label: "Rows Per Side", unit: "", min: 1, max: 6, step: 1, def: 2, int: true },
-      { id: "row_depth_mm", label: "Row Depth", unit: "mm", min: 4, max: 55, step: 1, def: 22 },
       { id: "height_mm", label: "Height", unit: "mm", min: 20, max: 100, step: 1, def: 40 },
     ],
     fixed: { wall_thickness_mm: 1.6, base_thickness_mm: 2.4 },
     paramsFn: "tray_cubbies_params",
     readouts: [
       { key: "width_mm", label: "Overall Width", unit: "mm" },
-      { key: "depth_mm", label: "Overall Depth", unit: "mm" },
+    ],
+    // Direct port of the real Blender extension's own tray_depth_mode
+    // toggle (ROW_DEPTH default, OVERALL_DEPTH the inverse) - same
+    // formula _settings_kwargs() uses there: row_depth_mm derived to
+    // fit row_count rows into a requested overall depth_mm.
+    modeGroups: [
+      {
+        key: "depthMode", label: "Depth defined by", default: "ROW_DEPTH",
+        options: [
+          {
+            id: "ROW_DEPTH", label: "Row Depth + Rows",
+            sliders: [
+              { id: "row_depth_mm", label: "Row Depth", unit: "mm", min: 4, max: 55, step: 1, def: 22 },
+            ],
+            readouts: [
+              { key: "depth_mm", label: "Overall Depth", unit: "mm" },
+            ],
+          },
+          {
+            id: "OVERALL_DEPTH", label: "Overall Depth + Rows",
+            sliders: [
+              { id: "depth_mm", label: "Depth", unit: "mm", min: 20, max: 350, step: 5, def: 49 },
+            ],
+            buildKwargs(v, fixed) {
+              const wall = fixed.wall_thickness_mm;
+              const row_depth_mm = (v.depth_mm - (v.row_count + 1) * wall) / v.row_count;
+              return { row_depth_mm };
+            },
+          },
+        ],
+      },
     ],
   },
 ];
@@ -633,14 +730,60 @@ let lastAltFaceIdx = null;
 let pending = null;
 let firstRunForType = true;
 
-// Types with a `modes` array (matching the real Blender extension's own
-// wall_cubby_height_mode/tray_depth_mode enum toggles) resolve sliders/
-// buildKwargs/readouts from whichever mode is currently selected
-// (type.depthMode); types without `modes` just use their own top-level
-// sliders/buildKwargs/readouts directly, unchanged from before.
-function activeMode(type) {
-  if (!type.modes) return type;
-  return type.modes.find((m) => m.id === type.depthMode) || type.modes[0];
+// Types can have any number of INDEPENDENT mode toggles (type.modeGroups),
+// matching the real Blender extension's own wall_cubby_height_mode/
+// tray_depth_mode enum pattern, generalized to more than one axis at
+// once - drawer_divider needs width mode AND depth mode switchable
+// separately, which a single "swap the whole slider set" toggle (as
+// file_sorter first used) can't express. Each group contributes its
+// OWN extra sliders/readouts and a buildKwargs PATCH (a partial kwargs
+// object merged into the rest), layered on top of the type's own
+// always-shown sliders/readouts/buildKwargs.
+function modeGroups(type) {
+  return type.modeGroups || [];
+}
+
+function currentOption(type, group) {
+  const cur = type[group.key] || group.default;
+  return group.options.find((o) => o.id === cur) || group.options[0];
+}
+
+function allSliders(type) {
+  const extra = modeGroups(type).flatMap((g) => currentOption(type, g).sliders || []);
+  return [...(type.sliders || []), ...extra];
+}
+
+function allReadouts(type) {
+  const extra = modeGroups(type).flatMap((g) => currentOption(type, g).readouts || []);
+  return [...(type.readouts || []), ...extra];
+}
+
+function combinedBuildKwargs(type, v) {
+  // Base kwargs come ONLY from type.sliders' own declared ids, never a
+  // blanket {...v} spread - v also contains every mode-group option's
+  // OWN slider values (e.g. file_sorter's pocket_depth_mm), and those
+  // are UI-only inputs that don't exist as generate_*() keyword
+  // arguments at all until a buildKwargs patch translates them (or, for
+  // options whose slider id already matches the generator 1:1, get
+  // passed through explicitly below) - spreading all of v directly
+  // would leak them in and throw a Python TypeError.
+  let kw;
+  if (type.buildKwargs) {
+    kw = type.buildKwargs(v);
+  } else {
+    kw = {};
+    (type.sliders || []).forEach((s) => { kw[s.id] = v[s.id]; });
+  }
+  for (const g of modeGroups(type)) {
+    const opt = currentOption(type, g);
+    if (opt.buildKwargs) {
+      Object.assign(kw, opt.buildKwargs(v, type.fixed || {}));
+    } else {
+      (opt.sliders || []).forEach((s) => { kw[s.id] = v[s.id]; });
+    }
+  }
+  Object.assign(kw, type.fixed);
+  return kw;
 }
 
 function renderTabs() {
@@ -659,22 +802,23 @@ function renderFields() {
   panelTitleEl.textContent = type.label;
   fieldsEl.innerHTML = "";
 
-  if (type.modes) {
+  modeGroups(type).forEach((g) => {
+    const cur = type[g.key] || g.default;
     const modeField = document.createElement("div");
     modeField.className = "field";
-    const options = type.modes
-      .map((m) => `<option value="${m.id}"${m.id === type.depthMode ? " selected" : ""}>${m.label}</option>`)
+    const options = g.options
+      .map((o) => `<option value="${o.id}"${o.id === cur ? " selected" : ""}>${o.label}</option>`)
       .join("");
-    modeField.innerHTML = `<label>Defined by</label><select id="in-mode">${options}</select>`;
+    modeField.innerHTML = `<label>${g.label}</label><select id="in-${g.key}">${options}</select>`;
     fieldsEl.appendChild(modeField);
-    document.getElementById("in-mode").addEventListener("change", (e) => {
-      type.depthMode = e.target.value;
+    document.getElementById("in-" + g.key).addEventListener("change", (e) => {
+      type[g.key] = e.target.value;
       renderFields();
       rebuild();
     });
-  }
+  });
 
-  activeMode(type).sliders.forEach((s) => {
+  allSliders(type).forEach((s) => {
     const field = document.createElement("div");
     field.className = "field";
     const valId = "val-" + s.id;
@@ -704,17 +848,15 @@ function scheduleRebuild() {
 
 function rebuild() {
   const type = TYPES[activeIndex];
-  const mode = activeMode(type);
   const values = {};
-  mode.sliders.forEach((s) => {
+  allSliders(type).forEach((s) => {
     const el = document.getElementById("in-" + s.id);
     const val = s.int ? parseInt(el.value, 10) : parseFloat(el.value);
     values[s.id] = val;
     document.getElementById("val-" + s.id).textContent = val;
   });
 
-  const kw = mode.buildKwargs ? mode.buildKwargs(values) : { ...values };
-  Object.assign(kw, type.fixed);
+  const kw = combinedBuildKwargs(type, values);
 
   const fn = GENERATOR_FNS.get(type.fn);
   const t0 = performance.now();
@@ -791,14 +933,15 @@ function rebuild() {
   lastTriFaceIdx = triFaceIdx;
   buyBtn.disabled = false;
 
-  renderReadouts(type, mode, kw);
+  renderReadouts(type, kw);
 }
 
 const readoutsEl = document.getElementById("readouts");
 
-function renderReadouts(type, mode, kw) {
+function renderReadouts(type, kw) {
   readoutsEl.innerHTML = "";
-  if (!mode.readouts) return;
+  const readouts = allReadouts(type);
+  if (readouts.length === 0) return;
 
   // Two sources: fromKw reads straight off the kwargs already built for
   // generate_*() (e.g. file_sorter's depth_mm, computed by buildKwargs
@@ -820,7 +963,7 @@ function renderReadouts(type, mode, kw) {
     }
   }
 
-  mode.readouts.forEach((r) => {
+  readouts.forEach((r) => {
     const val = r.fromKw ? kw[r.key] : (derived ? derived.get(r.key) : null);
     if (val == null) return;
     const row = document.createElement("div");
@@ -866,13 +1009,15 @@ GENERATOR_FNS = {
 }
 
 # Only for types whose sliders DON'T directly equal an overall dimension -
-# e.g. desk_caddy's width_mm slider IS the overall width already, but
-# drawer_divider's overall width_mm is derived from column count/width
-# plus the walls between them, and pen_cup's overall height is taller
-# than the "Front Height" slider because the rim is tilted. Called with
-# the exact same kwargs already built for the matching generate_*(), so
-# no separate parameter-mapping is needed on the JS side.
+# e.g. drawer_divider's overall width_mm is derived from column count/
+# width plus the walls between them, pen_cup's overall height is taller
+# than the "Front Height" slider because the rim is tilted, and
+# desk_caddy's own cell_width_mm (its Cell Width mode's derived readout)
+# isn't a generate_desk_caddy() kwarg at all. Called with the exact same
+# kwargs already built for the matching generate_*(), so no separate
+# parameter-mapping is needed on the JS side.
 PARAMS_FNS = {
+    "desk_caddy_params": generators.desk_caddy.desk_caddy_params,
     "drawer_divider_params": generators.drawer_divider.drawer_divider_params,
     "file_sorter_params": generators.file_sorter.file_sorter_params,
     "pen_cup_params": generators.pen_cup.pen_cup_params,
