@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Office Organizers — live parametric configurator</title>
+<meta name="description" content="Configure a 3D-printable desk organizer in your browser and download the STL — free while this is in testing.">
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+    --good: #7fd0a0;
+    --bad: #e08a8a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  header {
+    padding: 3rem 1.5rem 2rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  header p { color: var(--muted); max-width: 560px; margin: 0 auto; font-size: 1.05rem; }
+  .badge {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 999px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--good);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  /* --- type tabs --- */
+  .tabs {
+    max-width: 1100px;
+    margin: 2rem auto 0;
+    padding: 0 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .tab-btn {
+    background: var(--panel);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.5rem 1.1rem;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .tab-btn:hover { color: var(--text); border-color: var(--accent); }
+  .tab-btn.active { background: var(--accent); color: #0b0d10; border-color: var(--accent); }
+
+  /* --- configurator --- */
+  .configurator {
+    max-width: 1100px;
+    margin: 1.2rem auto 2.5rem;
+    padding: 0 1.5rem;
+  }
+  .app {
+    display: flex;
+    flex-wrap: wrap;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    min-height: 480px;
+  }
+  #viewer { flex: 1 1 480px; position: relative; background: #101215; }
+  #viewer canvas { display: block; }
+  #loading {
+    position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 13px; color: var(--muted); text-align: center; padding: 1rem;
+  }
+  #panel {
+    width: 300px; flex: 0 0 300px; padding: 1.4rem;
+    border-left: 1px solid var(--border); overflow-y: auto;
+  }
+  #panel h2 { font-size: 1.05rem; margin: 0 0 0.25rem; border: none; padding: 0; color: var(--text); }
+  #panel .sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.1rem; }
+  .field { margin-bottom: 1rem; }
+  .field label {
+    display: flex; justify-content: space-between; font-size: 0.82rem;
+    color: var(--text); margin-bottom: 0.25rem;
+  }
+  .field label span.val { color: var(--good); font-variant-numeric: tabular-nums; }
+  .field input[type=range] { width: 100%; }
+  .field select {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem;
+    font-size: 0.82rem;
+  }
+  #readouts { font-size: 0.82rem; color: var(--text); margin-bottom: 0.4rem; }
+  #readouts .readout { display: flex; justify-content: space-between; padding: 2px 0; }
+  #readouts .readout .val { color: var(--good); font-variant-numeric: tabular-nums; }
+  #status { font-size: 0.78rem; color: var(--muted); margin-top: 0.4rem; min-height: 34px; }
+  #status.err { color: var(--bad); }
+  #buy {
+    margin-top: 1.1rem; width: 100%; padding: 0.7rem; border-radius: 8px; border: none;
+    background: #3a3f4b; color: #666; font-size: 0.85rem; cursor: not-allowed; font-weight: 600;
+  }
+  #buy:not(:disabled) { background: var(--good); color: #0b0d10; cursor: pointer; }
+
+  main { max-width: 860px; margin: 0 auto; padding: 1rem 1.5rem 3rem; }
+  section { margin-bottom: 3rem; }
+  h2 { font-size: 1.4rem; border-left: 3px solid var(--accent); padding-left: 0.75rem; }
+  ul { color: var(--muted); }
+  code {
+    background: var(--panel); padding: 0.15rem 0.4rem; border-radius: 4px;
+    font-size: 0.9em; color: var(--text);
+  }
+  footer {
+    border-top: 1px solid var(--border); text-align: center; padding: 2rem 1.5rem;
+    color: var(--muted); font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Office Organizers</h1>
+  <p>Pick your own dimensions, watch it update live, and download a
+     ready-to-print STL — right here in the browser.</p>
+  <div class="badge">Free while this is in testing</div>
+</header>
+
+<div class="tabs" id="tabs" role="tablist"></div>
+
+<div class="configurator">
+  <div class="app">
+    <div id="viewer"><div id="loading">Loading Python runtime…</div></div>
+    <div id="panel">
+      <h2 id="panel-title"></h2>
+      <div class="sub">Live preview — runs entirely in your browser, no server call.</div>
+      <div id="fields"></div>
+      <div id="readouts"></div>
+      <div id="status">Booting Pyodide…</div>
+      <button id="buy" disabled>Download STL (free — testing)</button>
+    </div>
+  </div>
+</div>
+
+<main>
+
+<section>
+  <h2>What this is</h2>
+  <p>Every shape above is generated by the exact same Python code that
+     ships in the Blender extension this project is built on — running
+     unmodified in your browser via
+     <a href="https://pyodide.org/" style="color: var(--accent);">Pyodide</a>,
+     not a separate reimplementation. Nothing is uploaded anywhere; the
+     mesh is built and the STL is written entirely on your machine.</p>
+  <ul>
+    <li>Two more types (Wall Cubby, Cable Clip) need actual Blender/bmesh
+        under the hood, so they aren't part of this browser demo yet.</li>
+    <li>This is free during testing. If it turns into a paid product
+        later, existing free downloads aren't retroactively affected.</li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  <p>Contact: <a href="mailto:blakewysocki421@gmail.com">blakewysocki421@gmail.com</a></p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+
+// ---------------------------------------------------------------------
+// Each organizer type's slider set + how to turn slider values into the
+// real generator's kwargs. Ranges mostly mirror the Blender extension's
+// own UI slider min/max (OO_Settings in __init__.py); a few (drawer
+// divider's per-column/row proxies, and every type's chosen defaults)
+// are curated for a good first-look demo rather than exposing every
+// possible property - same spirit as desk_caddy's own web slice.
+// ---------------------------------------------------------------------
+const TYPES = [
+  {
+    id: "desk_caddy", label: "Desk Caddy", fn: "generate_desk_caddy",
+    filename: "desk_caddy.stl",
+    sliders: [
+      { id: "width_mm", label: "Width", unit: "mm", min: 100, max: 300, step: 5, def: 150 },
+      { id: "depth_mm", label: "Depth", unit: "mm", min: 30, max: 100, step: 2, def: 50 },
+      { id: "compartment_count", label: "Compartments", unit: "", min: 1, max: 8, step: 1, def: 4, int: true },
+      { id: "front_height_mm", label: "Front Height", unit: "mm", min: 8, max: 60, step: 1, def: 20 },
+      { id: "height_mm", label: "Back Height", unit: "mm", min: 10, max: 80, step: 1, def: 35 },
+    ],
+    fixed: { wall_thickness_mm: 2.0, base_thickness_mm: 2.0 },
+  },
+  {
+    id: "drawer_divider", label: "Drawer Divider", fn: "generate_drawer_divider",
+    filename: "drawer_divider.stl",
+    sliders: [
+      { id: "col_count", label: "Columns", unit: "", min: 1, max: 6, step: 1, def: 3, int: true },
+      { id: "col_width_mm", label: "Column Width", unit: "mm", min: 15, max: 60, step: 1, def: 36 },
+      { id: "row_count", label: "Rows", unit: "", min: 1, max: 4, step: 1, def: 2, int: true },
+      { id: "row_depth_mm", label: "Row Depth", unit: "mm", min: 15, max: 60, step: 1, def: 46 },
+      { id: "height_mm", label: "Height", unit: "mm", min: 20, max: 80, step: 1, def: 40 },
+    ],
+    fixed: { wall_thickness_mm: 1.6, base_thickness_mm: 2.4 },
+    buildKwargs(v) {
+      return {
+        col_widths_mm: Array(v.col_count).fill(v.col_width_mm),
+        row_depths_mm: Array(v.row_count).fill(v.row_depth_mm),
+        height_mm: v.height_mm,
+      };
+    },
+    paramsFn: "drawer_divider_params",
+    readouts: [
+      { key: "width_mm", label: "Overall Width", unit: "mm" },
+      { key: "depth_mm", label: "Overall Depth", unit: "mm" },
+    ],
+  },
+  {
+    id: "generic_tray", label: "Generic Tray", fn: "generate_generic_tray",
+    filename: "generic_tray.stl",
+    sliders: [
+      { id: "width_mm", label: "Width", unit: "mm", min: 40, max: 250, step: 5, def: 100 },
+      { id: "depth_mm", label: "Depth", unit: "mm", min: 40, max: 200, step: 5, def: 80 },
+      { id: "height_mm", label: "Height", unit: "mm", min: 20, max: 100, step: 1, def: 40 },
+    ],
+    fixed: { wall_thickness_mm: 1.6, base_thickness_mm: 2.4 },
+  },
+  {
+    id: "file_sorter", label: "File Sorter", fn: "generate_file_sorter",
+    filename: "file_sorter.stl",
+    fixed: {},
+    paramsFn: "file_sorter_params",
+    altFace: true, // thin ascending dividers print layer-weak on this
+                   // base - see recommended_alt_face()'s docstring
+    // Mode toggle, same pattern as the real Blender extension's own
+    // wall_cubby_height_mode/tray_depth_mode: pick which parameterization
+    // drives the shape, the other becomes a derived readout instead of
+    // an input. depthMode is mutable at runtime (selectDepthMode below).
+    depthMode: "SLOT_DEPTH",
+    modes: [
+      {
+        id: "SLOT_DEPTH", label: "Slot Depth + Slots",
+        sliders: [
+          { id: "width_mm", label: "Width", unit: "mm", min: 60, max: 300, step: 5, def: 230 },
+          { id: "pocket_depth_mm", label: "Slot Depth", unit: "mm", min: 10, max: 80, step: 1, def: 27.6 },
+          { id: "slot_count", label: "Slots", unit: "", min: 2, max: 10, step: 1, def: 5, int: true },
+          { id: "min_wall_height_mm", label: "Front Wall Height", unit: "mm", min: 15, max: 100, step: 1, def: 25 },
+          { id: "step_rise_mm", label: "Step Rise", unit: "mm", min: 0, max: 25, step: 1, def: 15 },
+          { id: "wall_thickness_mm", label: "Wall Thickness", unit: "mm", min: 1, max: 2.4, step: 0.1, def: 2.0 },
+          { id: "base_thickness_mm", label: "Base Thickness", unit: "mm", min: 1.2, max: 6, step: 0.1, def: 3.0 },
+        ],
+        // depth_mm (the real generator's own overall-depth input) is
+        // DERIVED here from the more intuitive "how deep is each pocket"
+        // + slot count instead - same pattern as drawer_divider's
+        // col_width/col_count. n_dividers = slot_count+1 (one more wall
+        // than pockets, matching file_sorter_params' own formula).
+        buildKwargs(v) {
+          const depth_mm = v.pocket_depth_mm * v.slot_count
+                          + (v.slot_count + 1) * v.wall_thickness_mm;
+          return {
+            width_mm: v.width_mm, depth_mm, slot_count: v.slot_count,
+            min_wall_height_mm: v.min_wall_height_mm,
+            step_rise_mm: v.step_rise_mm,
+            wall_thickness_mm: v.wall_thickness_mm,
+            base_thickness_mm: v.base_thickness_mm,
+          };
+        },
+        readouts: [
+          { key: "depth_mm", label: "Overall Depth", unit: "mm", fromKw: true },
+          { key: "overall_height_mm", label: "Overall Height", unit: "mm" },
+        ],
+      },
+      {
+        id: "OVERALL_DEPTH", label: "Overall Depth + Slots",
+        sliders: [
+          { id: "width_mm", label: "Width", unit: "mm", min: 60, max: 300, step: 5, def: 230 },
+          { id: "depth_mm", label: "Depth", unit: "mm", min: 60, max: 200, step: 5, def: 150 },
+          { id: "slot_count", label: "Slots", unit: "", min: 2, max: 10, step: 1, def: 5, int: true },
+          { id: "min_wall_height_mm", label: "Front Wall Height", unit: "mm", min: 15, max: 100, step: 1, def: 25 },
+          { id: "step_rise_mm", label: "Step Rise", unit: "mm", min: 0, max: 25, step: 1, def: 15 },
+          { id: "wall_thickness_mm", label: "Wall Thickness", unit: "mm", min: 1, max: 2.4, step: 0.1, def: 2.0 },
+          { id: "base_thickness_mm", label: "Base Thickness", unit: "mm", min: 1.2, max: 6, step: 0.1, def: 3.0 },
+        ],
+        buildKwargs(v) { return { ...v }; }, // every key already matches
+                                             // generate_file_sorter()'s
+                                             // own signature directly
+        readouts: [
+          { key: "overall_height_mm", label: "Overall Height", unit: "mm" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "pen_cup", label: "Pen Cup", fn: "generate_pen_cup",
+    filename: "pen_cup.stl",
+    sliders: [
+      { id: "diameter_mm", label: "Diameter", unit: "mm", min: 20, max: 150, step: 2, def: 80 },
+      { id: "min_height_mm", label: "Front Height", unit: "mm", min: 30, max: 150, step: 1, def: 90 },
+      { id: "mouth_angle_deg", label: "Mouth Angle", unit: "°", min: 0, max: 30, step: 1, def: 20 },
+    ],
+    fixed: { wall_thickness_mm: 2.0, base_thickness_mm: 3.0, segments: 48 },
+    paramsFn: "pen_cup_params",
+    readouts: [{ key: "max_height_mm", label: "Overall Height", unit: "mm" }],
+  },
+  {
+    id: "shelf_riser", label: "Shelf Riser", fn: "generate_shelf_riser",
+    filename: "shelf_riser.stl",
+    sliders: [
+      { id: "width_mm", label: "Width", unit: "mm", min: 30, max: 250, step: 5, def: 105 },
+      { id: "depth_mm", label: "Rise Height", unit: "mm", min: 20, max: 150, step: 1, def: 60 },
+      { id: "height_mm", label: "Footprint Depth", unit: "mm", min: 20, max: 150, step: 1, def: 42 },
+      { id: "wall_thickness_mm", label: "Wall Thickness", unit: "mm", min: 1, max: 20, step: 0.5, def: 2.4 },
+    ],
+    fixed: {},
+    // NOT altFace: the thin U-channel walls DO print layer-weak on this
+    // base (real anisotropy concern), but every alternative orientation
+    // (either back wall, either leg wall) was checked directly against
+    // dfm.overhang_faces() and each introduces 12-13 genuine overhangs -
+    // strictly worse than the anisotropy risk. Only this base and its
+    // upside-down flip (same axis, so no different) are overhang-free.
+    // There's no better orientation to recommend for this shape.
+  },
+  {
+    id: "tray_cubbies", label: "Tray Cubbies", fn: "generate_tray_cubbies",
+    filename: "tray_cubbies.stl",
+    sliders: [
+      { id: "side_width_mm", label: "Side Width", unit: "mm", min: 4, max: 110, step: 1, def: 36 },
+      { id: "middle_width_mm", label: "Middle Width", unit: "mm", min: 4, max: 140, step: 1, def: 36 },
+      { id: "row_count", label: "Rows Per Side", unit: "", min: 1, max: 6, step: 1, def: 2, int: true },
+      { id: "row_depth_mm", label: "Row Depth", unit: "mm", min: 4, max: 55, step: 1, def: 22 },
+      { id: "height_mm", label: "Height", unit: "mm", min: 20, max: 100, step: 1, def: 40 },
+    ],
+    fixed: { wall_thickness_mm: 1.6, base_thickness_mm: 2.4 },
+    paramsFn: "tray_cubbies_params",
+    readouts: [
+      { key: "width_mm", label: "Overall Width", unit: "mm" },
+      { key: "depth_mm", label: "Overall Depth", unit: "mm" },
+    ],
+  },
+];
+
+const PY_FILES = [
+  "generators/__init__.py", "generators/_geo.py", "generators/geo_helpers.py",
+  "generators/drawer_divider.py", "generators/generic_tray.py",
+  "generators/file_sorter.py", "generators/pen_cup.py",
+  "generators/shelf_riser.py", "generators/tray_cubbies.py",
+  "generators/desk_caddy.py", "dfm.py",
+];
+
+// ---------------------------------------------------------------------
+// Three.js scene setup
+// ---------------------------------------------------------------------
+const viewerEl = document.getElementById("viewer");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x101215);
+
+const camera = new THREE.PerspectiveCamera(40, 1, 1, 5000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+// Shadows matter here more than in a typical viewer: several shapes
+// (file_sorter's ascending staircase, tray_cubbies/drawer_divider's
+// recessed pockets) only read as "raised vs. recessed" through cast
+// shadows - flat ambient+directional lighting alone lit both a
+// divider's top AND the pocket floor behind it about equally (same
+// face-normal direction), so a shallow staircase looked like a smooth
+// ramp until shadows revealed the actual steps.
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+viewerEl.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+const key = new THREE.DirectionalLight(0xffffff, 1.1);
+key.position.set(120, 200, 160);
+key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+key.shadow.bias = -0.0005;
+scene.add(key);
+scene.add(key.target);
+const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+fill.position.set(-150, 60, -100);
+scene.add(fill);
+
+let mesh = null;
+const material = new THREE.MeshStandardMaterial({
+  color: 0xffffff, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide,
+  flatShading: true, vertexColors: true,
+});
+
+function resize() {
+  const w = viewerEl.clientWidth, h = viewerEl.clientHeight;
+  if (w === 0 || h === 0) return;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+window.addEventListener("resize", resize);
+resize();
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// verts: [[x,y,z], ...] in mm, Z-up (same convention every generator
+// itself uses - base at z=0). Three.js is Y-up, so ONLY the display
+// geometry remaps (x,z,-y); the STL export writes verts/triangles
+// untouched, so the downloaded file sits correctly oriented for slicing.
+const NORMAL_COLOR = [0.384, 0.710, 0.525];   // matches the old solid 0x62b586
+const OVERHANG_COLOR = [0.88, 0.18, 0.18];    // red - an actual problem (needs support material)
+const ALT_FACE_COLOR = [0.95, 0.78, 0.15];    // yellow - advisory (reorient before printing), not a defect
+
+// Non-indexed (each triangle gets its own 3 unique vertices, even if
+// duplicated) rather than the earlier deduplicated+indexed version -
+// highlighting needs per-TRIANGLE color, and an indexed geometry would
+// force two adjacent triangles (one flagged, one not) to blend colors
+// at any vertex they happen to share. flatShading already recomputes
+// face normals from screen-space derivatives regardless of the vertex
+// normal attribute, so losing shared/averaged normals here costs
+// nothing visually.
+function buildGeometry(verts, triangles, triFaceIdx, flaggedSet, flagColor) {
+  const positions = [];
+  const colors = [];
+  for (const [a, b, c] of triangles) {
+    for (const idx of [a, b, c]) {
+      const [x, y, z] = verts[idx];
+      positions.push(x, z, -y);
+    }
+  }
+  triangles.forEach((_, i) => {
+    const flagged = flaggedSet.has(triFaceIdx[i]);
+    const c = flagged ? flagColor : NORMAL_COLOR;
+    for (let k = 0; k < 3; k++) colors.push(c[0], c[1], c[2]);
+  });
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function computeFaceNormal(a, b, c) {
+  const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+  const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+  const nx = uy * vz - uz * vy;
+  const ny = uz * vx - ux * vz;
+  const nz = ux * vy - uy * vx;
+  const len = Math.hypot(nx, ny, nz) || 1;
+  return [nx / len, ny / len, nz / len];
+}
+
+// Rotate the whole mesh so the given (axis-aligned) outward normal ends
+// up pointing straight down (0,0,-1) - matching how every generator's
+// own bottom cap already points, so the flagged face becomes the new
+// floor. Used only for altFace types (file_sorter, shelf_riser) at
+// DOWNLOAD time - the live preview stays in the modeled orientation
+// (the diagnostic view showing why the highlighted face matters), but
+// the exported STL is reoriented so it's actually print-ready without
+// the user having to rotate it themselves in a slicer. Each of the 6
+// cases is a proper rotation (determinant +1, verified by hand), so
+// face winding/volume sign needs no correction, unlike a reflection.
+function reorientVertsFaceDown(verts, normal) {
+  const candidates = [
+    [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
+  ];
+  let best = candidates[5], bestDot = -Infinity;
+  for (const c of candidates) {
+    const dot = normal[0] * c[0] + normal[1] * c[1] + normal[2] * c[2];
+    if (dot > bestDot) { bestDot = dot; best = c; }
+  }
+  const [ax, ay, az] = best;
+  let transform;
+  if (ax === 0 && ay === 0 && az === -1) transform = (x, y, z) => [x, y, z];
+  else if (ax === 0 && ay === 0 && az === 1) transform = (x, y, z) => [x, -y, -z];
+  else if (ax === 1 && ay === 0 && az === 0) transform = (x, y, z) => [z, y, -x];
+  else if (ax === -1 && ay === 0 && az === 0) transform = (x, y, z) => [-z, y, x];
+  else if (ax === 0 && ay === 1 && az === 0) transform = (x, y, z) => [x, z, -y];
+  else transform = (x, y, z) => [x, -z, y]; // ax===0 && ay===-1 && az===0
+
+  const rotated = verts.map(([x, y, z]) => transform(x, y, z));
+  // Re-anchor all three axes to start at 0 - a rotation about the
+  // origin can easily leave X/Y negative (as it did here: file_sorter's
+  // case swaps in a coordinate that was never zero-anchored on its own
+  // axis), and every generator in this project starts at the (0,0,0)
+  // corner by convention - keep that true for the reoriented file too.
+  const minX = Math.min(...rotated.map((v) => v[0]));
+  const minY = Math.min(...rotated.map((v) => v[1]));
+  const minZ = Math.min(...rotated.map((v) => v[2]));
+  return rotated.map(([x, y, z]) => [x - minX, y - minY, z - minZ]);
+}
+
+// Binary STL: 80-byte header, uint32 triangle count, then per triangle:
+// 3 float32 normal + 3x(3 float32 vertex) + uint16 attribute byte count
+// (0) = 50 bytes/triangle.
+function buildBinarySTL(verts, triangles) {
+  const buffer = new ArrayBuffer(84 + 50 * triangles.length);
+  const view = new DataView(buffer);
+  view.setUint32(80, triangles.length, true);
+  let offset = 84;
+  for (const [i0, i1, i2] of triangles) {
+    const a = verts[i0], b = verts[i1], c = verts[i2];
+    const [nx, ny, nz] = computeFaceNormal(a, b, c);
+    view.setFloat32(offset, nx, true); offset += 4;
+    view.setFloat32(offset, ny, true); offset += 4;
+    view.setFloat32(offset, nz, true); offset += 4;
+    for (const v of [a, b, c]) {
+      view.setFloat32(offset, v[0], true); offset += 4;
+      view.setFloat32(offset, v[1], true); offset += 4;
+      view.setFloat32(offset, v[2], true); offset += 4;
+    }
+    offset += 2;
+  }
+  return buffer;
+}
+
+function downloadSTL() {
+  if (!lastVerts || !lastTriangles) return;
+  const type = TYPES[activeIndex];
+
+  let verts = lastVerts;
+  if (type.altFace && lastAltFaceIdx != null) {
+    const ti = lastTriFaceIdx.indexOf(lastAltFaceIdx);
+    const [a, b, c] = lastTriangles[ti];
+    const normal = computeFaceNormal(lastVerts[a], lastVerts[b], lastVerts[c]);
+    verts = reorientVertsFaceDown(lastVerts, normal);
+  }
+
+  const buffer = buildBinarySTL(verts, lastTriangles);
+  const blob = new Blob([buffer], { type: "model/stl" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = type.filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// Default camera offset (as multiples of the framing distance) works
+// for most types, but file_sorter's own axis convention puts its TALL,
+// solid back wall on the +X side (see generators/file_sorter.py's
+// docstring: "X = front-to-back depth") - the default +x/+y/+z offset
+// looks squarely at that solid wall, hiding the whole staircase-of-
+// pockets behind it and reading as an uninterrupted wedge. Viewing from
+// -x instead (the short front side) looks INTO the ascending steps.
+const CAMERA_DIR_OVERRIDES = {
+  file_sorter: { x: -0.75, y: 1.0, z: 0.7 },
+  // Same shallow-elevation fix the original Blender gallery-render
+  // script already needed for this exact shape (see its own
+  // CAMERA_ANGLE_OVERRIDES: elevation=10 instead of the default 32) -
+  // the default steep, elevated default angle looks almost straight
+  // down, which forced the back wall's plane to foreshorten toward the
+  // floor in screen space and read as "the bottom" rather than a
+  // distinct vertical wall. A shallow, more front-on angle (looking
+  // into the open U-channel) keeps the back wall clearly upright.
+  shelf_riser: { x: 0.565, y: 0.174, z: 0.807 },
+};
+const DEFAULT_CAMERA_DIR = { x: 0.55, y: 0.55, z: 0.75 };
+
+function frameCamera(geo) {
+  geo.computeBoundingSphere();
+  const { center, radius } = geo.boundingSphere;
+  const dist = radius / Math.sin((camera.fov * Math.PI) / 360) * 1.15;
+  const dir = CAMERA_DIR_OVERRIDES[TYPES[activeIndex].id] || DEFAULT_CAMERA_DIR;
+  camera.position.set(center.x + dist * dir.x, center.y + dist * dir.y, center.z + dist * dir.z);
+  controls.target.copy(center);
+  camera.near = Math.max(dist * 0.01, 0.1);
+  camera.far = dist * 10;
+  camera.updateProjectionMatrix();
+  controls.update();
+
+  // Object size varies a lot across types/sliders (a few cm to tens of
+  // cm) - the key light's shadow camera is an orthographic frustum that
+  // must be resized to fit, or shadows either clip off-object (frustum
+  // too small) or lose depth precision/look blocky (frustum too large).
+  key.position.set(center.x + radius * 1.2, center.y + radius * 2.0, center.z + radius * 1.6);
+  key.target.position.copy(center);
+  key.target.updateMatrixWorld();
+  const sc = key.shadow.camera;
+  sc.left = -radius * 1.5; sc.right = radius * 1.5;
+  sc.top = radius * 1.5; sc.bottom = -radius * 1.5;
+  sc.near = radius * 0.1; sc.far = radius * 6;
+  sc.updateProjectionMatrix();
+}
+
+// ---------------------------------------------------------------------
+// UI: tabs + dynamic slider panel
+// ---------------------------------------------------------------------
+const tabsEl = document.getElementById("tabs");
+const fieldsEl = document.getElementById("fields");
+const panelTitleEl = document.getElementById("panel-title");
+const statusEl = document.getElementById("status");
+const buyBtn = document.getElementById("buy");
+
+let pyodide = null;
+let GENERATOR_FNS = null;
+let MESH_TRIANGLES = null;
+let OVERHANG_FACE_SET = null;
+let ALT_FACE_FNS = null;
+let PARAMS_FNS = null;
+let activeIndex = 0;
+let lastVerts = null;
+let lastTriangles = null;
+let lastTriFaceIdx = null;
+let lastAltFaceIdx = null;
+let pending = null;
+let firstRunForType = true;
+
+// Types with a `modes` array (matching the real Blender extension's own
+// wall_cubby_height_mode/tray_depth_mode enum toggles) resolve sliders/
+// buildKwargs/readouts from whichever mode is currently selected
+// (type.depthMode); types without `modes` just use their own top-level
+// sliders/buildKwargs/readouts directly, unchanged from before.
+function activeMode(type) {
+  if (!type.modes) return type;
+  return type.modes.find((m) => m.id === type.depthMode) || type.modes[0];
+}
+
+function renderTabs() {
+  tabsEl.innerHTML = "";
+  TYPES.forEach((t, i) => {
+    const btn = document.createElement("button");
+    btn.className = "tab-btn" + (i === activeIndex ? " active" : "");
+    btn.textContent = t.label;
+    btn.addEventListener("click", () => selectType(i));
+    tabsEl.appendChild(btn);
+  });
+}
+
+function renderFields() {
+  const type = TYPES[activeIndex];
+  panelTitleEl.textContent = type.label;
+  fieldsEl.innerHTML = "";
+
+  if (type.modes) {
+    const modeField = document.createElement("div");
+    modeField.className = "field";
+    const options = type.modes
+      .map((m) => `<option value="${m.id}"${m.id === type.depthMode ? " selected" : ""}>${m.label}</option>`)
+      .join("");
+    modeField.innerHTML = `<label>Defined by</label><select id="in-mode">${options}</select>`;
+    fieldsEl.appendChild(modeField);
+    document.getElementById("in-mode").addEventListener("change", (e) => {
+      type.depthMode = e.target.value;
+      renderFields();
+      rebuild();
+    });
+  }
+
+  activeMode(type).sliders.forEach((s) => {
+    const field = document.createElement("div");
+    field.className = "field";
+    const valId = "val-" + s.id;
+    field.innerHTML =
+      `<label>${s.label} <span class="val" id="${valId}">${s.def}</span> ${s.unit}</label>` +
+      `<input type="range" id="in-${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.def}">`;
+    fieldsEl.appendChild(field);
+    document.getElementById("in-" + s.id).addEventListener("input", scheduleRebuild);
+  });
+}
+
+function selectType(i) {
+  activeIndex = i;
+  firstRunForType = true;
+  renderTabs();
+  renderFields();
+  rebuild();
+}
+
+function scheduleRebuild() {
+  // setTimeout, not requestAnimationFrame: rAF callbacks don't fire in a
+  // backgrounded/non-composited tab, which would silently stall live
+  // updates whenever the tab isn't actually the visible one.
+  if (pending) clearTimeout(pending);
+  pending = setTimeout(rebuild, 16);
+}
+
+function rebuild() {
+  const type = TYPES[activeIndex];
+  const mode = activeMode(type);
+  const values = {};
+  mode.sliders.forEach((s) => {
+    const el = document.getElementById("in-" + s.id);
+    const val = s.int ? parseInt(el.value, 10) : parseFloat(el.value);
+    values[s.id] = val;
+    document.getElementById("val-" + s.id).textContent = val;
+  });
+
+  const kw = mode.buildKwargs ? mode.buildKwargs(values) : { ...values };
+  Object.assign(kw, type.fixed);
+
+  const fn = GENERATOR_FNS.get(type.fn);
+  const t0 = performance.now();
+  let result;
+  try {
+    result = fn.callKwargs(kw);
+  } catch (e) {
+    // PythonError's string form is a full traceback ending in "\n", so a
+    // plain split("\n").pop() grabs the trailing empty string instead of
+    // the actual "ValueError: ..." line - trim first.
+    statusEl.textContent = "Invalid: " + String(e).trim().split("\n").pop();
+    statusEl.classList.add("err");
+    buyBtn.disabled = true;
+    return;
+  }
+  statusEl.classList.remove("err");
+  const [vertsPy, , facesPy] = result.toJs({ create_proxies: false });
+  result.destroy();
+
+  const trisResult = MESH_TRIANGLES(vertsPy, facesPy);
+  const [triangles, triFaceIdx] = trisResult.toJs({ create_proxies: false });
+  trisResult.destroy();
+
+  // Two DIFFERENT things can turn a face red, never both at once for a
+  // given type: overhang_face_set flags faces needing support material
+  // (a support/gravity concern - always empty for these 7 generators,
+  // every one is deliberately overhang-free by construction); altFace
+  // types instead flag which face SHOULD sit on the print bed instead
+  // of the modeled base (an FDM layer-anisotropy concern overhangs
+  // don't model at all - file_sorter's thin ascending dividers and
+  // shelf_riser's thin U-channel walls both print layer-weak stacked
+  // vertically, even though neither one ever has an actual overhang).
+  let flaggedSet, statusSuffix;
+  lastAltFaceIdx = null;
+  if (type.altFace) {
+    const altResult = ALT_FACE_FNS[type.id](vertsPy, facesPy);
+    const altList = altResult.toJs({ create_proxies: false });
+    altResult.destroy();
+    flaggedSet = new Set(altList);
+    if (flaggedSet.size > 0) lastAltFaceIdx = altList[0];
+    statusSuffix = flaggedSet.size > 0
+      ? " The face shown in yellow should sit on the print bed instead "
+      + "of the base shown here - downloading reorients the STL onto "
+      + "that face automatically, so the file itself is print-ready."
+      : "";
+  } else {
+    const overhangResult = OVERHANG_FACE_SET(vertsPy, facesPy);
+    const overhangList = overhangResult.toJs({ create_proxies: false });
+    overhangResult.destroy();
+    flaggedSet = new Set(overhangList);
+    statusSuffix = flaggedSet.size > 0
+      ? ` ${flaggedSet.size} face(s) shown in red need support material `
+      + `as currently oriented.`
+      : "";
+  }
+
+  const dt = (performance.now() - t0).toFixed(1);
+  statusEl.textContent = `Generated in ${dt} ms (in-browser, no server) — `
+                       + `${vertsPy.length} verts, ${triangles.length} triangles.`
+                       + statusSuffix;
+
+  const flagColor = type.altFace ? ALT_FACE_COLOR : OVERHANG_COLOR;
+  const geo = buildGeometry(vertsPy, triangles, triFaceIdx, flaggedSet, flagColor);
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); }
+  mesh = new THREE.Mesh(geo, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true; // self-shadowing: a divider's shadow needs
+                              // to land on its own pocket floor, same mesh
+  scene.add(mesh);
+  if (firstRunForType) { frameCamera(geo); firstRunForType = false; }
+
+  lastVerts = vertsPy;
+  lastTriangles = triangles;
+  lastTriFaceIdx = triFaceIdx;
+  buyBtn.disabled = false;
+
+  renderReadouts(type, mode, kw);
+}
+
+const readoutsEl = document.getElementById("readouts");
+
+function renderReadouts(type, mode, kw) {
+  readoutsEl.innerHTML = "";
+  if (!mode.readouts) return;
+
+  // Two sources: fromKw reads straight off the kwargs already built for
+  // generate_*() (e.g. file_sorter's depth_mm, computed by buildKwargs
+  // from Slot Depth x Slots - no Python call needed, it's already a
+  // plain JS number); everything else calls the real *_params() function
+  // for a value that isn't just sitting in kw already (e.g. pen_cup's
+  // tilted-rim max_height_mm).
+  let derived = null;
+  if (type.paramsFn) {
+    try {
+      const fn = PARAMS_FNS.get(type.paramsFn);
+      const result = fn.callKwargs(kw);
+      derived = result.toJs({ create_proxies: false });
+      result.destroy();
+    } catch (e) {
+      derived = null; // main generate() call already validated kw
+                      // moments ago - a throw here would be surprising,
+                      // not worth surfacing twice
+    }
+  }
+
+  mode.readouts.forEach((r) => {
+    const val = r.fromKw ? kw[r.key] : (derived ? derived.get(r.key) : null);
+    if (val == null) return;
+    const row = document.createElement("div");
+    row.className = "readout";
+    row.innerHTML = `<span>${r.label}</span><span class="val">`
+                  + `${val.toFixed(1)} ${r.unit}</span>`;
+    readoutsEl.appendChild(row);
+  });
+}
+
+async function boot() {
+  pyodide = await loadPyodide();
+
+  pyodide.FS.mkdirTree("/app/generators");
+  for (const rel of PY_FILES) {
+    const resp = await fetch("py/" + rel);
+    if (!resp.ok) throw new Error("failed to fetch " + rel + ": " + resp.status);
+    const text = await resp.text();
+    pyodide.FS.writeFile("/app/" + rel, text);
+  }
+
+  pyodide.runPython(`
+import sys
+sys.path.insert(0, "/app")
+import generators.desk_caddy
+import generators.drawer_divider
+import generators.generic_tray
+import generators.file_sorter
+import generators.pen_cup
+import generators.shelf_riser
+import generators.tray_cubbies
+import generators.geo_helpers as gh
+import dfm
+
+GENERATOR_FNS = {
+    "generate_desk_caddy": generators.desk_caddy.generate_desk_caddy,
+    "generate_drawer_divider": generators.drawer_divider.generate_drawer_divider,
+    "generate_generic_tray": generators.generic_tray.generate_generic_tray,
+    "generate_file_sorter": generators.file_sorter.generate_file_sorter,
+    "generate_pen_cup": generators.pen_cup.generate_pen_cup,
+    "generate_shelf_riser": generators.shelf_riser.generate_shelf_riser,
+    "generate_tray_cubbies": generators.tray_cubbies.generate_tray_cubbies,
+}
+
+# Only for types whose sliders DON'T directly equal an overall dimension -
+# e.g. desk_caddy's width_mm slider IS the overall width already, but
+# drawer_divider's overall width_mm is derived from column count/width
+# plus the walls between them, and pen_cup's overall height is taller
+# than the "Front Height" slider because the rim is tilted. Called with
+# the exact same kwargs already built for the matching generate_*(), so
+# no separate parameter-mapping is needed on the JS side.
+PARAMS_FNS = {
+    "drawer_divider_params": generators.drawer_divider.drawer_divider_params,
+    "file_sorter_params": generators.file_sorter.file_sorter_params,
+    "pen_cup_params": generators.pen_cup.pen_cup_params,
+    "tray_cubbies_params": generators.tray_cubbies.tray_cubbies_params,
+}
+
+def mesh_triangles(verts, faces):
+    """Fan-triangulating from vertex 0 (the naive approach) only gives
+    correct results for CONVEX faces - most generators' faces are plain
+    quads, where fan and ear-clip agree, but file_sorter's comb outline
+    and shelf_riser's U-channel outline are CONCAVE n-gons (fill_mode
+    "ngon" caps), and fanning across a concave notch draws a phantom
+    triangle spanning open air. Route every face through geo_helpers'
+    own proven ear-clipping triangulate() instead - correct for both
+    convex and concave planar polygons, and it's already loaded here
+    for shelf_riser's own use, so no new dependency.
+
+    Also returns tri_face_idx, a parallel list mapping each output
+    triangle back to its ORIGINAL face index - overhang_faces() below
+    flags whole original faces, and highlighting needs to know which
+    triangles belong to which flagged face."""
+    tris = []
+    tri_face_idx = []
+    for fi, f in enumerate(faces):
+        if len(f) == 3:
+            tris.append([f[0], f[1], f[2]])
+            tri_face_idx.append(fi)
+            continue
+        pts = [tuple(verts[i]) for i in f]
+        local = gh.triangulate(gh.Loop(pts, True))
+        for (a, b, c) in local:
+            tris.append([f[a], f[b], f[c]])
+            tri_face_idx.append(fi)
+    return tris, tri_face_idx
+
+def overhang_face_set(verts, faces):
+    """Original-face indices that would need support material printed
+    as currently modeled (dfm.py's own OVERHANG_LIMIT_DEG=45) - the
+    exact same check the Blender extension runs before STL export, not
+    a separate reimplementation. In practice this is always empty for
+    every generator here - every one is deliberately built overhang-free
+    (vertical walls, upward-only ramps) - verified by sweeping wide
+    parameter ranges for all 7 types directly against this function
+    before trusting that claim, not just recalling it from old project
+    docs. See recommended_alt_face() below for a DIFFERENT, real concern
+    overhang_faces() doesn't model at all: FDM layer anisotropy."""
+    return list(dfm.overhang_faces(verts, faces))
+
+def recommended_alt_face_file_sorter(verts, faces):
+    """Face 0 - the front end cap (y=0), always the first face
+    generate_file_sorter() returns (extrude_profile_along_y's own
+    construction: front cap, back cap, then the side-wall ring).
+    file_sorter is EXTRUDED along Y (width) - resting it on this cap
+    instead of its modeled Z-up base makes every print layer an
+    IDENTICAL copy of the whole comb profile, so every divider's full
+    height sits within one layer instead of being built as a stack of
+    ~100mm worth of separately-bonded layer-strips prone to snapping
+    sideways. A generic "largest flat face" search instead finds the
+    solid back wall (bigger area than the notched cap, but the WRONG
+    fix - it doesn't align with the shape's own extrusion axis, so it
+    doesn't get the "every layer identical" property) - this is
+    deliberately a hardcoded index, from directly reading the
+    generator's own construction, not a geometric heuristic."""
+    return [0]
+
+`);
+  GENERATOR_FNS = pyodide.globals.get("GENERATOR_FNS");
+  MESH_TRIANGLES = pyodide.globals.get("mesh_triangles");
+  OVERHANG_FACE_SET = pyodide.globals.get("overhang_face_set");
+  ALT_FACE_FNS = {
+    file_sorter: pyodide.globals.get("recommended_alt_face_file_sorter"),
+  };
+  PARAMS_FNS = pyodide.globals.get("PARAMS_FNS");
+
+  document.getElementById("loading").remove();
+  statusEl.textContent = "Ready — drag a slider.";
+  buyBtn.addEventListener("click", downloadSTL);
+  renderTabs();
+  renderFields();
+  resize();
+  rebuild();
+}
+
+boot().catch((e) => {
+  document.getElementById("loading").textContent =
+    "Failed to load: " + e.message;
+});
+</script>
+</body>
+</html>
