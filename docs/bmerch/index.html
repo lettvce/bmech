@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bmerch — 3D-printable merch generators for Blender</title>
+<meta name="description" content="Turn any Text or SVG object into a single-piece, 3D-printable bead, keychain, nameplate, pendant, coaster, or coin — six generators, one Blender extension.">
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  header {
+    padding: 3rem 1.5rem 2rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    font-size: 2.4rem;
+    margin: 0 0 0.5rem;
+  }
+  header p {
+    color: var(--muted);
+    max-width: 560px;
+    margin: 0 auto;
+    font-size: 1.05rem;
+  }
+  .hero-img {
+    max-width: 720px;
+    width: 100%;
+    margin: 2rem auto 0;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    display: block;
+  }
+  .cta {
+    margin-top: 2rem;
+  }
+  .btn {
+    display: inline-block;
+    padding: 0.75rem 1.6rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    margin: 0 0.4rem;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0b0d10;
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem;
+  }
+  section {
+    margin-bottom: 3rem;
+  }
+  h2 {
+    font-size: 1.4rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+  }
+  ol, ul {
+    color: var(--muted);
+  }
+  code {
+    background: var(--panel);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--text);
+  }
+
+  /* Generator switcher */
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1rem;
+  }
+  .tab-btn {
+    background: var(--panel);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.5rem 1.1rem;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  }
+  .tab-btn:hover {
+    color: var(--text);
+    border-color: var(--accent);
+  }
+  .tab-btn.active {
+    background: var(--accent);
+    color: #0b0d10;
+    border-color: var(--accent);
+  }
+  .tab-panel {
+    display: none;
+    margin-top: 1.5rem;
+  }
+  .tab-panel.active {
+    display: block;
+  }
+  .tab-panel h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.15rem;
+    color: var(--accent);
+  }
+  .tab-panel p {
+    color: var(--muted);
+    max-width: 640px;
+  }
+  .shot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-top: 1.2rem;
+  }
+  .shot-grid img {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    display: block;
+    background: var(--panel);
+  }
+  .shot-grid.single {
+    grid-template-columns: minmax(240px, 480px);
+  }
+
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>bmerch</h1>
+  <p>Turn any Text or SVG/curve object into a single-piece, 3D-printable
+     merch item — six generators, one Blender extension, straight from
+     Shift-A.</p>
+  <div class="cta">
+    <a class="btn btn-primary" href="https://superhivemarket.com/products/bmerch">Get it on Superhive</a>
+  </div>
+  <img class="hero-img" src="assets/img/hero_keychain.png" alt="A bmerch keychain spelling out 'bmerch' itself, printed as a demo piece">
+</header>
+
+<main>
+
+<section>
+  <h2>Six generators, one extension</h2>
+  <p style="color: var(--muted); margin-top: -0.5rem;">
+    Every generator does the same core job — bridging letters into one
+    connected, structurally sound solid, with every counter (the inside of
+    an "e" or "o") staying correctly open instead of getting silently
+    filled in — then shapes that into whichever piece you pick below.
+  </p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab-btn active" data-tab="bead" role="tab">Bead</button>
+    <button class="tab-btn" data-tab="keychain" role="tab">Keychain</button>
+    <button class="tab-btn" data-tab="nameplate" role="tab">Nameplate</button>
+    <button class="tab-btn" data-tab="pendant" role="tab">Pendant</button>
+    <button class="tab-btn" data-tab="coaster" role="tab">Coaster</button>
+    <button class="tab-btn" data-tab="coin" role="tab">Coin</button>
+  </div>
+
+  <div class="tab-panel active" data-panel="bead">
+    <h3>Bead</h3>
+    <p>Turn a word or icon into a single, holdable bead in one click. A
+       backing rim bridges nearby letters into one connected piece —
+       never floating disconnected letters — with raised or flush
+       lettering and an optional stringing hole drilled straight through
+       for a cord or wire.</p>
+    <div class="shot-grid single">
+      <img src="assets/img/bead.png" alt="A bead reading 'SUPER MAPLES', with raised gold lettering on a grey backing">
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="keychain">
+    <h3>Keychain</h3>
+    <p>The same bridged-letter backing as Bead, plus a welded attachment
+       loop with its own hole for an actual keyring — anchored to
+       whichever corner of the shape you choose.</p>
+    <div class="shot-grid single">
+      <img src="assets/img/keychain.png" alt="A mushroom-shaped keychain with a welded loop and drilled hole for a keyring">
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="nameplate">
+    <h3>Nameplate</h3>
+    <p>A fixed-size plate — independent of what the text says — with your
+       text or graphic centered on it, raised as a relief or engraved
+       into the surface. Flat, or bent into a desk-standing shape with
+       its own foot and angled face panel.</p>
+    <div class="shot-grid">
+      <img src="assets/img/nameplate_flat.png" alt="A flat nameplate reading 'NORTH KIDS' in raised gold lettering">
+      <img src="assets/img/nameplate_standing.png" alt="A standing nameplate reading 'RAHAYU', bent into a desk-standing shape">
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="pendant">
+    <h3>Pendant</h3>
+    <p>A circular bezel: a raised outer rim standing above a recessed
+       floor, with your text or icon filling that recess exactly flush
+       with the rim's own top. An optional hole bores straight through
+       the rim itself for a jump ring or cord.</p>
+    <div class="shot-grid single">
+      <img src="assets/img/pendant.png" alt="A circular pendant with a six-petal flower design in raised gold">
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="coaster">
+    <h3>Coaster</h3>
+    <p>A wide, low-profile disc or rounded square with a raised outer
+       border and the design filling a shallow recess, flush with the
+       border's own top — deliberately barely-there, so the flat top
+       still masks and paints evenly. Round or square.</p>
+    <div class="shot-grid">
+      <img src="assets/img/coaster_round.png" alt="A round coaster">
+      <img src="assets/img/coaster_square.png" alt="A square coaster with a rounded alien-face icon in gold">
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="coin">
+    <h3>Coin</h3>
+    <p>A two-sided circular bezel: a raised border on both faces, each
+       with its own recess and its own design, decorated completely
+       independently. The back is automatically mirrored so it reads
+       correctly once the coin is physically flipped over.</p>
+    <div class="shot-grid">
+      <img src="assets/img/coin_front.png" alt="A coin's front face with a cat-face design in raised gold">
+      <img src="assets/img/coin_back.png" alt="A coin's back face">
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Install</h2>
+  <ol>
+    <li>Get <code>bmerch</code> from
+        <a href="https://superhivemarket.com/products/bmerch">Superhive</a>.</li>
+    <li>In Blender 4.2+, open <code>Edit &gt; Preferences &gt; Get Extensions</code>,
+        click the dropdown in the top-right, and choose
+        <code>Install from Disk...</code>.</li>
+    <li>Select the downloaded zip. Every generator appears under
+        <code>Shift-A &gt; Merch</code> in the 3D viewport — no sidebar
+        tab to find.</li>
+  </ol>
+</section>
+
+<section>
+  <h2>Requirements</h2>
+  <ul>
+    <li>Blender 4.2 or newer</li>
+    <li>Windows only, for now — bmerch relies on a small compiled library
+        (pyclipper) for robust 2D offsetting on tight, detailed curves,
+        currently only built for Windows, so macOS and Linux aren't
+        supported yet.</li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  <p>Contact: <a href="mailto:blakewysocki421@gmail.com">blakewysocki421@gmail.com</a></p>
+</footer>
+
+<script>
+  document.querySelectorAll('.tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var target = btn.getAttribute('data-tab');
+
+      document.querySelectorAll('.tab-btn').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+      });
+      document.querySelectorAll('.tab-panel').forEach(function (panel) {
+        panel.classList.toggle('active', panel.getAttribute('data-panel') === target);
+      });
+    });
+  });
+</script>
+
+</body>
+</html>
