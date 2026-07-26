@@ -341,6 +341,17 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   }}
   .breadcrumb a {{ color: var(--muted); }}
   .breadcrumb a:hover {{ color: var(--accent); }}
+  .home-bar {{
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1rem 1.5rem 0;
+  }}
+  .home-bar a {{
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }}
+  .home-bar a:hover {{ color: var(--accent); }}
   header {{
     padding: 2rem 1.5rem 3rem;
     text-align: center;
@@ -479,6 +490,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 </style>
 </head>
 <body>
+<div class="home-bar"><a href="/">← Lettvce</a></div>
 <div class="breadcrumb">{breadcrumb}</div>
 <header>
   <h1>{heading}</h1>
