@@ -104,6 +104,16 @@
     border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem;
     font-size: 0.82rem;
   }
+  .unit-toggle {
+    display: flex; gap: 0.4rem; margin-bottom: 1.1rem;
+  }
+  .unit-btn {
+    flex: 1; background: var(--bg); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.35rem 0; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  }
+  .unit-btn:hover { color: var(--text); border-color: var(--accent); }
+  .unit-btn.active { background: var(--accent); color: #0b0d10; border-color: var(--accent); }
   #readouts { font-size: 0.82rem; color: var(--text); margin-bottom: 0.4rem; }
   #readouts .readout { display: flex; justify-content: space-between; padding: 2px 0; }
   #readouts .readout .val { color: var(--good); font-variant-numeric: tabular-nums; }
@@ -159,6 +169,10 @@
     <div id="panel">
       <h2 id="panel-title"></h2>
       <div class="sub">Live preview — runs entirely in your browser, no server call.</div>
+      <div class="unit-toggle" id="unit-toggle">
+        <button type="button" class="unit-btn active" data-unit="mm">mm</button>
+        <button type="button" class="unit-btn" data-unit="in">in</button>
+      </div>
       <div id="fields"></div>
       <div id="readouts"></div>
       <div id="status">Booting Pyodide…</div>
@@ -727,6 +741,7 @@ const fieldsEl = document.getElementById("fields");
 const panelTitleEl = document.getElementById("panel-title");
 const statusEl = document.getElementById("status");
 const buyBtn = document.getElementById("buy");
+const unitToggleEl = document.getElementById("unit-toggle");
 
 let pyodide = null;
 let GENERATOR_FNS = null;
@@ -735,6 +750,11 @@ let OVERHANG_FACE_SET = null;
 let ALT_FACE_FNS = null;
 let PARAMS_FNS = null;
 let activeIndex = 0;
+// Only ever affects on-page DISPLAY - every slider's underlying value,
+// every generate_*() kwarg, and the exported STL itself all stay in mm
+// always (3D printers/slicers expect mm; there's no reason to touch
+// that). "in" mode just converts mm-labeled numbers for reading.
+let displayUnit = "mm";
 let lastVerts = null;
 let lastTriangles = null;
 let lastTriFaceIdx = null;
@@ -753,6 +773,33 @@ let firstRunForType = true;
 // always-shown sliders/readouts/buildKwargs.
 function modeGroups(type) {
   return type.modeGroups || [];
+}
+
+// Converts a raw mm value for DISPLAY ONLY, based on the current unit
+// toggle - only ever touches slider/readout entries whose declared unit
+// is literally "mm" (angles, counts, and anything else pass through
+// unchanged). mmDecimals is only applied in mm mode, matching each
+// caller's existing formatting (sliders showed the raw value with no
+// fixed decimals; readouts used toFixed(1)) - "in" mode always uses 3
+// decimals regardless, since a round mm number is rarely a round number
+// of inches (150mm = 5.906in).
+function toDisplay(mmValue, unit, mmDecimals) {
+  if (unit !== "mm" || displayUnit === "mm") {
+    const text = mmDecimals == null ? String(mmValue) : mmValue.toFixed(mmDecimals);
+    return { text, unit };
+  }
+  return { text: (mmValue / 25.4).toFixed(3), unit: "in" };
+}
+
+// Unit-suffix text next to each slider (e.g. "mm"/"in") isn't touched by
+// rebuild()'s per-drag updates - it only needs refreshing on an actual
+// unit-toggle click, not on every slider move, so it's kept separate
+// rather than re-querying the DOM on every rebuild() call.
+function refreshUnitSuffixes() {
+  fieldsEl.querySelectorAll(".unit-suffix").forEach((el) => {
+    const orig = el.dataset.origUnit;
+    el.textContent = orig === "mm" ? displayUnit : orig;
+  });
 }
 
 function currentOption(type, group) {
@@ -834,8 +881,13 @@ function renderFields() {
     const field = document.createElement("div");
     field.className = "field";
     const valId = "val-" + s.id;
+    // The <input> itself stays mm-native always (min/max/step/value) -
+    // only the displayed def text + unit suffix reflect the current
+    // toggle, via toDisplay()/data-orig-unit.
+    const disp = toDisplay(s.def, s.unit);
     field.innerHTML =
-      `<label>${s.label} <span class="val" id="${valId}">${s.def}</span> ${s.unit}</label>` +
+      `<label>${s.label} <span class="val" id="${valId}">${disp.text}</span> ` +
+      `<span class="unit-suffix" data-orig-unit="${s.unit}">${disp.unit}</span></label>` +
       `<input type="range" id="in-${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.def}">`;
     fieldsEl.appendChild(field);
     document.getElementById("in-" + s.id).addEventListener("input", scheduleRebuild);
@@ -864,8 +916,8 @@ function rebuild() {
   allSliders(type).forEach((s) => {
     const el = document.getElementById("in-" + s.id);
     const val = s.int ? parseInt(el.value, 10) : parseFloat(el.value);
-    values[s.id] = val;
-    document.getElementById("val-" + s.id).textContent = val;
+    values[s.id] = val; // always mm - this is what reaches generate_*()
+    document.getElementById("val-" + s.id).textContent = toDisplay(val, s.unit).text;
   });
 
   const kw = combinedBuildKwargs(type, values);
@@ -978,10 +1030,11 @@ function renderReadouts(type, kw) {
   readouts.forEach((r) => {
     const val = r.fromKw ? kw[r.key] : (derived ? derived.get(r.key) : null);
     if (val == null) return;
+    const disp = toDisplay(val, r.unit, 1);
     const row = document.createElement("div");
     row.className = "readout";
     row.innerHTML = `<span>${r.label}</span><span class="val">`
-                  + `${val.toFixed(1)} ${r.unit}</span>`;
+                  + `${disp.text} ${disp.unit}</span>`;
     readoutsEl.appendChild(row);
   });
 }
@@ -1107,6 +1160,19 @@ def recommended_alt_face_file_sorter(verts, faces):
   document.getElementById("loading").remove();
   statusEl.textContent = "Ready — drag a slider.";
   buyBtn.addEventListener("click", downloadSTL);
+  unitToggleEl.querySelectorAll(".unit-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.unit === displayUnit) return;
+      displayUnit = btn.dataset.unit;
+      unitToggleEl.querySelectorAll(".unit-btn").forEach((b) => {
+        b.classList.toggle("active", b.dataset.unit === displayUnit);
+      });
+      refreshUnitSuffixes();
+      rebuild(); // re-derives val-spans + readouts in the new unit; mm
+                 // values themselves (and the kwargs sent to Python) are
+                 // untouched, so this doesn't change the modeled shape
+    });
+  });
   renderTabs();
   renderFields();
   resize();
