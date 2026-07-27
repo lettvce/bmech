@@ -97,8 +97,17 @@
     display: flex; justify-content: space-between; font-size: 0.82rem;
     color: var(--text); margin-bottom: 0.25rem;
   }
-  .field label span.val { color: var(--good); font-variant-numeric: tabular-nums; }
-  .field input[type=range] { width: 100%; }
+  .field label span.unit-suffix { color: var(--muted); font-weight: 600; }
+  .field input[type=number] {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem;
+    font-size: 0.9rem; font-variant-numeric: tabular-nums;
+  }
+  .field input[type=number]:focus { outline: none; border-color: var(--accent); }
+  .field .hint {
+    display: block; min-height: 1em; margin-top: 0.2rem;
+    font-size: 0.72rem; color: var(--muted);
+  }
   .field select {
     width: 100%; background: var(--bg); color: var(--text);
     border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem;
@@ -802,6 +811,28 @@ function refreshUnitSuffixes() {
   });
 }
 
+// Small non-editable "≈ 5.906 in" hint under an mm-native input, shown
+// only in "in" mode - the typed value itself always stays mm, so this is
+// the only place an inch reading is visible while editing.
+function hintText(mmValue, unit) {
+  return (unit === "mm" && displayUnit === "in")
+    ? `≈ ${(mmValue / 25.4).toFixed(3)} in` : "";
+}
+
+// Reads each slider's CURRENT typed value (not its def) - used after a
+// unit-toggle click and after every rebuild(), so an in-progress edit's
+// hint stays accurate instead of resetting to the default's hint.
+function refreshHints() {
+  const type = TYPES[activeIndex];
+  allSliders(type).forEach((s) => {
+    const el = document.getElementById("in-" + s.id);
+    const hintEl = document.getElementById("hint-" + s.id);
+    if (!el || !hintEl) return;
+    const val = parseFloat(el.value);
+    hintEl.textContent = Number.isNaN(val) ? "" : hintText(val, s.unit);
+  });
+}
+
 function currentOption(type, group) {
   const cur = type[group.key] || group.default;
   return group.options.find((o) => o.id === cur) || group.options[0];
@@ -880,18 +911,21 @@ function renderFields() {
   allSliders(type).forEach((s) => {
     const field = document.createElement("div");
     field.className = "field";
-    const valId = "val-" + s.id;
-    // The <input> itself stays mm-native always (min/max/step/value) -
-    // only the displayed def text + unit suffix reflect the current
-    // toggle, via toDisplay()/data-orig-unit.
-    const disp = toDisplay(s.def, s.unit);
+    // The <input> itself stays mm-native always (value/min/max/step) -
+    // typing is always in mm/degrees/count, whatever s.unit really is;
+    // the unit-suffix label and the inches hint below are the only
+    // things that react to the mm/in toggle, via toDisplay()/
+    // data-orig-unit - see toDisplay()'s own comment for why.
+    const suffixDisp = s.unit === "mm" ? displayUnit : s.unit;
     field.innerHTML =
-      `<label>${s.label} <span class="val" id="${valId}">${disp.text}</span> ` +
-      `<span class="unit-suffix" data-orig-unit="${s.unit}">${disp.unit}</span></label>` +
-      `<input type="range" id="in-${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.def}">`;
+      `<label>${s.label} <span class="unit-suffix" data-orig-unit="${s.unit}">${suffixDisp}</span></label>` +
+      `<input type="number" id="in-${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.def}" ` +
+      `inputmode="${s.int ? "numeric" : "decimal"}">` +
+      `<span class="hint" id="hint-${s.id}"></span>`;
     fieldsEl.appendChild(field);
     document.getElementById("in-" + s.id).addEventListener("input", scheduleRebuild);
   });
+  refreshHints();
 }
 
 function selectType(i) {
@@ -913,12 +947,25 @@ function scheduleRebuild() {
 function rebuild() {
   const type = TYPES[activeIndex];
   const values = {};
+  let anyInvalid = false;
   allSliders(type).forEach((s) => {
     const el = document.getElementById("in-" + s.id);
-    const val = s.int ? parseInt(el.value, 10) : parseFloat(el.value);
+    let val = parseFloat(el.value);
+    if (Number.isNaN(val)) { anyInvalid = true; return; }
+    if (s.int) {
+      val = Math.floor(val); // discrete field, typed float -> floor, not round
+      el.value = val;        // snap the box itself to what actually gets used
+    }
     values[s.id] = val; // always mm - this is what reaches generate_*()
-    document.getElementById("val-" + s.id).textContent = toDisplay(val, s.unit).text;
   });
+  refreshHints();
+
+  if (anyInvalid) {
+    statusEl.textContent = "Enter a number in every field.";
+    statusEl.classList.add("err");
+    buyBtn.disabled = true;
+    return;
+  }
 
   const kw = combinedBuildKwargs(type, values);
 
