@@ -581,6 +581,18 @@ const material = new THREE.MeshStandardMaterial({
   color: 0xffffff, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide,
   flatShading: true, vertexColors: true,
 });
+// Server-backed types (Wall Cubby/Cable Clip) get their own solid-color
+// material instead of the shared one above - that one's vertexColors:true
+// depends entirely on buildGeometry() setting an explicit per-vertex
+// "color" attribute (that's how the red/yellow overhang highlighting
+// works for the other 7 types); an STLLoader-parsed geometry has no such
+// attribute, so reusing that material would render solid black, not
+// white. Mint green also doubles as a visual cue these two are the
+// server-generated ones.
+const serverMaterial = new THREE.MeshStandardMaterial({
+  color: 0x8fe8b8, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide,
+  flatShading: true,
+});
 
 function resize() {
   const w = viewerEl.clientWidth, h = viewerEl.clientHeight;
@@ -1156,7 +1168,7 @@ async function rebuildFromServer(type, kw) {
   geo.computeVertexNormals();
 
   if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); }
-  mesh = new THREE.Mesh(geo, material);
+  mesh = new THREE.Mesh(geo, serverMaterial);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   scene.add(mesh);
