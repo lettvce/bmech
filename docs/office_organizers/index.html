@@ -177,7 +177,7 @@
     <div id="viewer"><div id="loading">Loading Python runtime…</div></div>
     <div id="panel">
       <h2 id="panel-title"></h2>
-      <div class="sub">Live preview — runs entirely in your browser, no server call.</div>
+      <div class="sub" id="panel-sub">Live preview — runs entirely in your browser, no server call.</div>
       <div class="unit-toggle" id="unit-toggle">
         <button type="button" class="unit-btn active" data-unit="mm">mm</button>
         <button type="button" class="unit-btn" data-unit="in">in</button>
@@ -225,6 +225,14 @@
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+import { STLLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/STLLoader.js";
+
+// Wall Cubby / Cable Clip need real bpy/bmesh booleans (see office_organizers'
+// own CLAUDE.md) - can't run in Pyodide like the other 7, so they're served
+// by a small persistent Blender worker on a real Linode instead. Every
+// other type stays 100% client-side; these two are the only ones that
+// make a network call, and the only ones with `serverEndpoint` set below.
+const SERVER_BASE = "https://api.lettvce.com";
 
 // ---------------------------------------------------------------------
 // Each organizer type's slider set + how to turn slider values into the
@@ -490,6 +498,38 @@ const TYPES = [
       },
     ],
   },
+  {
+    // The only two types that hit the network - see the SERVER_BASE
+    // comment above. `serverEndpoint` (not `fn`) is what rebuild()/
+    // renderFields() key off of to take the fetch path instead of Pyodide.
+    id: "wall_cubby", label: "Wall Cubby", serverEndpoint: "wall_cubby",
+    filename: "wall_cubby.stl",
+    sliders: [
+      { id: "width_mm", label: "Width", unit: "mm", min: 60, max: 300, step: 5, def: 104 },
+      { id: "compartment_count", label: "Compartments", unit: "", min: 1, max: 6, step: 1, def: 3, int: true },
+      { id: "cubby_depth_mm", label: "Cubby Depth", unit: "mm", min: 20, max: 60, step: 1, def: 60 },
+      { id: "cubby_height_mm", label: "Cubby Height", unit: "mm", min: 20, max: 150, step: 1, def: 60 },
+      { id: "wall_thickness_mm", label: "Wall Thickness", unit: "mm", min: 1, max: 4, step: 0.2, def: 2.0 },
+      { id: "base_thickness_mm", label: "Base Thickness", unit: "mm", min: 1.2, max: 6, step: 0.2, def: 2.0 },
+      { id: "hole_count", label: "Mounting Holes", unit: "", min: 1, max: 6, step: 1, def: 2, int: true },
+      { id: "hole_diameter_mm", label: "Hole Diameter", unit: "mm", min: 3, max: 15, step: 0.5, def: 10.0 },
+    ],
+    fixed: {},
+  },
+  {
+    id: "cable_clip", label: "Cable Clip", serverEndpoint: "cable_clip",
+    filename: "cable_clip.stl",
+    sliders: [
+      { id: "hole_diameter_mm", label: "Hole Diameter", unit: "mm", min: 2, max: 10, step: 0.5, def: 4.0 },
+      { id: "hole_count", label: "Holes", unit: "", min: 1, max: 6, step: 1, def: 2, int: true },
+      { id: "hole_spacing_mm", label: "Hole Spacing", unit: "mm", min: 4, max: 50, step: 1, def: 8 },
+      { id: "flange_height_mm", label: "Flange Height", unit: "mm", min: 4, max: 30, step: 1, def: 8 },
+      { id: "flange_thickness_mm", label: "Flange Thickness", unit: "mm", min: 1.5, max: 6, step: 0.5, def: 3.0 },
+      { id: "spine_height_mm", label: "Spine Height", unit: "mm", min: 2, max: 20, step: 1, def: 5 },
+      { id: "wall_thickness_mm", label: "Wall Thickness", unit: "mm", min: 1, max: 4, step: 0.2, def: 2.0 },
+    ],
+    fixed: {},
+  },
 ];
 
 const PY_FILES = [
@@ -672,18 +712,27 @@ function buildBinarySTL(verts, triangles) {
 }
 
 function downloadSTL() {
-  if (!lastVerts || !lastTriangles) return;
   const type = TYPES[activeIndex];
+  let buffer;
 
-  let verts = lastVerts;
-  if (type.altFace && lastAltFaceIdx != null) {
-    const ti = lastTriFaceIdx.indexOf(lastAltFaceIdx);
-    const [a, b, c] = lastTriangles[ti];
-    const normal = computeFaceNormal(lastVerts[a], lastVerts[b], lastVerts[c]);
-    verts = reorientVertsFaceDown(lastVerts, normal);
+  if (type.serverEndpoint) {
+    // The worker already exported real STL bytes for the exact mesh
+    // on screen - reuse them as-is instead of re-triangulating
+    // anything client-side.
+    if (!lastServerSTLBytes) return;
+    buffer = lastServerSTLBytes;
+  } else {
+    if (!lastVerts || !lastTriangles) return;
+    let verts = lastVerts;
+    if (type.altFace && lastAltFaceIdx != null) {
+      const ti = lastTriFaceIdx.indexOf(lastAltFaceIdx);
+      const [a, b, c] = lastTriangles[ti];
+      const normal = computeFaceNormal(lastVerts[a], lastVerts[b], lastVerts[c]);
+      verts = reorientVertsFaceDown(lastVerts, normal);
+    }
+    buffer = buildBinarySTL(verts, lastTriangles);
   }
 
-  const buffer = buildBinarySTL(verts, lastTriangles);
   const blob = new Blob([buffer], { type: "model/stl" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -748,6 +797,7 @@ function frameCamera(geo) {
 const tabsEl = document.getElementById("tabs");
 const fieldsEl = document.getElementById("fields");
 const panelTitleEl = document.getElementById("panel-title");
+const panelSubEl = document.getElementById("panel-sub");
 const statusEl = document.getElementById("status");
 const buyBtn = document.getElementById("buy");
 const unitToggleEl = document.getElementById("unit-toggle");
@@ -768,6 +818,8 @@ let lastVerts = null;
 let lastTriangles = null;
 let lastTriFaceIdx = null;
 let lastAltFaceIdx = null;
+let lastServerSTLBytes = null; // set only for serverEndpoint types - raw STL straight from the worker, reused as-is for download
+let serverRequestSeq = 0;      // guards against an older, slower server response landing after a newer one
 let pending = null;
 let firstRunForType = true;
 
@@ -890,6 +942,9 @@ function renderTabs() {
 function renderFields() {
   const type = TYPES[activeIndex];
   panelTitleEl.textContent = type.label;
+  panelSubEl.textContent = type.serverEndpoint
+    ? "Generated on a remote server - these dimensions are sent to build the shape (the other 7 types stay fully local)."
+    : "Live preview — runs entirely in your browser, no server call.";
   fieldsEl.innerHTML = "";
 
   modeGroups(type).forEach((g) => {
@@ -923,7 +978,13 @@ function renderFields() {
       `inputmode="${s.int ? "numeric" : "decimal"}">` +
       `<span class="hint" id="hint-${s.id}"></span>`;
     fieldsEl.appendChild(field);
-    document.getElementById("in-" + s.id).addEventListener("input", scheduleRebuild);
+    // Server-backed types (wall_cubby/cable_clip) only rebuild on
+    // "change" (blur/Enter), not every keystroke like the Pyodide types'
+    // "input" - each rebuild there is a real network round trip, not a
+    // free in-browser call, so firing one per character would both spam
+    // the server and feel laggier than just waiting for a commit.
+    const eventName = type.serverEndpoint ? "change" : "input";
+    document.getElementById("in-" + s.id).addEventListener(eventName, scheduleRebuild);
   });
   refreshHints();
 }
@@ -968,6 +1029,11 @@ function rebuild() {
   }
 
   const kw = combinedBuildKwargs(type, values);
+
+  if (type.serverEndpoint) {
+    rebuildFromServer(type, kw);
+    return;
+  }
 
   const fn = GENERATOR_FNS.get(type.fn);
   const t0 = performance.now();
@@ -1045,6 +1111,61 @@ function rebuild() {
   buyBtn.disabled = false;
 
   renderReadouts(type, kw);
+}
+
+// Wall Cubby / Cable Clip's only rebuild path - see the SERVER_BASE
+// comment near the top of this script. Everything else in rebuild()
+// (reading/flooring slider values, the anyInvalid guard, building kw
+// via combinedBuildKwargs) is shared; this only takes over once kw is
+// already built, replacing the Pyodide call + triangulation + overhang
+// analysis with a single fetch that returns a ready-to-render STL.
+async function rebuildFromServer(type, kw) {
+  statusEl.classList.remove("err");
+  statusEl.textContent = "Generating on server…";
+  buyBtn.disabled = true;
+  lastServerSTLBytes = null;
+  readoutsEl.innerHTML = ""; // these two types have no readouts (yet) - clear any left over from the previously active type
+
+  const requestId = ++serverRequestSeq; // if a newer request starts before this one resolves, its result must win
+  let stlBuffer;
+  try {
+    const resp = await fetch(`${SERVER_BASE}/generate/${type.serverEndpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(kw),
+    });
+    if (requestId !== serverRequestSeq) return;
+    if (!resp.ok) {
+      const msg = await resp.text();
+      statusEl.textContent = "Invalid: " + msg;
+      statusEl.classList.add("err");
+      buyBtn.disabled = true;
+      return;
+    }
+    stlBuffer = await resp.arrayBuffer();
+  } catch (e) {
+    if (requestId !== serverRequestSeq) return;
+    statusEl.textContent = "Server unreachable: " + e.message;
+    statusEl.classList.add("err");
+    buyBtn.disabled = true;
+    return;
+  }
+  if (requestId !== serverRequestSeq) return;
+
+  const geo = new STLLoader().parse(stlBuffer);
+  geo.computeVertexNormals();
+
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); }
+  mesh = new THREE.Mesh(geo, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  if (firstRunForType) { frameCamera(geo); firstRunForType = false; }
+
+  lastServerSTLBytes = stlBuffer;
+  statusEl.classList.remove("err");
+  statusEl.textContent = `Generated on server — ${geo.attributes.position.count} verts.`;
+  buyBtn.disabled = false;
 }
 
 const readoutsEl = document.getElementById("readouts");
