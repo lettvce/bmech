@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bmerch — live generator</title>
+<meta name="description" content="Type your text or upload an SVG, watch the real mesh come back, and download a ready-to-print STL.">
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+    --good: #7fd0a0;
+    --bad: #e08a8a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  header {
+    padding: 2.5rem 1.5rem 1.5rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 2rem; margin: 0 0 0.5rem; }
+  header p { color: var(--muted); max-width: 560px; margin: 0 auto; font-size: 1.02rem; }
+  .home-bar {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1rem 1.5rem 0;
+    display: flex;
+    justify-content: space-between;
+  }
+  .home-bar a { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+  .home-bar a:hover { color: var(--accent); }
+
+  .tabs {
+    max-width: 1100px;
+    margin: 1.5rem auto 0;
+    padding: 0 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .tab-btn {
+    background: var(--panel);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.5rem 1.1rem;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .tab-btn:hover { color: var(--text); border-color: var(--accent); }
+  .tab-btn.active { background: var(--accent); color: #0b0d10; border-color: var(--accent); }
+
+  .configurator { max-width: 1100px; margin: 1.2rem auto 2.5rem; padding: 0 1.5rem; }
+  .app {
+    display: flex; flex-wrap: wrap;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; min-height: 480px;
+  }
+  #viewer { flex: 1 1 480px; position: relative; background: #101215; }
+  #viewer canvas { display: block; }
+  #loading {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--muted); text-align: center; padding: 1rem;
+  }
+  #panel { width: 320px; flex: 0 0 320px; padding: 1.4rem; border-left: 1px solid var(--border); overflow-y: auto; max-height: 720px; }
+  #panel h2 { font-size: 1.05rem; margin: 0 0 0.25rem; border: none; padding: 0; color: var(--text); }
+  #panel .sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.1rem; }
+
+  .section-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--muted); margin: 1.1rem 0 0.5rem; }
+  .section-label:first-child { margin-top: 0; }
+
+  .seg-toggle { display: flex; gap: 0.4rem; margin-bottom: 0.7rem; }
+  .seg-btn {
+    flex: 1; background: var(--bg); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.35rem 0; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  }
+  .seg-btn:hover { color: var(--text); border-color: var(--accent); }
+  .seg-btn.active { background: var(--accent); color: #0b0d10; border-color: var(--accent); }
+
+  .field { margin-bottom: 0.85rem; }
+  .field label {
+    display: flex; justify-content: space-between; font-size: 0.82rem;
+    color: var(--text); margin-bottom: 0.25rem;
+  }
+  .field label span.unit-suffix { color: var(--muted); font-weight: 600; }
+  .field input[type=number], .field input[type=text] {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem;
+    font-size: 0.9rem; font-variant-numeric: tabular-nums;
+  }
+  .field input[type=number]:focus, .field input[type=text]:focus { outline: none; border-color: var(--accent); }
+  .field select {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem;
+    font-size: 0.82rem;
+  }
+  .field input[type=file] { width: 100%; font-size: 0.78rem; color: var(--muted); }
+  .field .hint { display: block; min-height: 1em; margin-top: 0.2rem; font-size: 0.72rem; color: var(--muted); }
+  .checkbox-field { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.85rem; }
+  .checkbox-field input { width: auto; }
+  .checkbox-field label { font-size: 0.82rem; color: var(--text); margin: 0; }
+
+  #status { font-size: 0.78rem; color: var(--muted); margin-top: 0.6rem; min-height: 34px; }
+  #status.err { color: var(--bad); }
+  #generate {
+    margin-top: 0.6rem; width: 100%; padding: 0.7rem; border-radius: 8px; border: none;
+    background: var(--accent); color: #0b0d10; font-size: 0.88rem; cursor: pointer; font-weight: 700;
+  }
+  #generate:disabled { background: #3a3f4b; color: #666; cursor: not-allowed; }
+  #download {
+    margin-top: 0.5rem; width: 100%; padding: 0.7rem; border-radius: 8px; border: none;
+    background: #3a3f4b; color: #666; font-size: 0.85rem; cursor: not-allowed; font-weight: 600;
+  }
+  #download:not(:disabled) { background: var(--good); color: #0b0d10; cursor: pointer; }
+
+  main { max-width: 860px; margin: 0 auto; padding: 1rem 1.5rem 3rem; }
+  section { margin-bottom: 2rem; }
+  h2 { font-size: 1.3rem; border-left: 3px solid var(--accent); padding-left: 0.75rem; }
+  ul { color: var(--muted); }
+  footer { border-top: 1px solid var(--border); text-align: center; padding: 2rem 1.5rem; color: var(--muted); font-size: 0.9rem; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="home-bar">
+  <a href="/">← Lettvce</a>
+  <a href="../">bmerch overview</a>
+</div>
+
+<header>
+  <h1>bmerch — live generator</h1>
+  <p>Type your text or upload your own SVG, and get back a real,
+     print-ready mesh — generated on the server by the same engine
+     the Blender extension ships with.</p>
+</header>
+
+<div class="tabs" id="tabs" role="tablist"></div>
+
+<div class="configurator">
+  <div class="app">
+    <div id="viewer"><div id="loading">Nothing generated yet — fill in the form and hit Generate.</div></div>
+    <div id="panel">
+      <h2 id="panel-title"></h2>
+      <div class="sub" id="panel-sub"></div>
+      <div id="fields"></div>
+      <button id="generate">Generate</button>
+      <div id="status"></div>
+      <button id="download" disabled>Download STL</button>
+    </div>
+  </div>
+</div>
+
+<main>
+<section>
+  <h2>How this works</h2>
+  <ul>
+    <li>Your text/font choice (or uploaded SVG) is sent to a small server,
+        run through the real merch_core.py engine inside a disposable
+        Blender process, and the resulting STL is sent straight back — a
+        fresh process handles every request, and nothing is stored
+        afterward.</li>
+    <li>SVG uploads are capped at 256KB and checked for obviously
+        suspicious content before they're ever touched — a plain icon or
+        logo SVG is a few KB, so this is generous headroom, not a real
+        limit.</li>
+    <li>Only one curated font is available right now (DejaVu Sans) — more
+        are planned.</li>
+  </ul>
+</section>
+</main>
+
+<footer>
+  <p>Contact: <a href="mailto:blakewysocki421@gmail.com">blakewysocki421@gmail.com</a></p>
+</footer>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+import { STLLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/STLLoader.js";
+
+const SERVER_BASE = "https://api.lettvce.com/bmerch";
+const MAX_SVG_BYTES = 256 * 1024;
+const CURATED_FONTS = [["test_font", "DejaVu Sans (default)"]];
+
+const JOIN_TYPE_OPTIONS = [["ROUND", "Round"], ["MITER", "Miter"], ["SQUARE", "Square"]];
+const SIZE_MODE_OPTIONS = [["X", "Set Width (X)"], ["Y", "Set Height (Y)"], ["INDEPENDENT", "Independent"]];
+const HOLE_DIR_OPTIONS = [["X", "X"], ["Y", "Y"], ["Z", "Z"]];
+const LOOP_TAB_ANCHOR_OPTIONS = [
+  ["TOP_LEFT", "Top Left"], ["TOP_CENTER", "Top Center"], ["TOP_RIGHT", "Top Right"],
+  ["BOTTOM_LEFT", "Bottom Left"], ["BOTTOM_CENTER", "Bottom Center"], ["BOTTOM_RIGHT", "Bottom Right"],
+];
+
+// Every product but Coin shares one "source" (text+font or SVG) - these
+// fields are on every product's own field list so the generic field
+// renderer needs no special-casing for Bead/Keychain/Nameplate/Pendant/
+// Coaster. Coin has two independent sources instead (see COIN_SOURCE_FIELDS
+// below) and is rendered by its own dedicated path.
+const RESOLUTION_FIELDS = [
+  { key: "text_resolution", label: "Text Resolution", type: "number", default: 8, min: 2, max: 64, step: 1, integer: true,
+    hint: "Higher = smoother letterforms, slower to generate" },
+  { key: "shape_resolution", label: "Shape Resolution", type: "number", default: 16, min: 3, max: 64, step: 1, integer: true,
+    hint: "Higher = rounder borders/holes" },
+];
+
+const EDGE_BEVEL_FIELDS = [
+  { key: "edge_bevel_enable", label: "Edge Bevel", type: "checkbox", default: false },
+  { key: "edge_bevel_length", label: "Bevel Length", unit: "mm", type: "number", default: 0.5, min: 0.0, max: 5, step: 0.1,
+    showIf: v => v.edge_bevel_enable },
+  { key: "edge_bevel_segments", label: "Bevel Segments", type: "number", default: 8, min: 1, max: 16, step: 1, integer: true,
+    showIf: v => v.edge_bevel_enable },
+];
+
+const PRODUCTS = [
+  {
+    id: "bead_factory", label: "Bead", filename: "bead.stl",
+    sub: "A stringable bead from your own text or a small icon.",
+    fields: [
+      { key: "width_ratio_percent", label: "Width Ratio", unit: "%", type: "number", default: 3.0, min: 0.5, max: 20, step: 0.5 },
+      { key: "base_thickness", label: "Base Thickness", unit: "mm", type: "number", default: 3.0, min: 0.5, max: 20, step: 0.5 },
+      { key: "relief_height", label: "Relief Height", unit: "mm", type: "number", default: 0.2, min: 0.0, max: 5, step: 0.1 },
+      { key: "join_type", label: "Join Type", type: "select", default: "ROUND", options: JOIN_TYPE_OPTIONS },
+      { key: "size_mode", label: "Size Mode", type: "select", default: "X", options: SIZE_MODE_OPTIONS },
+      { key: "target_length", label: "Graphic Width (X)", unit: "mm", type: "number", default: 30.0, min: 1, max: 200, step: 1 },
+      { key: "target_depth", label: "Graphic Height (Y)", unit: "mm", type: "number", default: 0.0, min: 0, max: 200, step: 1,
+        hint: "0 = auto (follows Width Ratio)" },
+      { key: "hole_radius", label: "Hole Radius", unit: "mm", type: "number", default: 1.0, min: 0, max: 10, step: 0.1,
+        hint: "0 disables the stringing hole" },
+      { key: "hole_direction", label: "Hole Direction", type: "select", default: "X", options: HOLE_DIR_OPTIONS },
+      ...RESOLUTION_FIELDS,
+    ],
+  },
+  {
+    id: "keychain_maker", label: "Keychain", filename: "keychain.stl",
+    sub: "Same charm as Bead, with a welded loop tab instead of a stringing hole.",
+    fields: [
+      { key: "width_ratio_percent", label: "Width Ratio", unit: "%", type: "number", default: 3.0, min: 0.5, max: 20, step: 0.5 },
+      { key: "base_thickness", label: "Base Thickness", unit: "mm", type: "number", default: 3.0, min: 0.5, max: 20, step: 0.5 },
+      { key: "relief_height", label: "Relief Height", unit: "mm", type: "number", default: 0.2, min: 0.0, max: 5, step: 0.1 },
+      { key: "join_type", label: "Join Type", type: "select", default: "ROUND", options: JOIN_TYPE_OPTIONS },
+      { key: "size_mode", label: "Size Mode", type: "select", default: "X", options: SIZE_MODE_OPTIONS },
+      { key: "target_length", label: "Graphic Width (X)", unit: "mm", type: "number", default: 30.0, min: 1, max: 200, step: 1 },
+      { key: "target_depth", label: "Graphic Height (Y)", unit: "mm", type: "number", default: 0.0, min: 0, max: 200, step: 1,
+        hint: "0 = auto (follows Width Ratio)" },
+      { key: "loop_tab_hole_diameter", label: "Loop Hole Diameter", unit: "mm", type: "number", default: 4.0, min: 1, max: 15, step: 0.5 },
+      { key: "loop_tab_wall_thickness", label: "Loop Wall Thickness", unit: "mm", type: "number", default: 2.0, min: 0.5, max: 10, step: 0.5 },
+      { key: "loop_tab_anchor", label: "Loop Anchor", type: "select", default: "TOP_LEFT", options: LOOP_TAB_ANCHOR_OPTIONS },
+      ...RESOLUTION_FIELDS,
+    ],
+  },
+  {
+    id: "nameplate_maker", label: "Nameplate", filename: "nameplate.stl",
+    sub: "A flat plate, or a bent standing plaque, with your text raised or engraved.",
+    fields: [
+      { key: "variant", label: "Shape", type: "select", default: "flat", options: [["flat", "Flat Plate"], ["standing", "Standing"]] },
+      { key: "plate_width", label: "Plate Width", unit: "mm", type: "number", default: 60.0, min: 10, max: 300, step: 1 },
+      { key: "plate_height", label: "Plate Height", unit: "mm", type: "number", default: 20.0, min: 5, max: 200, step: 1,
+        showIf: v => v.variant === "flat" },
+      { key: "corner_radius", label: "Corner Radius", unit: "mm", type: "number", default: 3.0, min: 0, max: 30, step: 0.5,
+        showIf: v => v.variant === "flat" },
+      { key: "base_thickness", label: "Base Thickness", unit: "mm", type: "number", default: 3.0, min: 0.5, max: 20, step: 0.5,
+        showIf: v => v.variant === "flat" },
+      { key: "strip_thickness", label: "Strip Thickness", unit: "mm", type: "number", default: 4.0, min: 0.5, max: 20, step: 0.5,
+        showIf: v => v.variant === "standing" },
+      { key: "foot_length", label: "Foot Length", unit: "mm", type: "number", default: 25.0, min: 5, max: 150, step: 1,
+        showIf: v => v.variant === "standing" },
+      { key: "face_length", label: "Face Length", unit: "mm", type: "number", default: 30.0, min: 5, max: 150, step: 1,
+        showIf: v => v.variant === "standing" },
+      { key: "bend_radius", label: "Bend Radius", unit: "mm", type: "number", default: 6.0, min: 0.5, max: 40, step: 0.5,
+        showIf: v => v.variant === "standing" },
+      { key: "bend_angle_deg", label: "Bend Angle", unit: "°", type: "number", default: 120.0, min: 1, max: 170, step: 1,
+        showIf: v => v.variant === "standing" },
+      { key: "edge_radius", label: "Edge Radius", unit: "mm", type: "number", default: 0.0, min: 0, max: 10, step: 0.5,
+        showIf: v => v.variant === "standing" },
+      { key: "text_style", label: "Text Style", type: "select", default: "RAISED", options: [["RAISED", "Raised"], ["ENGRAVED", "Engraved"]] },
+      { key: "relief_height", label: "Relief Height", unit: "mm", type: "number", default: 0.5, min: 0, max: 5, step: 0.1 },
+      { key: "size_mode", label: "Size Mode", type: "select", default: "Y", options: SIZE_MODE_OPTIONS },
+      { key: "target_length", label: "Graphic Width (X)", unit: "mm", type: "number", default: 0.0, min: 0, max: 300, step: 1,
+        hint: "0 = auto" },
+      { key: "target_depth", label: "Graphic Height (Y)", unit: "mm", type: "number", default: 0.0, min: 0, max: 300, step: 1,
+        hint: "0 = auto" },
+      { key: "shape_resolution", label: "Shape Resolution", type: "number", default: 16, min: 3, max: 64, step: 1, integer: true,
+        showIf: v => v.variant === "flat" },
+      { key: "text_resolution", label: "Text Resolution", type: "number", default: 8, min: 2, max: 64, step: 1, integer: true },
+    ],
+  },
+  {
+    id: "pendant_maker", label: "Pendant", filename: "pendant.stl",
+    sub: "A round bezel with a recessed graphic, flush with the rim.",
+    fields: [
+      { key: "outer_diameter", label: "Outer Diameter", unit: "mm", type: "number", default: 30.0, min: 5, max: 150, step: 1 },
+      { key: "base_thickness", label: "Base Thickness", unit: "mm", type: "number", default: 2.0, min: 0.5, max: 15, step: 0.5 },
+      { key: "wall_height", label: "Text & Border Height", unit: "mm", type: "number", default: 1.0, min: 0.2, max: 10, step: 0.1 },
+      { key: "wall_thickness", label: "Border Thickness", unit: "mm", type: "number", default: 2.0, min: 0.5, max: 20, step: 0.5 },
+      { key: "hole_diameter", label: "Hole Diameter", unit: "mm", type: "number", default: 1.5, min: 0, max: 10, step: 0.1,
+        hint: "0 disables the jump-ring hole" },
+      { key: "hole_edge_gap", label: "Hole Edge Gap", unit: "mm", type: "number", default: 1.0, min: 0, max: 10, step: 0.5 },
+      ...EDGE_BEVEL_FIELDS,
+      { key: "size_mode", label: "Size Mode", type: "select", default: "Y", options: SIZE_MODE_OPTIONS },
+      { key: "target_length", label: "Graphic Width (X)", unit: "mm", type: "number", default: 0.0, min: 0, max: 150, step: 1,
+        hint: "0 = auto (largest that clears the rim)" },
+      { key: "target_depth", label: "Graphic Height (Y)", unit: "mm", type: "number", default: 0.0, min: 0, max: 150, step: 1,
+        hint: "0 = auto (largest that clears the rim)" },
+      ...RESOLUTION_FIELDS,
+    ],
+  },
+  {
+    id: "coaster_maker", label: "Coaster", filename: "coaster.stl",
+    sub: "A round or square coaster with a barely-raised graphic, paint-friendly.",
+    fields: [
+      { key: "shape", label: "Shape", type: "select", default: "round", options: [["round", "Round"], ["square", "Square"]] },
+      { key: "outer_diameter", label: "Diameter", unit: "mm", type: "number", default: 90.0, min: 20, max: 300, step: 1,
+        showIf: v => v.shape === "round" },
+      { key: "side_length", label: "Side Length", unit: "mm", type: "number", default: 90.0, min: 20, max: 300, step: 1,
+        showIf: v => v.shape === "square" },
+      { key: "corner_radius", label: "Corner Radius", unit: "mm", type: "number", default: 6.0, min: 0, max: 40, step: 0.5,
+        showIf: v => v.shape === "square" },
+      { key: "base_thickness", label: "Height", unit: "mm", type: "number", default: 4.0, min: 0.5, max: 20, step: 0.5 },
+      { key: "wall_thickness", label: "Border Thickness", unit: "mm", type: "number", default: 4.0, min: 0.5, max: 30, step: 0.5 },
+      ...EDGE_BEVEL_FIELDS,
+      { key: "size_mode", label: "Size Mode", type: "select", default: "Y", options: SIZE_MODE_OPTIONS },
+      { key: "target_length", label: "Graphic Width (X)", unit: "mm", type: "number", default: 0.0, min: 0, max: 300, step: 1,
+        hint: "0 = auto (largest that clears the border)" },
+      { key: "target_depth", label: "Graphic Height (Y)", unit: "mm", type: "number", default: 0.0, min: 0, max: 300, step: 1,
+        hint: "0 = auto (largest that clears the border)" },
+      ...RESOLUTION_FIELDS,
+    ],
+  },
+  {
+    id: "coin_maker", label: "Coin", filename: "coin.stl",
+    sub: "A two-sided coin - decorate the front, the back, or both.",
+    twoSided: true,
+    fields: [
+      { key: "outer_diameter", label: "Outer Diameter", unit: "mm", type: "number", default: 40.0, min: 10, max: 150, step: 1 },
+      { key: "core_thickness", label: "Core Thickness", unit: "mm", type: "number", default: 2.0, min: 0.5, max: 15, step: 0.5 },
+      { key: "relief_height", label: "Relief Height", unit: "mm", type: "number", default: 1.0, min: 0.2, max: 10, step: 0.1 },
+      { key: "wall_thickness", label: "Border Thickness", unit: "mm", type: "number", default: 3.0, min: 0.5, max: 20, step: 0.5 },
+      ...EDGE_BEVEL_FIELDS,
+      { key: "text_resolution", label: "Text Resolution", type: "number", default: 8, min: 2, max: 64, step: 1, integer: true },
+      { key: "shape_resolution", label: "Shape Resolution", type: "number", default: 16, min: 3, max: 64, step: 1, integer: true },
+    ],
+    sideFields: [
+      { key: "size_mode", label: "Size Mode", type: "select", default: "Y", options: SIZE_MODE_OPTIONS },
+      { key: "target_length", label: "Graphic Width (X)", unit: "mm", type: "number", default: 0.0, min: 0, max: 150, step: 1,
+        hint: "0 = auto" },
+      { key: "target_depth", label: "Graphic Height (Y)", unit: "mm", type: "number", default: 0.0, min: 0, max: 150, step: 1,
+        hint: "0 = auto" },
+    ],
+  },
+];
+
+// ---------------------------------------------------------------------
+// Three.js scene setup - same conventions as office_organizers' own
+// configurator (dark viewport, key+fill lights, orbit controls); every
+// bmerch product is server-generated, so there's only ever one material.
+// ---------------------------------------------------------------------
+const viewerEl = document.getElementById("viewer");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x101215);
+
+const camera = new THREE.PerspectiveCamera(40, 1, 1, 5000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+viewerEl.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+const key = new THREE.DirectionalLight(0xffffff, 1.1);
+key.position.set(120, 200, 160);
+key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+key.shadow.bias = -0.0005;
+scene.add(key);
+scene.add(key.target);
+const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+fill.position.set(-150, 60, -100);
+scene.add(fill);
+
+let mesh = null;
+const material = new THREE.MeshStandardMaterial({
+  color: 0x8fe8b8, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide, flatShading: true,
+});
+
+function resize() {
+  const w = viewerEl.clientWidth, h = viewerEl.clientHeight;
+  if (w === 0 || h === 0) return;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+window.addEventListener("resize", resize);
+resize();
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+function frameCamera(geo) {
+  geo.computeBoundingSphere();
+  const { center, radius } = geo.boundingSphere;
+  const dist = radius / Math.sin((camera.fov * Math.PI) / 360) * 1.15;
+  camera.position.set(center.x + dist * 0.55, center.y + dist * 0.55, center.z + dist * 0.75);
+  controls.target.copy(center);
+  camera.near = Math.max(dist * 0.01, 0.1);
+  camera.far = dist * 10;
+  camera.updateProjectionMatrix();
+  controls.update();
+
+  key.position.set(center.x + radius * 1.2, center.y + radius * 2.0, center.z + radius * 1.6);
+  key.target.position.copy(center);
+  key.target.updateMatrixWorld();
+  const sc = key.shadow.camera;
+  sc.left = -radius * 1.5; sc.right = radius * 1.5;
+  sc.top = radius * 1.5; sc.bottom = -radius * 1.5;
+  sc.near = radius * 0.1; sc.far = radius * 6;
+  sc.updateProjectionMatrix();
+}
+
+function showMesh(stlBuffer) {
+  const geo = new STLLoader().parse(stlBuffer);
+  geo.computeVertexNormals();
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); }
+  mesh = new THREE.Mesh(geo, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  frameCamera(geo);
+}
+
+// ---------------------------------------------------------------------
+// UI state + rendering
+// ---------------------------------------------------------------------
+const tabsEl = document.getElementById("tabs");
+const fieldsEl = document.getElementById("fields");
+const panelTitleEl = document.getElementById("panel-title");
+const panelSubEl = document.getElementById("panel-sub");
+const statusEl = document.getElementById("status");
+const generateBtn = document.getElementById("generate");
+const downloadBtn = document.getElementById("download");
+const loadingEl = document.getElementById("loading");
+
+let activeIndex = 0;
+let fieldValues = {};      // product param values, keyed by field.key
+let sourceState = {};      // { mode: 'text'|'svg', text, fontId, svgFile } per side ('single'/'front'/'back')
+let lastSTLBytes = null;
+
+function svgToBase64(arrayBuffer) {
+  let binary = "";
+  const bytes = new Uint8Array(arrayBuffer);
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+function renderSourceBlock(side, label) {
+  const st = sourceState[side];
+  const wrap = document.createElement("div");
+
+  const toggle = document.createElement("div");
+  toggle.className = "seg-toggle";
+  ["text", "svg"].forEach((mode) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "seg-btn" + (st.mode === mode ? " active" : "");
+    btn.textContent = mode === "text" ? "Text" : "Upload SVG";
+    btn.addEventListener("click", () => { st.mode = mode; renderFields(); });
+    toggle.appendChild(btn);
+  });
+  wrap.appendChild(toggle);
+
+  if (st.mode === "text") {
+    const textField = document.createElement("div");
+    textField.className = "field";
+    textField.innerHTML = `<label>${label} Text</label>`;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = st.text;
+    input.placeholder = "Your text";
+    input.addEventListener("input", () => { st.text = input.value; });
+    textField.appendChild(input);
+    wrap.appendChild(textField);
+
+    const fontField = document.createElement("div");
+    fontField.className = "field";
+    fontField.innerHTML = `<label>Font</label>`;
+    const select = document.createElement("select");
+    CURATED_FONTS.forEach(([id, name]) => {
+      const opt = document.createElement("option");
+      opt.value = id; opt.textContent = name;
+      if (id === st.fontId) opt.selected = true;
+      select.appendChild(opt);
+    });
+    select.addEventListener("change", () => { st.fontId = select.value; });
+    fontField.appendChild(select);
+    wrap.appendChild(fontField);
+  } else {
+    const fileField = document.createElement("div");
+    fileField.className = "field";
+    fileField.innerHTML = `<label>${label} SVG File</label>`;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".svg,image/svg+xml";
+    const hint = document.createElement("span");
+    hint.className = "hint";
+    hint.textContent = st.svgBytes ? `${st.svgFileName} (${(st.svgBytes.byteLength / 1024).toFixed(1)}KB)` : "Max 256KB";
+    input.addEventListener("change", async () => {
+      const file = input.files[0];
+      if (!file) { st.svgBytes = null; return; }
+      if (file.size > MAX_SVG_BYTES) {
+        hint.textContent = `Too large (${(file.size / 1024).toFixed(0)}KB) - max 256KB`;
+        st.svgBytes = null;
+        input.value = "";
+        return;
+      }
+      st.svgBytes = await file.arrayBuffer();
+      st.svgFileName = file.name;
+      hint.textContent = `${file.name} (${(file.size / 1024).toFixed(1)}KB)`;
+    });
+    fileField.appendChild(input);
+    fileField.appendChild(hint);
+    wrap.appendChild(fileField);
+  }
+
+  return wrap;
+}
+
+function renderField(field) {
+  if (field.showIf && !field.showIf(fieldValues)) return null;
+
+  if (field.type === "checkbox") {
+    const wrap = document.createElement("div");
+    wrap.className = "checkbox-field";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.id = "f_" + field.key;
+    input.checked = !!fieldValues[field.key];
+    input.addEventListener("change", () => { fieldValues[field.key] = input.checked; renderFields(); });
+    const label = document.createElement("label");
+    label.htmlFor = input.id;
+    label.textContent = field.label;
+    wrap.appendChild(input);
+    wrap.appendChild(label);
+    return wrap;
+  }
+
+  const wrap = document.createElement("div");
+  wrap.className = "field";
+  const labelEl = document.createElement("label");
+  labelEl.innerHTML = `<span>${field.label}</span>` + (field.unit ? `<span class="unit-suffix">${field.unit}</span>` : "");
+  wrap.appendChild(labelEl);
+
+  if (field.type === "select") {
+    const select = document.createElement("select");
+    field.options.forEach(([val, text]) => {
+      const opt = document.createElement("option");
+      opt.value = val; opt.textContent = text;
+      if (val === fieldValues[field.key]) opt.selected = true;
+      select.appendChild(opt);
+    });
+    select.addEventListener("change", () => { fieldValues[field.key] = select.value; renderFields(); });
+    wrap.appendChild(select);
+  } else {
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = field.min; input.max = field.max; input.step = field.step;
+    input.value = fieldValues[field.key];
+    input.addEventListener("input", () => {
+      const n = field.integer ? parseInt(input.value, 10) : parseFloat(input.value);
+      fieldValues[field.key] = Number.isFinite(n) ? n : field.default;
+    });
+    wrap.appendChild(input);
+  }
+
+  if (field.hint) {
+    const hint = document.createElement("span");
+    hint.className = "hint";
+    hint.textContent = field.hint;
+    wrap.appendChild(hint);
+  }
+  return wrap;
+}
+
+function sectionLabel(text) {
+  const el = document.createElement("div");
+  el.className = "section-label";
+  el.textContent = text;
+  return el;
+}
+
+function renderFields() {
+  const product = PRODUCTS[activeIndex];
+  fieldsEl.innerHTML = "";
+
+  if (product.twoSided) {
+    fieldsEl.appendChild(sectionLabel("Front"));
+    fieldsEl.appendChild(renderSourceBlock("front", "Front"));
+    sideFieldsFor(product, "front").forEach((f) => {
+      const el = renderField(f);
+      if (el) fieldsEl.appendChild(el);
+    });
+
+    fieldsEl.appendChild(sectionLabel("Back"));
+    fieldsEl.appendChild(renderSourceBlock("back", "Back"));
+    sideFieldsFor(product, "back").forEach((f) => {
+      const el = renderField(f);
+      if (el) fieldsEl.appendChild(el);
+    });
+
+    fieldsEl.appendChild(sectionLabel("Coin"));
+  } else {
+    fieldsEl.appendChild(sectionLabel("Graphic"));
+    fieldsEl.appendChild(renderSourceBlock("single", ""));
+    fieldsEl.appendChild(sectionLabel("Shape"));
+  }
+
+  product.fields.forEach((f) => {
+    const el = renderField(f);
+    if (el) fieldsEl.appendChild(el);
+  });
+}
+
+// coin_maker's shared sideFields config needs independent front_*/back_*
+// keys and its own fieldValues entries - built fresh per side rather than
+// mutating the shared template in place.
+function sideFieldsFor(product, side) {
+  return product.sideFields.map((f) => {
+    const key = `${side}_${f.key}`;
+    if (!(key in fieldValues)) fieldValues[key] = f.default;
+    return { ...f, key, label: f.label };
+  });
+}
+
+function resetProductState(product) {
+  fieldValues = {};
+  product.fields.forEach((f) => { fieldValues[f.key] = f.default; });
+  if (product.twoSided) {
+    sourceState = {
+      front: { mode: "text", text: "HI", fontId: "test_font", svgBytes: null, svgFileName: "" },
+      back: { mode: "text", text: "", fontId: "test_font", svgBytes: null, svgFileName: "" },
+    };
+    product.sideFields.forEach((f) => {
+      fieldValues[`front_${f.key}`] = f.default;
+      fieldValues[`back_${f.key}`] = f.default;
+    });
+  } else {
+    sourceState = { single: { mode: "text", text: "HI", fontId: "test_font", svgBytes: null, svgFileName: "" } };
+  }
+}
+
+function selectProduct(index) {
+  activeIndex = index;
+  const product = PRODUCTS[index];
+  [...tabsEl.children].forEach((btn, i) => btn.classList.toggle("active", i === index));
+  panelTitleEl.textContent = product.label;
+  panelSubEl.textContent = product.sub;
+  resetProductState(product);
+  renderFields();
+  statusEl.textContent = "";
+  statusEl.classList.remove("err");
+  downloadBtn.disabled = true;
+  lastSTLBytes = null;
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); mesh = null; }
+  loadingEl.style.display = "flex";
+  loadingEl.textContent = "Nothing generated yet — fill in the form and hit Generate.";
+}
+
+PRODUCTS.forEach((product, i) => {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "tab-btn";
+  btn.textContent = product.label;
+  btn.addEventListener("click", () => selectProduct(i));
+  tabsEl.appendChild(btn);
+});
+
+function buildSourcePayload(side, prefix) {
+  const st = sourceState[side];
+  const payload = {};
+  if (st.mode === "svg") {
+    if (!st.svgBytes) return null;
+    payload[`${prefix}svg_base64`] = svgToBase64(st.svgBytes);
+  } else {
+    if (!st.text.trim()) return null;
+    payload[`${prefix}text`] = st.text;
+    payload[`${prefix}font_id`] = st.fontId;
+  }
+  return payload;
+}
+
+async function generate() {
+  const product = PRODUCTS[activeIndex];
+  const body = { ...fieldValues };
+
+  if (product.twoSided) {
+    const front = buildSourcePayload("front", "front_");
+    const back = buildSourcePayload("back", "back_");
+    if (!front && !back) {
+      statusEl.textContent = "Set at least a Front or Back text/SVG.";
+      statusEl.classList.add("err");
+      return;
+    }
+    if (front) Object.assign(body, front);
+    if (back) Object.assign(body, back);
+  } else {
+    const source = buildSourcePayload("single", "");
+    if (!source) {
+      statusEl.textContent = "Enter some text, or upload an SVG.";
+      statusEl.classList.add("err");
+      return;
+    }
+    Object.assign(body, source);
+  }
+
+  generateBtn.disabled = true;
+  downloadBtn.disabled = true;
+  statusEl.classList.remove("err");
+  statusEl.textContent = "Generating on server…";
+  loadingEl.style.display = "flex";
+  loadingEl.textContent = "Generating…";
+
+  try {
+    const resp = await fetch(`${SERVER_BASE}/generate/${product.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const msg = await resp.text();
+      statusEl.textContent = "Failed: " + msg;
+      statusEl.classList.add("err");
+      loadingEl.textContent = "Generation failed — see message below.";
+      return;
+    }
+    const buffer = await resp.arrayBuffer();
+    showMesh(buffer);
+    lastSTLBytes = buffer;
+    loadingEl.style.display = "none";
+    statusEl.textContent = `Generated — ${(buffer.byteLength / 1024).toFixed(1)}KB STL.`;
+    downloadBtn.disabled = false;
+  } catch (e) {
+    statusEl.textContent = "Server unreachable: " + e.message;
+    statusEl.classList.add("err");
+    loadingEl.textContent = "Couldn't reach the server.";
+  } finally {
+    generateBtn.disabled = false;
+  }
+}
+
+function downloadSTL() {
+  if (!lastSTLBytes) return;
+  const product = PRODUCTS[activeIndex];
+  const blob = new Blob([lastSTLBytes], { type: "model/stl" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = product.filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+generateBtn.addEventListener("click", generate);
+downloadBtn.addEventListener("click", downloadSTL);
+
+selectProduct(0);
+</script>
+</body>
+</html>
