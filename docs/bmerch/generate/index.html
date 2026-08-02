@@ -126,6 +126,11 @@
     background: #3a3f4b; color: #666; font-size: 0.85rem; cursor: not-allowed; font-weight: 600;
   }
   #download:not(:disabled) { background: var(--good); color: #0b0d10; cursor: pointer; }
+  #download-all {
+    display: none; margin-top: 0.5rem; width: 100%; padding: 0.7rem; border-radius: 8px; border: none;
+    background: var(--accent); color: #0b0d10; font-size: 0.85rem; cursor: pointer; font-weight: 700;
+  }
+  #download-all:disabled { background: #3a3f4b; color: #666; cursor: not-allowed; }
 
   main { max-width: 860px; margin: 0 auto; padding: 1rem 1.5rem 3rem; }
   section { margin-bottom: 2rem; }
@@ -160,6 +165,7 @@
       <button id="generate">Generate</button>
       <div id="status"></div>
       <button id="download" disabled>Download STL</button>
+      <button id="download-all">Download All</button>
     </div>
   </div>
 </div>
@@ -179,6 +185,11 @@
         limit.</li>
     <li>Only one curated font is available right now (DejaVu Sans) — more
         are planned.</li>
+    <li>Labels is different — no text/SVG source, just a Prefix, Suffix,
+        and number Range (e.g. Prefix "DRAWER-", Range 1–7 for DRAWER-01
+        through DRAWER-07). Generate previews just the first label; Download
+        All builds and zips the whole range in one request (capped at 200
+        labels per batch).</li>
   </ul>
 </section>
 </main>
@@ -367,7 +378,34 @@ const PRODUCTS = [
         hint: "0 = auto" },
     ],
   },
+  {
+    id: "label_maker", label: "Labels", filename: "label_preview.stl",
+    sub: "Batch labels from a prefix + number range, e.g. DRAWER-01 through DRAWER-07 - one fixed plate size for the whole batch.",
+    isBatch: true,
+    fields: [
+      { key: "prefix", label: "Prefix", type: "text", default: "DRAWER-" },
+      { key: "suffix", label: "Suffix", type: "text", default: "" },
+      { key: "range_start", label: "Range Start", type: "number", default: 1, min: 0, max: 999999, step: 1, integer: true },
+      { key: "range_end", label: "Range End", type: "number", default: 7, min: 0, max: 999999, step: 1, integer: true },
+      { key: "digits", label: "Zero-Pad Digits", type: "number", default: 0, min: 0, max: 6, step: 1, integer: true,
+        hint: "0 = auto (matches the widest number in the range)" },
+      { key: "font_id", label: "Font", type: "select", default: "test_font", options: CURATED_FONTS },
+      { key: "plate_width_mm", label: "Plate Width", unit: "mm", type: "number", default: 100.0, min: 10, max: 300, step: 1,
+        hint: "Fixed for every label in the batch" },
+      { key: "plate_depth_mm", label: "Plate Depth", unit: "mm", type: "number", default: 34.0, min: 5, max: 150, step: 1 },
+      { key: "base_thickness_mm", label: "Thickness", unit: "mm", type: "number", default: 1.6, min: 0.4, max: 10, step: 0.1 },
+      { key: "corner_radius_mm", label: "Corner Radius", unit: "mm", type: "number", default: 5.0, min: 0, max: 30, step: 0.5 },
+      { key: "corner_segments", label: "Corner Segments", type: "number", default: 12, min: 2, max: 32, step: 1, integer: true },
+      { key: "text_size_mm", label: "Text Size", unit: "mm", type: "number", default: 16.0, min: 2, max: 100, step: 0.5 },
+      { key: "text_extrude_mm", label: "Text Relief Height", unit: "mm", type: "number", default: 0.6, min: 0.1, max: 5, step: 0.1 },
+    ],
+  },
 ];
+
+// Mirrors bmerch_listener.py's own MAX_LABEL_BATCH - checked here too
+// for instant feedback, though the server enforces this independently
+// regardless of anything checked client-side.
+const MAX_LABEL_BATCH_CLIENT = 200;
 
 // ---------------------------------------------------------------------
 // Three.js scene setup - same conventions as office_organizers' own
@@ -464,6 +502,7 @@ const panelSubEl = document.getElementById("panel-sub");
 const statusEl = document.getElementById("status");
 const generateBtn = document.getElementById("generate");
 const downloadBtn = document.getElementById("download");
+const downloadAllBtn = document.getElementById("download-all");
 const loadingEl = document.getElementById("loading");
 
 let activeIndex = 0;
@@ -585,6 +624,12 @@ function renderField(field) {
     });
     select.addEventListener("change", () => { fieldValues[field.key] = select.value; renderFields(); });
     wrap.appendChild(select);
+  } else if (field.type === "text") {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = fieldValues[field.key];
+    input.addEventListener("input", () => { fieldValues[field.key] = input.value; });
+    wrap.appendChild(input);
   } else {
     const input = document.createElement("input");
     input.type = "number";
@@ -633,6 +678,11 @@ function renderFields() {
     });
 
     fieldsEl.appendChild(sectionLabel("Coin"));
+  } else if (product.isBatch) {
+    // No text/SVG source at all - the prefix/suffix/range fields
+    // (product.fields' own first few entries) drive every label's text
+    // directly, matching label_maker_core.py's own template.
+    fieldsEl.appendChild(sectionLabel("Batch"));
   } else {
     fieldsEl.appendChild(sectionLabel("Graphic"));
     fieldsEl.appendChild(renderSourceBlock("single", ""));
@@ -684,6 +734,7 @@ function selectProduct(index) {
   statusEl.textContent = "";
   statusEl.classList.remove("err");
   downloadBtn.disabled = true;
+  downloadAllBtn.style.display = product.isBatch ? "block" : "none";
   lastSTLBytes = null;
   if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); mesh = null; }
   loadingEl.style.display = "flex";
@@ -715,9 +766,17 @@ function buildSourcePayload(side, prefix) {
 
 async function generate() {
   const product = PRODUCTS[activeIndex];
-  const body = { ...fieldValues };
+  let body;
 
-  if (product.twoSided) {
+  if (product.isBatch) {
+    // Generate always previews just the FIRST label in the range - a
+    // fast, single-STL request (same response shape as every other
+    // product) even if the user's own Range End covers hundreds of
+    // labels. Download All (below) is what actually requests the full
+    // batch; the range fields themselves are untouched here.
+    body = { ...fieldValues, range_end: fieldValues.range_start };
+  } else if (product.twoSided) {
+    body = { ...fieldValues };
     const front = buildSourcePayload("front", "front_");
     const back = buildSourcePayload("back", "back_");
     if (!front && !back) {
@@ -728,6 +787,7 @@ async function generate() {
     if (front) Object.assign(body, front);
     if (back) Object.assign(body, back);
   } else {
+    body = { ...fieldValues };
     const source = buildSourcePayload("single", "");
     if (!source) {
       statusEl.textContent = "Enter some text, or upload an SVG.";
@@ -786,8 +846,67 @@ function downloadSTL() {
   URL.revokeObjectURL(url);
 }
 
+async function downloadAll() {
+  const product = PRODUCTS[activeIndex];
+  const start = fieldValues.range_start;
+  const end = fieldValues.range_end;
+  if (end < start) {
+    statusEl.textContent = "Range End must be >= Range Start.";
+    statusEl.classList.add("err");
+    return;
+  }
+  const count = end - start + 1;
+  if (count > MAX_LABEL_BATCH_CLIENT) {
+    statusEl.textContent = `${count} labels requested - max ${MAX_LABEL_BATCH_CLIENT} per batch. Split into multiple requests.`;
+    statusEl.classList.add("err");
+    return;
+  }
+
+  downloadAllBtn.disabled = true;
+  generateBtn.disabled = true;
+  statusEl.classList.remove("err");
+  statusEl.textContent = `Generating ${count} label${count === 1 ? "" : "s"} on server…`;
+
+  try {
+    const resp = await fetch(`${SERVER_BASE}/generate/${product.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...fieldValues }),
+    });
+    if (!resp.ok) {
+      const msg = await resp.text();
+      statusEl.textContent = "Failed: " + msg;
+      statusEl.classList.add("err");
+      return;
+    }
+    const buffer = await resp.arrayBuffer();
+    // A range of exactly 1 still comes back as a plain STL (same
+    // single-label contract every other product uses) - Content-Type
+    // is what actually distinguishes the two cases, not the count
+    // computed above (which is only ever a client-side hint).
+    const isZip = (resp.headers.get("Content-Type") || "").includes("zip");
+    const blob = new Blob([buffer], { type: isZip ? "application/zip" : "model/stl" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = isZip ? "labels.zip" : "label.stl";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    statusEl.textContent = `Downloaded ${count} label${count === 1 ? "" : "s"} (${(buffer.byteLength / 1024).toFixed(1)}KB).`;
+  } catch (e) {
+    statusEl.textContent = "Server unreachable: " + e.message;
+    statusEl.classList.add("err");
+  } finally {
+    downloadAllBtn.disabled = false;
+    generateBtn.disabled = false;
+  }
+}
+
 generateBtn.addEventListener("click", generate);
 downloadBtn.addEventListener("click", downloadSTL);
+downloadAllBtn.addEventListener("click", downloadAll);
 
 selectProduct(0);
 </script>
