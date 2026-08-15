@@ -923,12 +923,56 @@ function refreshUnitSuffixes() {
   });
 }
 
-// Small non-editable "≈ 5.906 in" hint under an mm-native input, shown
-// only in "in" mode - the typed value itself always stays mm, so this is
-// the only place an inch reading is visible while editing.
-function hintText(mmValue, unit) {
-  return (unit === "mm" && displayUnit === "in")
-    ? `≈ ${(mmValue / 25.4).toFixed(3)} in` : "";
+// Small reference hint under an mm-native input, showing the OTHER
+// unit's equivalent of whatever's currently in the box (the box itself
+// holds whichever unit is active - see convertSliderUnits).
+function hintText(displayedValue, unit) {
+  if (unit !== "mm") return "";
+  return displayUnit === "mm"
+    ? `≈ ${(displayedValue / 25.4).toFixed(3)} in`
+    : `≈ ${(displayedValue * 25.4).toFixed(2)} mm`;
+}
+
+function round(x, decimals) {
+  const p = Math.pow(10, decimals);
+  return Math.round(x * p) / p;
+}
+
+// Converts a static mm number (a slider's own def/min/max/step) to
+// whichever unit is CURRENTLY active - used when a fresh slider is
+// rendered (renderFields()) rather than an existing one converted in
+// place (convertSliderUnits, which carries a real typed VALUE forward
+// instead of re-deriving from the static declaration).
+function mmToUnit(mmVal) {
+  return displayUnit === "in" ? mmVal / 25.4 : mmVal;
+}
+
+// Rewrites every currently-rendered mm-native slider's own value/min/
+// max/step in place when the unit toggle is clicked, so the box
+// actually holds - and accepts typed input in - whichever unit is
+// active, instead of always being mm-only underneath a converted
+// read-only hint. min/max/step are always recomputed fresh from the
+// slider's own declared mm numbers (never incrementally converted), so
+// repeated toggling can't drift them - only VALUE is carried forward
+// from whatever's currently in the box, since that (unlike min/max/
+// step) can hold a real edit that has to survive the switch. Only
+// touches sliders belonging to the ACTIVE type - that's all that's
+// actually in the DOM right now.
+function convertSliderUnits(type, oldUnit, newUnit) {
+  if (oldUnit === newUnit) return;
+  allSliders(type).forEach((s) => {
+    if (s.unit !== "mm") return;
+    const el = document.getElementById("in-" + s.id);
+    if (!el) return;
+    const raw = parseFloat(el.value);
+    if (!Number.isNaN(raw)) {
+      const mmVal = oldUnit === "mm" ? raw : raw * 25.4;
+      el.value = newUnit === "mm" ? round(mmVal, 2) : round(mmVal / 25.4, 3);
+    }
+    el.min = newUnit === "mm" ? s.min : round(s.min / 25.4, 4);
+    el.max = newUnit === "mm" ? s.max : round(s.max / 25.4, 4);
+    el.step = newUnit === "mm" ? s.step : round(s.step / 25.4, 5);
+  });
 }
 
 // Reads each slider's CURRENT typed value (not its def) - used after a
@@ -1026,15 +1070,22 @@ function renderFields() {
   allSliders(type).forEach((s) => {
     const field = document.createElement("div");
     field.className = "field";
-    // The <input> itself stays mm-native always (value/min/max/step) -
-    // typing is always in mm/degrees/count, whatever s.unit really is;
-    // the unit-suffix label and the inches hint below are the only
-    // things that react to the mm/in toggle, via toDisplay()/
-    // data-orig-unit - see toDisplay()'s own comment for why.
+    // renderFields() always rebuilds from each slider's own static def
+    // (a pre-existing behavior on tab switch / mode-group change, not
+    // something this touches) - so there's no "current edit" to
+    // preserve here, unlike convertSliderUnits' own toggle-time
+    // conversion. Just render that def (and min/max/step) in whichever
+    // unit is currently active, so a fresh render while in "in" mode
+    // doesn't show a raw mm number mislabeled as inches.
+    const isMm = s.unit === "mm";
+    const dispDef = isMm ? round(mmToUnit(s.def), displayUnit === "in" ? 3 : 2) : s.def;
+    const dispMin = isMm ? round(mmToUnit(s.min), displayUnit === "in" ? 4 : 2) : s.min;
+    const dispMax = isMm ? round(mmToUnit(s.max), displayUnit === "in" ? 4 : 2) : s.max;
+    const dispStep = isMm ? round(mmToUnit(s.step), displayUnit === "in" ? 5 : 3) : s.step;
     const suffixDisp = s.unit === "mm" ? displayUnit : s.unit;
     field.innerHTML =
       `<label>${s.label} <span class="unit-suffix" data-orig-unit="${s.unit}">${suffixDisp}</span></label>` +
-      `<input type="number" id="in-${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.def}" ` +
+      `<input type="number" id="in-${s.id}" min="${dispMin}" max="${dispMax}" step="${dispStep}" value="${dispDef}" ` +
       `inputmode="${s.int ? "numeric" : "decimal"}">` +
       `<span class="hint" id="hint-${s.id}"></span>`;
     fieldsEl.appendChild(field);
@@ -1044,7 +1095,15 @@ function renderFields() {
     // free in-browser call, so firing one per character would both spam
     // the server and feel laggier than just waiting for a commit.
     const eventName = type.serverEndpoint ? "change" : "input";
-    document.getElementById("in-" + s.id).addEventListener(eventName, scheduleRebuild);
+    const sliderEl = document.getElementById("in-" + s.id);
+    const sliderHintEl = document.getElementById("hint-" + s.id);
+    sliderEl.addEventListener(eventName, () => {
+      if (s.unit === "mm") {
+        const val = parseFloat(sliderEl.value);
+        sliderHintEl.textContent = Number.isNaN(val) ? "" : hintText(val, s.unit);
+      }
+      scheduleRebuild();
+    });
   });
   refreshHints();
 }
@@ -1077,6 +1136,10 @@ function rebuild() {
       val = Math.floor(val); // discrete field, typed float -> floor, not round
       el.value = val;        // snap the box itself to what actually gets used
     }
+    // The box itself now holds whichever unit is active (see
+    // convertSliderUnits) - convert back to mm here, once, so every kwarg
+    // built below stays mm regardless of what unit was actually typed.
+    if (s.unit === "mm" && displayUnit === "in") val *= 25.4;
     values[s.id] = val; // always mm - this is what reaches generate_*()
   });
   refreshHints();
@@ -1390,15 +1453,21 @@ def recommended_alt_face_file_sorter(verts, faces):
   buyBtn.addEventListener("click", downloadSTL);
   unitToggleEl.querySelectorAll(".unit-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      if (btn.dataset.unit === displayUnit) return;
-      displayUnit = btn.dataset.unit;
+      const newUnit = btn.dataset.unit;
+      if (newUnit === displayUnit) return;
+      // Converts every slider's own value/min/max/step into the new
+      // unit IN PLACE first, while displayUnit still holds the OLD unit
+      // (convertSliderUnits needs both ends of the conversion) - a
+      // typed edit now actually survives the toggle instead of the box
+      // just staying mm-labeled-as-whatever underneath a converted hint.
+      convertSliderUnits(TYPES[activeIndex], displayUnit, newUnit);
+      displayUnit = newUnit;
       unitToggleEl.querySelectorAll(".unit-btn").forEach((b) => {
         b.classList.toggle("active", b.dataset.unit === displayUnit);
       });
       refreshUnitSuffixes();
-      rebuild(); // re-derives val-spans + readouts in the new unit; mm
-                 // values themselves (and the kwargs sent to Python) are
-                 // untouched, so this doesn't change the modeled shape
+      refreshHints();
+      rebuild();
     });
   });
   renderTabs();
