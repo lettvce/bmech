@@ -511,17 +511,15 @@ let lastTriangles = null;
 let pending = null;
 let firstRun = true;
 
-function toDisplay(mmValue, unit, mmDecimals) {
-  if (unit !== "mm" || displayUnit === "mm") {
-    const text = mmDecimals == null ? String(mmValue) : mmValue.toFixed(mmDecimals);
-    return { text, unit };
-  }
-  return { text: (mmValue / 25.4).toFixed(3), unit: "in" };
-}
-
-function hintText(mmValue, unit) {
-  return (unit === "mm" && displayUnit === "in")
-    ? `≈ ${(mmValue / 25.4).toFixed(3)} in` : "";
+// unit here is the DISPLAYED value's own unit (i.e. already matches
+// displayUnit for an "mm"-declared field, since convertFieldUnits below
+// keeps the box itself in the active unit) - shows the OTHER unit's
+// equivalent as a small reference hint underneath.
+function hintText(displayedValue, unit) {
+  if (unit !== "mm") return "";
+  return displayUnit === "mm"
+    ? `≈ ${(displayedValue / 25.4).toFixed(3)} in`
+    : `≈ ${(displayedValue * 25.4).toFixed(2)} mm`;
 }
 
 function refreshUnitSuffixes() {
@@ -542,11 +540,47 @@ function refreshHints() {
   });
 }
 
-// Reads every field's current value (used both to decide visibility —
-// e.g. mouth_corner_radius_mm only for RECTANGULAR — and to build the
-// kwargs passed to build_assembly_mesh). Hidden fields still contribute
-// their last-known value from the DOM if present, otherwise their
-// default, so toggling a field back to visible doesn't lose an edit.
+function round(x, decimals) {
+  const p = Math.pow(10, decimals);
+  return Math.round(x * p) / p;
+}
+
+// Rewrites every mm-native field's own value/min/max/step in place when
+// the unit toggle is clicked, so the box actually holds - and accepts
+// typed input in - whichever unit is active, instead of always being
+// mm-only underneath a converted read-only hint (the office_organizers
+// template this page started from only ever showed "≈ X in" below a
+// still-mm input; typing was mm regardless of the toggle - on request,
+// this makes the toggle change what you actually type). min/max/step
+// are always recomputed fresh from FIELDS' own declared mm numbers
+// (never incrementally converted), so repeated toggling can't drift
+// them - only VALUE is carried forward from whatever's currently in the
+// box, since that (unlike min/max/step) can hold a real edit that has to
+// survive the switch.
+function convertFieldUnits(oldUnit, newUnit) {
+  if (oldUnit === newUnit) return;
+  FIELDS.forEach((f) => {
+    if (!f.id || f.unit !== "mm" || f.type === "select" || f.type === "checkbox") return;
+    const el = document.getElementById("in-" + f.id);
+    if (!el) return;
+    const raw = parseFloat(el.value);
+    if (!Number.isNaN(raw)) {
+      const mmVal = oldUnit === "mm" ? raw : raw * 25.4;
+      el.value = newUnit === "mm" ? round(mmVal, 2) : round(mmVal / 25.4, 3);
+    }
+    el.min = newUnit === "mm" ? f.min : round(f.min / 25.4, 4);
+    el.max = newUnit === "mm" ? f.max : round(f.max / 25.4, 4);
+    el.step = newUnit === "mm" ? f.step : round(f.step / 25.4, 5);
+  });
+}
+
+// Reads every field's current value, ALWAYS converted to mm regardless
+// of displayUnit (used both to decide visibility — e.g.
+// mouth_corner_radius_mm only for RECTANGULAR — and to build the
+// kwargs passed to build_assembly_mesh, which only ever understands
+// mm). Hidden fields still contribute their last-known value from the
+// DOM if present, otherwise their default, so toggling a field back to
+// visible doesn't lose an edit.
 function currentValues() {
   const v = {};
   FIELDS.forEach((f) => {
@@ -558,7 +592,9 @@ function currentValues() {
       v[f.id] = el ? el.checked : f.def;
     } else {
       const raw = el ? parseFloat(el.value) : f.def;
-      v[f.id] = Number.isNaN(raw) ? f.def : raw;
+      let val = Number.isNaN(raw) ? f.def : raw;
+      if (f.unit === "mm" && displayUnit === "in") val *= 25.4;
+      v[f.id] = val;
     }
   });
   return v;
@@ -646,7 +682,13 @@ function buildFieldsOnce() {
         `<input type="number" id="in-${f.id}" min="${initialMin}" max="${f.max}" step="${f.step}" value="${f.def}">` +
         `<span class="hint" id="hint-${f.id}"></span>`;
       fieldsEl.appendChild(field);
-      document.getElementById("in-" + f.id).addEventListener("input", () => {
+      const inputEl = document.getElementById("in-" + f.id);
+      const hintEl = document.getElementById("hint-" + f.id);
+      inputEl.addEventListener("input", () => {
+        if (f.unit === "mm") {
+          const val = parseFloat(inputEl.value);
+          hintEl.textContent = Number.isNaN(val) ? "" : hintText(val, f.unit);
+        }
         updateFieldVisibility();
         scheduleRebuild();
       });
@@ -788,13 +830,16 @@ def mesh_triangles(verts, faces):
   buyBtn.addEventListener("click", downloadSTL);
   unitToggleEl.querySelectorAll(".unit-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      if (btn.dataset.unit === displayUnit) return;
-      displayUnit = btn.dataset.unit;
+      const newUnit = btn.dataset.unit;
+      if (newUnit === displayUnit) return;
+      convertFieldUnits(displayUnit, newUnit);
+      displayUnit = newUnit;
       unitToggleEl.querySelectorAll(".unit-btn").forEach((b) => {
         b.classList.toggle("active", b.dataset.unit === displayUnit);
       });
       refreshUnitSuffixes();
       refreshHints();
+      rebuild();
     });
   });
   buildFieldsOnce();
