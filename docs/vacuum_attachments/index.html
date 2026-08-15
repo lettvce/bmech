@@ -523,8 +523,35 @@ function currentValues() {
   return v;
 }
 
-function renderFields() {
+function fieldWrapperId(f) {
+  return "field-" + f.id;
+}
+
+// Shows/hides each conditionally-visible field's own wrapper div in
+// place (mouth_corner_radius_mm for RECTANGULAR only, bend_radius_mm
+// once bend_angle_deg != 0, target_od_mm for CUSTOM) - a plain
+// style.display toggle, not a DOM rebuild. buildFieldsOnce() used to
+// call the old renderFields() (full fieldsEl.innerHTML = "" + rebuild)
+// on every single keystroke in ANY number field, since a field like
+// bend_angle_deg crossing zero can change what else should be visible -
+// but destroying and recreating every <input> on every keystroke also
+// destroyed the one YOU were actively typing into, kicking focus out to
+// the document and resetting the panel's scroll position, forcing a
+// re-click + one-digit-at-a-time typing. This is the fix: the fields
+// are only ever built once (buildFieldsOnce, at boot), and every
+// input/change handler afterward just calls this instead - toggling
+// display on the (few) OTHER wrapper divs never touches the input the
+// user has focused.
+function updateFieldVisibility() {
   const v = currentValues();
+  FIELDS.forEach((f) => {
+    if (!f.id || !f.visible) return;
+    const el = document.getElementById(fieldWrapperId(f));
+    if (el) el.style.display = f.visible(v) ? "" : "none";
+  });
+}
+
+function buildFieldsOnce() {
   fieldsEl.innerHTML = "";
 
   FIELDS.forEach((f) => {
@@ -535,37 +562,34 @@ function renderFields() {
       fieldsEl.appendChild(label);
       return;
     }
-    if (f.visible && !f.visible(v)) return;
 
     const field = document.createElement("div");
     field.className = "field";
+    field.id = fieldWrapperId(f);
     if (f.type === "select") {
       const options = f.options
-        .map(([val, label]) => `<option value="${val}"${val === v[f.id] ? " selected" : ""}>${label}</option>`)
+        .map(([val, label]) => `<option value="${val}"${val === f.def ? " selected" : ""}>${label}</option>`)
         .join("");
       field.innerHTML = `<label>${f.label}</label><select id="in-${f.id}">${options}</select>`;
       fieldsEl.appendChild(field);
       document.getElementById("in-" + f.id).addEventListener("change", () => {
-        renderFields();
+        updateFieldVisibility();
         rebuild();
       });
     } else {
       const suffixDisp = f.unit === "mm" ? displayUnit : f.unit;
       field.innerHTML =
         `<label>${f.label} <span class="unit-suffix" data-orig-unit="${f.unit}">${suffixDisp}</span></label>` +
-        `<input type="number" id="in-${f.id}" min="${f.min}" max="${f.max}" step="${f.step}" value="${v[f.id]}">` +
+        `<input type="number" id="in-${f.id}" min="${f.min}" max="${f.max}" step="${f.step}" value="${f.def}">` +
         `<span class="hint" id="hint-${f.id}"></span>`;
       fieldsEl.appendChild(field);
       document.getElementById("in-" + f.id).addEventListener("input", () => {
-        // A field like bend_angle_deg crossing zero, or target_preset
-        // flipping to/from CUSTOM, changes which OTHER fields should be
-        // visible — cheap enough to just re-render the whole panel on
-        // every input, not worth diffing.
-        renderFields();
+        updateFieldVisibility();
         scheduleRebuild();
       });
     }
   });
+  updateFieldVisibility();
   refreshHints();
 }
 
@@ -710,7 +734,7 @@ def mesh_triangles(verts, faces):
       refreshHints();
     });
   });
-  renderFields();
+  buildFieldsOnce();
   resize();
   rebuild();
 }
