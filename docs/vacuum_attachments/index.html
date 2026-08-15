@@ -89,6 +89,12 @@
   }
   .group-label:first-of-type { margin-top: 0; }
   .field { margin-bottom: 1rem; }
+  .checkbox-field { margin-bottom: 1.2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+  .checkbox-label {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 0.88rem; font-weight: 600; color: var(--text); cursor: pointer;
+  }
+  .checkbox-label input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
   .field label {
     display: flex; justify-content: space-between; font-size: 0.82rem;
     color: var(--text); margin-bottom: 0.25rem;
@@ -236,7 +242,17 @@ const SERVER_BASE = "https://api.lettvce.com";
 // (Shared / Mouth / Neck Connector / Adapter), so this page can't drift
 // out of sync with what the Blender operator itself exposes.
 // ---------------------------------------------------------------------
+// Advanced (off by default): a handful of fields that are almost always
+// left at their sensible default are hidden until this is checked, each
+// gated via its own `visible` below (`v.advanced && ...` for
+// mouth_corner_radius_mm, which is also still RECTANGULAR-only). Toggling
+// it never touches any value - the underlying inputs keep whatever
+// they're set to (their default, or a prior edit made while Advanced was
+// on), same "never destroy an input" discipline as updateFieldVisibility
+// itself; see that function's own comment.
 const FIELDS = [
+  { id: "advanced", label: "Advanced", type: "checkbox", def: false },
+
   { group: "Shared" },
   { id: "neck_id_mm", label: "Neck ID", unit: "mm", min: 5, max: 60, step: 0.1, def: 25.4 },
   { id: "wall_mm", label: "Wall Thickness", unit: "mm", min: 0.4, max: 4, step: 0.1, def: 1.2 },
@@ -248,31 +264,46 @@ const FIELDS = [
   },
   { id: "mouth_width_mm", label: "Mouth Width", unit: "mm", min: 3, max: 150, step: 0.1, def: 27.8 },
   { id: "mouth_depth_mm", label: "Mouth Depth", unit: "mm", min: 3, max: 300, step: 0.1, def: 69.5 },
+  { id: "mouth_height_mm", label: "Mouth Height", unit: "mm", min: 1, max: 60, step: 0.5, def: 10.0 },
   {
-    id: "mouth_corner_radius_mm", label: "Mouth Corner Radius", unit: "mm", min: 0, max: 40, step: 0.1, def: 4.633,
-    visible: (v) => v.mouth_kind === "RECTANGULAR",
+    id: "mouth_corner_radius_mm", label: "Mouth Corner Radius", unit: "mm", min: 0, max: 40, step: 0.1, def: 4.0,
+    visible: (v) => v.advanced && v.mouth_kind === "RECTANGULAR",
   },
   { id: "mouth_neck_height_mm", label: "Mouth Neck Height", unit: "mm", min: 1, max: 60, step: 0.5, def: 10.0 },
-  { id: "mouth_loft_height_mm", label: "Mouth Loft Height", unit: "mm", min: 1, max: 100, step: 0.5, def: 25.0 },
-  { id: "mouth_height_mm", label: "Mouth Height", unit: "mm", min: 1, max: 60, step: 0.5, def: 10.0 },
+  {
+    id: "mouth_loft_height_mm", label: "Mouth Loft Height", unit: "mm", min: 1, max: 100, step: 0.5, def: 25.0,
+    visible: (v) => v.advanced,
+  },
   { id: "mouth_tilt_deg", label: "Mouth Tilt", unit: "°", min: -80, max: 80, step: 1, def: 0 },
 
   { group: "Neck Connector" },
-  { id: "lead_in_len_mm", label: "Lead-in Length", unit: "mm", min: 1, max: 100, step: 0.5, def: 10.0 },
+  {
+    id: "lead_in_len_mm", label: "Lead-in Length", unit: "mm", min: 1, max: 100, step: 0.5, def: 10.0,
+    visible: (v) => v.advanced,
+  },
   { id: "bend_angle_deg", label: "Bend Angle", unit: "°", min: -180, max: 180, step: 1, def: 0 },
   {
     id: "bend_radius_mm", label: "Bend Radius", unit: "mm", min: 1, max: 150, step: 0.5, def: 20.0,
     visible: (v) => v.bend_angle_deg !== 0,
   },
-  { id: "lead_out_len_mm", label: "Lead-out Length", unit: "mm", min: 1, max: 200, step: 0.5, def: 10.0 },
+  {
+    id: "lead_out_len_mm", label: "Lead-out Length", unit: "mm", min: 1, max: 200, step: 0.5, def: 10.0,
+    visible: (v) => v.advanced,
+  },
 
   { group: "Adapter" },
   {
     id: "adapter_kind", label: "Adapter", type: "select", def: "SOCKET",
     options: [["TAPER", "Male Taper"], ["SOCKET", "Female Socket"]],
   },
-  { id: "adapter_neck_stub_len_mm", label: "Adapter Neck Stub", unit: "mm", min: 1, max: 60, step: 0.5, def: 10.0 },
-  { id: "adapter_transition_len_mm", label: "Adapter Transition", unit: "mm", min: 1, max: 60, step: 0.5, def: 15.0 },
+  {
+    id: "adapter_neck_stub_len_mm", label: "Adapter Neck Stub", unit: "mm", min: 1, max: 60, step: 0.5, def: 10.0,
+    visible: (v) => v.advanced,
+  },
+  {
+    id: "adapter_transition_len_mm", label: "Adapter Transition", unit: "mm", min: 1, max: 60, step: 0.5, def: 10.0,
+    visible: (v) => v.advanced,
+  },
   {
     id: "target_preset", label: "Target Hose/Spigot", type: "select", def: "32",
     options: [["32", "32mm"], ["35", "35mm"], ["CUSTOM", "Custom"]],
@@ -494,7 +525,7 @@ function refreshUnitSuffixes() {
 
 function refreshHints() {
   FIELDS.forEach((f) => {
-    if (!f.id || f.type === "select") return;
+    if (!f.id || f.type === "select" || f.type === "checkbox") return;
     const el = document.getElementById("in-" + f.id);
     const hintEl = document.getElementById("hint-" + f.id);
     if (!el || !hintEl) return;
@@ -515,6 +546,8 @@ function currentValues() {
     const el = document.getElementById("in-" + f.id);
     if (f.type === "select") {
       v[f.id] = el ? el.value : f.def;
+    } else if (f.type === "checkbox") {
+      v[f.id] = el ? el.checked : f.def;
     } else {
       const raw = el ? parseFloat(el.value) : f.def;
       v[f.id] = Number.isNaN(raw) ? f.def : raw;
@@ -576,6 +609,16 @@ function buildFieldsOnce() {
         updateFieldVisibility();
         rebuild();
       });
+    } else if (f.type === "checkbox") {
+      field.className = "field checkbox-field";
+      field.innerHTML =
+        `<label class="checkbox-label"><span>${f.label}</span>` +
+        `<input type="checkbox" id="in-${f.id}"${f.def ? " checked" : ""}></label>`;
+      fieldsEl.appendChild(field);
+      // Toggling Advanced never changes any generator kwarg - the
+      // underlying inputs it shows/hides keep whatever value they
+      // already have - so this only needs a visibility pass, no rebuild.
+      document.getElementById("in-" + f.id).addEventListener("change", updateFieldVisibility);
     } else {
       const suffixDisp = f.unit === "mm" ? displayUnit : f.unit;
       field.innerHTML =
