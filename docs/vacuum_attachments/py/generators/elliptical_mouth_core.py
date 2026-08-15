@@ -142,11 +142,12 @@ def _tilt_z_fn(tilt_deg):
     Tilts around Y (not X) specifically so this lands in the SAME plane
     neck_connector_core.py's own bend curves in - see
     rectangular_mouth_core.py's own matching _tilt_z_fn comment for the
-    full reasoning (identical here)."""
+    full reasoning (identical here), including why the sign is negated
+    (-x, not x)."""
     if tilt_deg == 0.0:
         return None
     slope = math.tan(math.radians(tilt_deg))
-    return lambda x, y: slope * x
+    return lambda x, y: slope * -x
 
 
 # Minimum clearance the tilted opening ring must keep above the mouth's

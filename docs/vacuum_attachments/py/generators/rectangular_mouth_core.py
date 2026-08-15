@@ -248,17 +248,23 @@ def _tilt_z_fn(tilt_deg):
 
     Tilts around Y (not X) specifically so this lands in the SAME plane
     neck_connector_core.py's own bend curves in - that one always curves
-    toward +X (see build_centerline's own docstring) - so a positive
-    Mouth Tilt and a positive Bend Angle lean the same way when both are
-    dialed in on the full assembly, instead of tilting on an axis
-    orthogonal to the bend and looking unrelated to it (confirmed to be
-    the actual bug when this used Y/around-X: the two controls simply
-    couldn't "point the same way" on perpendicular axes, whatever their
-    signs)."""
+    toward +X (see build_centerline's own docstring) - instead of tilting
+    on an axis orthogonal to the bend and looking unrelated to it
+    (confirmed to be an actual bug when this used Y/around-X: the two
+    controls simply couldn't relate to each other on perpendicular axes,
+    whatever their signs).
+
+    Sign is negated (-x, not x) on request: a positive Mouth Tilt and a
+    positive Bend Angle now lean OPPOSITE ways when both are dialed in on
+    the full assembly - previously (same axis, no negation) they leaned
+    the same way. Only the sign flipped here; which axis this tilts
+    around is unchanged, and _validate_mouth_tilt's own margin check is
+    symmetric (uses abs(mouth_tilt_deg)), so it's unaffected either
+    way."""
     if tilt_deg == 0.0:
         return None
     slope = math.tan(math.radians(tilt_deg))
-    return lambda x, y: slope * x
+    return lambda x, y: slope * -x
 
 
 # Minimum clearance the tilted opening ring must keep above the mouth's

@@ -51,22 +51,35 @@
   }
   .app {
     display: flex;
-    flex-wrap: wrap;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 12px;
     overflow: hidden;
-    min-height: 480px;
+    height: min(640px, 80vh);
   }
-  #viewer { flex: 1 1 480px; position: relative; background: #101215; }
+  #viewer { flex: 1 1 auto; min-width: 280px; position: relative; background: #101215; height: 100%; }
   #viewer canvas { display: block; }
   #loading {
     position: absolute; inset: 0; display: flex; align-items: center;
     justify-content: center; font-size: 13px; color: var(--muted); text-align: center; padding: 1rem;
   }
+  /* Panel sits LEFT of the viewer (order: -1, ahead of #viewer's own DOM
+     position) with its own fixed height matching .app's, so it scrolls
+     independently via overflow-y - the object stays on screen no matter
+     how far down the parameter list you scroll. Below the mobile
+     breakpoint there's no room for side-by-side, so it falls back to a
+     stacked layout instead (see the media query below) - a sticky,
+     shortened viewer there does the same "always visible" job. */
   #panel {
+    order: -1;
     width: 320px; flex: 0 0 320px; padding: 1.4rem;
-    border-left: 1px solid var(--border); overflow-y: auto; max-height: 720px;
+    border-left: none; border-right: 1px solid var(--border);
+    overflow-y: auto; height: 100%;
+  }
+  @media (max-width: 680px) {
+    .app { flex-direction: column; height: auto; }
+    #viewer { order: -1; flex: none; height: 320px; min-width: 0; position: sticky; top: 0; z-index: 1; }
+    #panel { order: 0; width: 100%; flex: none; height: auto; border-right: none; border-top: 1px solid var(--border); }
   }
   #panel h2 { font-size: 1.05rem; margin: 0 0 0.25rem; border: none; padding: 0; color: var(--text); }
   #panel .sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.1rem; }
