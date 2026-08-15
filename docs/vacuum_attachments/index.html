@@ -312,7 +312,15 @@ const FIELDS = [
     id: "target_od_mm", label: "Target OD", unit: "mm", min: 5, max: 80, step: 0.5, def: 32.0,
     visible: (v) => v.target_preset === "CUSTOM",
   },
-  { id: "taper_angle_deg", label: "Taper Angle", unit: "°", min: 0.5, max: 8, step: 0.1, def: 3.0 },
+  {
+    // Female Socket's bore has no minimum-angle requirement - 0 is a
+    // valid straight, non-tapered bore sized exactly to the target
+    // spigot OD (see adapter_socket_core.py's own build function - no
+    // floor is enforced there either). Male Taper keeps the 0.5 floor -
+    // matches adapter_taper.py's own standalone operator.
+    id: "taper_angle_deg", label: "Taper Angle", unit: "°", max: 8, step: 0.1, def: 3.0,
+    minFn: (v) => (v.adapter_kind === "SOCKET" ? 0 : 0.5),
+  },
   { id: "engagement_len_mm", label: "Engagement Length", unit: "mm", min: 5, max: 80, step: 0.5, def: 20.0 },
 ];
 
@@ -578,9 +586,20 @@ function fieldWrapperId(f) {
 function updateFieldVisibility() {
   const v = currentValues();
   FIELDS.forEach((f) => {
-    if (!f.id || !f.visible) return;
-    const el = document.getElementById(fieldWrapperId(f));
-    if (el) el.style.display = f.visible(v) ? "" : "none";
+    if (!f.id) return;
+    if (f.visible) {
+      const el = document.getElementById(fieldWrapperId(f));
+      if (el) el.style.display = f.visible(v) ? "" : "none";
+    }
+    // taper_angle_deg's own min floor depends on adapter_kind (0 for
+    // Female Socket, 0.5 for Male Taper) - just the input's own min
+    // attribute, not a value clamp (nothing here ever force-edits a
+    // value the user typed, same "never touch other inputs" discipline
+    // as the visibility toggle above).
+    if (f.minFn) {
+      const input = document.getElementById("in-" + f.id);
+      if (input) input.min = f.minFn(v);
+    }
   });
 }
 
@@ -621,9 +640,10 @@ function buildFieldsOnce() {
       document.getElementById("in-" + f.id).addEventListener("change", updateFieldVisibility);
     } else {
       const suffixDisp = f.unit === "mm" ? displayUnit : f.unit;
+      const initialMin = f.minFn ? f.minFn(currentValues()) : f.min;
       field.innerHTML =
         `<label>${f.label} <span class="unit-suffix" data-orig-unit="${f.unit}">${suffixDisp}</span></label>` +
-        `<input type="number" id="in-${f.id}" min="${f.min}" max="${f.max}" step="${f.step}" value="${f.def}">` +
+        `<input type="number" id="in-${f.id}" min="${initialMin}" max="${f.max}" step="${f.step}" value="${f.def}">` +
         `<span class="hint" id="hint-${f.id}"></span>`;
       fieldsEl.appendChild(field);
       document.getElementById("in-" + f.id).addEventListener("input", () => {
