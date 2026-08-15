@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vacuum Attachments — live parametric configurator</title>
+<meta name="description" content="Configure a 3D-printable vacuum attachment (mouth + neck + adapter, fused as one part) in your browser and download the STL — free while this is in testing.">
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+    --good: #7fd0a0;
+    --bad: #e08a8a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  header {
+    padding: 3rem 1.5rem 2rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  header p { color: var(--muted); max-width: 560px; margin: 0 auto; font-size: 1.05rem; }
+  .badge {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 999px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--good);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  /* --- configurator --- */
+  .configurator {
+    max-width: 1100px;
+    margin: 2rem auto 2.5rem;
+    padding: 0 1.5rem;
+  }
+  .app {
+    display: flex;
+    flex-wrap: wrap;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    min-height: 480px;
+  }
+  #viewer { flex: 1 1 480px; position: relative; background: #101215; }
+  #viewer canvas { display: block; }
+  #loading {
+    position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 13px; color: var(--muted); text-align: center; padding: 1rem;
+  }
+  #panel {
+    width: 320px; flex: 0 0 320px; padding: 1.4rem;
+    border-left: 1px solid var(--border); overflow-y: auto; max-height: 720px;
+  }
+  #panel h2 { font-size: 1.05rem; margin: 0 0 0.25rem; border: none; padding: 0; color: var(--text); }
+  #panel .sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.1rem; }
+  .group-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--accent); margin: 1.2rem 0 0.6rem;
+  }
+  .group-label:first-of-type { margin-top: 0; }
+  .field { margin-bottom: 1rem; }
+  .field label {
+    display: flex; justify-content: space-between; font-size: 0.82rem;
+    color: var(--text); margin-bottom: 0.25rem;
+  }
+  .field label span.unit-suffix { color: var(--muted); font-weight: 600; }
+  .field input[type=number] {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem;
+    font-size: 0.9rem; font-variant-numeric: tabular-nums;
+  }
+  .field input[type=number]:focus { outline: none; border-color: var(--accent); }
+  .field .hint {
+    display: block; min-height: 1em; margin-top: 0.2rem;
+    font-size: 0.72rem; color: var(--muted);
+  }
+  .field select {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem;
+    font-size: 0.82rem;
+  }
+  .unit-toggle {
+    display: flex; gap: 0.4rem; margin-bottom: 1.1rem;
+  }
+  .unit-btn {
+    flex: 1; background: var(--bg); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.35rem 0; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  }
+  .unit-btn:hover { color: var(--text); border-color: var(--accent); }
+  .unit-btn.active { background: var(--accent); color: #0b0d10; border-color: var(--accent); }
+  #readouts { font-size: 0.82rem; color: var(--text); margin-bottom: 0.4rem; }
+  #readouts .readout { display: flex; justify-content: space-between; padding: 2px 0; }
+  #readouts .readout .val { color: var(--good); font-variant-numeric: tabular-nums; }
+  #status { font-size: 0.78rem; color: var(--muted); margin-top: 0.4rem; min-height: 34px; }
+  #status.err { color: var(--bad); }
+  #buy {
+    margin-top: 1.1rem; width: 100%; padding: 0.7rem; border-radius: 8px; border: none;
+    background: #3a3f4b; color: #666; font-size: 0.85rem; cursor: not-allowed; font-weight: 600;
+  }
+  #buy:not(:disabled) { background: var(--good); color: #0b0d10; cursor: pointer; }
+
+  main { max-width: 860px; margin: 0 auto; padding: 1rem 1.5rem 3rem; }
+  section { margin-bottom: 3rem; }
+  h2 { font-size: 1.4rem; border-left: 3px solid var(--accent); padding-left: 0.75rem; }
+  ul { color: var(--muted); }
+  code {
+    background: var(--panel); padding: 0.15rem 0.4rem; border-radius: 4px;
+    font-size: 0.9em; color: var(--text);
+  }
+  footer {
+    border-top: 1px solid var(--border); text-align: center; padding: 2rem 1.5rem;
+    color: var(--muted); font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+  .home-bar {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1rem 1.5rem 0;
+  }
+  .home-bar a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+  .home-bar a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="home-bar"><a href="/">← Lettvce</a></div>
+
+<header>
+  <h1>Vacuum Attachments</h1>
+  <p>Mouth, bent neck, and friction-fit adapter — fused into one
+     watertight part. Dial it in and download a ready-to-print STL,
+     right here in the browser.</p>
+  <div class="badge">Free while this is in testing</div>
+</header>
+
+<div class="configurator">
+  <div class="app">
+    <div id="viewer"><div id="loading">Loading Python runtime…</div></div>
+    <div id="panel">
+      <h2>Full Assembly</h2>
+      <div class="sub">Live preview — runs entirely in your browser, no server call.</div>
+      <div class="unit-toggle" id="unit-toggle">
+        <button type="button" class="unit-btn active" data-unit="mm">mm</button>
+        <button type="button" class="unit-btn" data-unit="in">in</button>
+      </div>
+      <div id="fields"></div>
+      <div id="readouts"></div>
+      <div id="status">Booting Pyodide…</div>
+      <button id="buy" disabled>Download STL (free — testing)</button>
+    </div>
+  </div>
+</div>
+
+<main>
+
+<section>
+  <h2>What this is</h2>
+  <p>The exact same Python that ships in the Blender extension this
+     project is built on runs unmodified in your browser via
+     <a href="https://pyodide.org/" style="color: var(--accent);">Pyodide</a>,
+     not a separate reimplementation. Nothing about the shape or your
+     chosen dimensions is uploaded anywhere — the mesh is built and the
+     STL is written entirely on your machine.</p>
+  <ul>
+    <li>The mouth opening is Rectangular (rounded corners) or Elliptical;
+        the neck can run straight or bend at an angle; the adapter is
+        either a male taper (plugs into a female hose port) or a female
+        socket (receives a male spigot). All three sections fuse into
+        one printable shell — not three separate parts.</li>
+    <li>A small "this was downloaded" ping fires when you click
+        Download — a counter, not any file content.</li>
+    <li>This is free during testing. If it turns into a paid product
+        later, existing free downloads aren't retroactively affected.</li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  <p>Contact: <a href="mailto:blakewysocki421@gmail.com">blakewysocki421@gmail.com</a></p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+
+const SERVER_BASE = "https://api.lettvce.com";
+
+// ---------------------------------------------------------------------
+// One fixed field set — no tabs/types, this page only ever builds the
+// full assembly (mouth + neck connector + adapter fused into one part).
+// Grouped/labeled and defaulted to match assemble_attachment.py's own
+// OBJECT_OT_assemble_attachment property list and draw() layout exactly
+// (Shared / Mouth / Neck Connector / Adapter), so this page can't drift
+// out of sync with what the Blender operator itself exposes.
+// ---------------------------------------------------------------------
+const FIELDS = [
+  { group: "Shared" },
+  { id: "neck_id_mm", label: "Neck ID", unit: "mm", min: 5, max: 60, step: 0.1, def: 25.4 },
+  { id: "wall_mm", label: "Wall Thickness", unit: "mm", min: 0.4, max: 4, step: 0.1, def: 1.2 },
+
+  { group: "Mouth" },
+  {
+    id: "mouth_kind", label: "Mouth Shape", type: "select", def: "RECTANGULAR",
+    options: [["RECTANGULAR", "Rectangular"], ["ELLIPTICAL", "Elliptical"]],
+  },
+  { id: "mouth_width_mm", label: "Mouth Width", unit: "mm", min: 3, max: 150, step: 0.1, def: 27.8 },
+  { id: "mouth_depth_mm", label: "Mouth Depth", unit: "mm", min: 3, max: 300, step: 0.1, def: 69.5 },
+  {
+    id: "mouth_corner_radius_mm", label: "Mouth Corner Radius", unit: "mm", min: 0, max: 40, step: 0.1, def: 4.633,
+    visible: (v) => v.mouth_kind === "RECTANGULAR",
+  },
+  { id: "mouth_neck_height_mm", label: "Mouth Neck Height", unit: "mm", min: 1, max: 60, step: 0.5, def: 10.0 },
+  { id: "mouth_loft_height_mm", label: "Mouth Loft Height", unit: "mm", min: 1, max: 100, step: 0.5, def: 25.0 },
+  { id: "mouth_height_mm", label: "Mouth Height", unit: "mm", min: 1, max: 60, step: 0.5, def: 10.0 },
+  { id: "mouth_tilt_deg", label: "Mouth Tilt", unit: "°", min: -80, max: 80, step: 1, def: 0 },
+
+  { group: "Neck Connector" },
+  { id: "lead_in_len_mm", label: "Lead-in Length", unit: "mm", min: 1, max: 100, step: 0.5, def: 10.0 },
+  { id: "bend_angle_deg", label: "Bend Angle", unit: "°", min: -180, max: 180, step: 1, def: 0 },
+  {
+    id: "bend_radius_mm", label: "Bend Radius", unit: "mm", min: 1, max: 150, step: 0.5, def: 20.0,
+    visible: (v) => v.bend_angle_deg !== 0,
+  },
+  { id: "lead_out_len_mm", label: "Lead-out Length", unit: "mm", min: 1, max: 200, step: 0.5, def: 10.0 },
+
+  { group: "Adapter" },
+  {
+    id: "adapter_kind", label: "Adapter", type: "select", def: "TAPER",
+    options: [["TAPER", "Male Taper"], ["SOCKET", "Female Socket"]],
+  },
+  { id: "adapter_neck_stub_len_mm", label: "Adapter Neck Stub", unit: "mm", min: 1, max: 60, step: 0.5, def: 10.0 },
+  { id: "adapter_transition_len_mm", label: "Adapter Transition", unit: "mm", min: 1, max: 60, step: 0.5, def: 15.0 },
+  {
+    id: "target_preset", label: "Target Hose/Spigot", type: "select", def: "32",
+    options: [["32", "32mm"], ["35", "35mm"], ["CUSTOM", "Custom"]],
+  },
+  {
+    id: "target_od_mm", label: "Target OD", unit: "mm", min: 5, max: 80, step: 0.5, def: 32.0,
+    visible: (v) => v.target_preset === "CUSTOM",
+  },
+  { id: "taper_angle_deg", label: "Taper Angle", unit: "°", min: 0.5, max: 8, step: 0.1, def: 3.0 },
+  { id: "engagement_len_mm", label: "Engagement Length", unit: "mm", min: 5, max: 80, step: 0.5, def: 20.0 },
+];
+
+const PY_FILES = [
+  "generators/geo_helpers.py",
+  "generators/rectangular_mouth_core.py",
+  "generators/elliptical_mouth_core.py",
+  "generators/neck_connector_core.py",
+  "generators/adapter_taper_core.py",
+  "generators/adapter_socket_core.py",
+  "generators/assemble_core.py",
+];
+
+// ---------------------------------------------------------------------
+// Three.js scene setup
+// ---------------------------------------------------------------------
+const viewerEl = document.getElementById("viewer");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x101215);
+
+const camera = new THREE.PerspectiveCamera(40, 1, 1, 5000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+viewerEl.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+const key = new THREE.DirectionalLight(0xffffff, 1.1);
+key.position.set(120, 200, 160);
+key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+key.shadow.bias = -0.0005;
+scene.add(key);
+scene.add(key.target);
+const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+fill.position.set(-150, 60, -100);
+scene.add(fill);
+
+let mesh = null;
+const material = new THREE.MeshStandardMaterial({
+  color: 0x62b586, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide,
+  flatShading: true,
+});
+
+function resize() {
+  const w = viewerEl.clientWidth, h = viewerEl.clientHeight;
+  if (w === 0 || h === 0) return;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+window.addEventListener("resize", resize);
+resize();
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// verts: [[x,y,z], ...] in mm, Z-up (same convention every generator
+// itself uses). Three.js is Y-up, so ONLY the display geometry remaps
+// (x,z,-y); the STL export writes verts/triangles untouched, so the
+// downloaded file sits correctly oriented for slicing.
+function buildGeometry(verts, triangles) {
+  const positions = [];
+  for (const [a, b, c] of triangles) {
+    for (const idx of [a, b, c]) {
+      const [x, y, z] = verts[idx];
+      positions.push(x, z, -y);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function computeFaceNormal(a, b, c) {
+  const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+  const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+  const nx = uy * vz - uz * vy;
+  const ny = uz * vx - ux * vz;
+  const nz = ux * vy - uy * vx;
+  const len = Math.hypot(nx, ny, nz) || 1;
+  return [nx / len, ny / len, nz / len];
+}
+
+// Binary STL: 80-byte header, uint32 triangle count, then per triangle:
+// 3 float32 normal + 3x(3 float32 vertex) + uint16 attribute byte count
+// (0) = 50 bytes/triangle.
+function buildBinarySTL(verts, triangles) {
+  const buffer = new ArrayBuffer(84 + 50 * triangles.length);
+  const view = new DataView(buffer);
+  view.setUint32(80, triangles.length, true);
+  let offset = 84;
+  for (const [i0, i1, i2] of triangles) {
+    const a = verts[i0], b = verts[i1], c = verts[i2];
+    const [nx, ny, nz] = computeFaceNormal(a, b, c);
+    view.setFloat32(offset, nx, true); offset += 4;
+    view.setFloat32(offset, ny, true); offset += 4;
+    view.setFloat32(offset, nz, true); offset += 4;
+    for (const v of [a, b, c]) {
+      view.setFloat32(offset, v[0], true); offset += 4;
+      view.setFloat32(offset, v[1], true); offset += 4;
+      view.setFloat32(offset, v[2], true); offset += 4;
+    }
+    offset += 2;
+  }
+  return buffer;
+}
+
+// Fire-and-forget download counter — same sendBeacon/fetch-fallback
+// pattern as office_organizers' own trackDownload, "text/plain" so
+// sendBeacon doesn't trigger a CORS preflight.
+function trackDownload() {
+  const body = JSON.stringify({ type: "vacuum_attachment" });
+  const url = SERVER_BASE + "/track/download";
+  try {
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(url, new Blob([body], { type: "text/plain" }));
+      return;
+    }
+  } catch (e) { /* fall through to fetch */ }
+  fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true })
+    .catch(() => {});
+}
+
+function downloadSTL() {
+  if (!lastVerts || !lastTriangles) return;
+  const buffer = buildBinarySTL(lastVerts, lastTriangles);
+  const blob = new Blob([buffer], { type: "model/stl" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "vacuum_attachment.stl";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  trackDownload();
+}
+
+const DEFAULT_CAMERA_DIR = { x: 0.55, y: 0.55, z: 0.75 };
+
+function frameCamera(geo) {
+  geo.computeBoundingSphere();
+  const { center, radius } = geo.boundingSphere;
+  const dist = radius / Math.sin((camera.fov * Math.PI) / 360) * 1.15;
+  const dir = DEFAULT_CAMERA_DIR;
+  camera.position.set(center.x + dist * dir.x, center.y + dist * dir.y, center.z + dist * dir.z);
+  controls.target.copy(center);
+  camera.near = Math.max(dist * 0.01, 0.1);
+  camera.far = dist * 10;
+  camera.updateProjectionMatrix();
+  controls.update();
+
+  key.position.set(center.x + radius * 1.2, center.y + radius * 2.0, center.z + radius * 1.6);
+  key.target.position.copy(center);
+  key.target.updateMatrixWorld();
+  const sc = key.shadow.camera;
+  sc.left = -radius * 1.5; sc.right = radius * 1.5;
+  sc.top = radius * 1.5; sc.bottom = -radius * 1.5;
+  sc.near = radius * 0.1; sc.far = radius * 6;
+  sc.updateProjectionMatrix();
+}
+
+// ---------------------------------------------------------------------
+// UI: fields panel (no tabs — one fixed field set, see FIELDS above)
+// ---------------------------------------------------------------------
+const fieldsEl = document.getElementById("fields");
+const statusEl = document.getElementById("status");
+const buyBtn = document.getElementById("buy");
+const unitToggleEl = document.getElementById("unit-toggle");
+const readoutsEl = document.getElementById("readouts");
+
+let pyodide = null;
+let BUILD_ASSEMBLY = null;
+let MESH_TRIANGLES = null;
+let displayUnit = "mm";
+let lastVerts = null;
+let lastTriangles = null;
+let pending = null;
+let firstRun = true;
+
+function toDisplay(mmValue, unit, mmDecimals) {
+  if (unit !== "mm" || displayUnit === "mm") {
+    const text = mmDecimals == null ? String(mmValue) : mmValue.toFixed(mmDecimals);
+    return { text, unit };
+  }
+  return { text: (mmValue / 25.4).toFixed(3), unit: "in" };
+}
+
+function hintText(mmValue, unit) {
+  return (unit === "mm" && displayUnit === "in")
+    ? `≈ ${(mmValue / 25.4).toFixed(3)} in` : "";
+}
+
+function refreshUnitSuffixes() {
+  fieldsEl.querySelectorAll(".unit-suffix").forEach((el) => {
+    const orig = el.dataset.origUnit;
+    el.textContent = orig === "mm" ? displayUnit : orig;
+  });
+}
+
+function refreshHints() {
+  FIELDS.forEach((f) => {
+    if (!f.id || f.type === "select") return;
+    const el = document.getElementById("in-" + f.id);
+    const hintEl = document.getElementById("hint-" + f.id);
+    if (!el || !hintEl) return;
+    const val = parseFloat(el.value);
+    hintEl.textContent = Number.isNaN(val) ? "" : hintText(val, f.unit);
+  });
+}
+
+// Reads every field's current value (used both to decide visibility —
+// e.g. mouth_corner_radius_mm only for RECTANGULAR — and to build the
+// kwargs passed to build_assembly_mesh). Hidden fields still contribute
+// their last-known value from the DOM if present, otherwise their
+// default, so toggling a field back to visible doesn't lose an edit.
+function currentValues() {
+  const v = {};
+  FIELDS.forEach((f) => {
+    if (!f.id) return;
+    const el = document.getElementById("in-" + f.id);
+    if (f.type === "select") {
+      v[f.id] = el ? el.value : f.def;
+    } else {
+      const raw = el ? parseFloat(el.value) : f.def;
+      v[f.id] = Number.isNaN(raw) ? f.def : raw;
+    }
+  });
+  return v;
+}
+
+function renderFields() {
+  const v = currentValues();
+  fieldsEl.innerHTML = "";
+
+  FIELDS.forEach((f) => {
+    if (f.group) {
+      const label = document.createElement("div");
+      label.className = "group-label";
+      label.textContent = f.group;
+      fieldsEl.appendChild(label);
+      return;
+    }
+    if (f.visible && !f.visible(v)) return;
+
+    const field = document.createElement("div");
+    field.className = "field";
+    if (f.type === "select") {
+      const options = f.options
+        .map(([val, label]) => `<option value="${val}"${val === v[f.id] ? " selected" : ""}>${label}</option>`)
+        .join("");
+      field.innerHTML = `<label>${f.label}</label><select id="in-${f.id}">${options}</select>`;
+      fieldsEl.appendChild(field);
+      document.getElementById("in-" + f.id).addEventListener("change", () => {
+        renderFields();
+        rebuild();
+      });
+    } else {
+      const suffixDisp = f.unit === "mm" ? displayUnit : f.unit;
+      field.innerHTML =
+        `<label>${f.label} <span class="unit-suffix" data-orig-unit="${f.unit}">${suffixDisp}</span></label>` +
+        `<input type="number" id="in-${f.id}" min="${f.min}" max="${f.max}" step="${f.step}" value="${v[f.id]}">` +
+        `<span class="hint" id="hint-${f.id}"></span>`;
+      fieldsEl.appendChild(field);
+      document.getElementById("in-" + f.id).addEventListener("input", () => {
+        // A field like bend_angle_deg crossing zero, or target_preset
+        // flipping to/from CUSTOM, changes which OTHER fields should be
+        // visible — cheap enough to just re-render the whole panel on
+        // every input, not worth diffing.
+        renderFields();
+        scheduleRebuild();
+      });
+    }
+  });
+  refreshHints();
+}
+
+function scheduleRebuild() {
+  if (pending) clearTimeout(pending);
+  pending = setTimeout(rebuild, 16);
+}
+
+function rebuild() {
+  const v = currentValues();
+  const kw = {
+    neck_id_mm: v.neck_id_mm,
+    wall_mm: v.wall_mm,
+    segments: 128,
+    mouth_kind: v.mouth_kind,
+    mouth_width_mm: v.mouth_width_mm,
+    mouth_depth_mm: v.mouth_depth_mm,
+    mouth_corner_radius_mm: v.mouth_corner_radius_mm,
+    mouth_neck_height_mm: v.mouth_neck_height_mm,
+    mouth_loft_height_mm: v.mouth_loft_height_mm,
+    mouth_height_mm: v.mouth_height_mm,
+    mouth_tilt_deg: v.mouth_tilt_deg,
+    lead_in_len_mm: v.lead_in_len_mm,
+    bend_angle_deg: v.bend_angle_deg,
+    bend_radius_mm: v.bend_radius_mm,
+    lead_out_len_mm: v.lead_out_len_mm,
+    adapter_kind: v.adapter_kind,
+    adapter_neck_stub_len_mm: v.adapter_neck_stub_len_mm,
+    adapter_transition_len_mm: v.adapter_transition_len_mm,
+    target_od_mm: v.target_preset === "32" ? 32.0 : v.target_preset === "35" ? 35.0 : v.target_od_mm,
+    taper_angle_deg: v.taper_angle_deg,
+    engagement_len_mm: v.engagement_len_mm,
+  };
+
+  const t0 = performance.now();
+  let result;
+  try {
+    result = BUILD_ASSEMBLY.callKwargs(kw);
+  } catch (e) {
+    // PythonError's string form is a full traceback ending in "\n" - a
+    // plain split("\n").pop() grabs the trailing empty string instead of
+    // the actual "ValueError: ..." line, so trim first. build_assembly's
+    // own ValueError messages are already prefixed with which stage
+    // failed ("Mouth: ...", "Neck connector: ...", "Adapter: ...") by
+    // assemble_core.build_assembly_mesh itself.
+    statusEl.textContent = "Invalid: " + String(e).trim().split("\n").pop();
+    statusEl.classList.add("err");
+    buyBtn.disabled = true;
+    return;
+  }
+  statusEl.classList.remove("err");
+  const [vertsPy, facesPy, volume] = result.toJs({ create_proxies: false });
+  result.destroy();
+
+  const trisResult = MESH_TRIANGLES(vertsPy, facesPy);
+  const [triangles] = trisResult.toJs({ create_proxies: false });
+  trisResult.destroy();
+
+  const dt = (performance.now() - t0).toFixed(1);
+  statusEl.textContent = `Generated in ${dt} ms (in-browser, no server) — `
+                       + `${vertsPy.length} verts, ${triangles.length} triangles.`;
+
+  const geo = buildGeometry(vertsPy, triangles);
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); }
+  mesh = new THREE.Mesh(geo, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  if (firstRun) { frameCamera(geo); firstRun = false; }
+
+  lastVerts = vertsPy;
+  lastTriangles = triangles;
+  buyBtn.disabled = false;
+
+  readoutsEl.innerHTML = "";
+  const row = document.createElement("div");
+  row.className = "readout";
+  const cm3 = volume / 1000;
+  row.innerHTML = `<span>Volume</span><span class="val">${cm3.toFixed(1)} cm³</span>`;
+  readoutsEl.appendChild(row);
+}
+
+async function boot() {
+  pyodide = await loadPyodide();
+
+  pyodide.FS.mkdirTree("/app/generators");
+  for (const rel of PY_FILES) {
+    const resp = await fetch("py/" + rel);
+    if (!resp.ok) throw new Error("failed to fetch " + rel + ": " + resp.status);
+    const text = await resp.text();
+    pyodide.FS.writeFile("/app/" + rel, text);
+  }
+
+  pyodide.runPython(`
+import sys
+sys.path.insert(0, "/app/generators")
+import assemble_core
+import geo_helpers as gh
+
+def build_assembly(**kwargs):
+    """Thin wrapper so the JS side gets a plain (verts, faces, volume)
+    tuple - toJs() can't cleanly convert assemble_core.build_assembly_mesh's
+    own return value (a geo_helpers Mesh + ValidationReport, neither a
+    plain dict/list)."""
+    mesh, report = assemble_core.build_assembly_mesh(**kwargs)
+    verts, edges, faces = mesh.to_pydata()
+    return verts, faces, report.volume
+
+def mesh_triangles(verts, faces):
+    """Fan-triangulating from vertex 0 only gives correct results for
+    CONVEX faces - every face this project's generators emit (loft/
+    bridge/cap_annulus bands, and the mouth's own convex rounded-rect/
+    ellipse end caps) already is, but route through geo_helpers' own
+    ear-clipping triangulate() anyway rather than assuming - correct
+    either way, same helper office_organizers' own web configurator
+    already uses for its (genuinely concave) n-gon caps."""
+    tris = []
+    for f in faces:
+        if len(f) == 3:
+            tris.append([f[0], f[1], f[2]])
+            continue
+        pts = [tuple(verts[i]) for i in f]
+        local = gh.triangulate(gh.Loop(pts, True))
+        for (a, b, c) in local:
+            tris.append([f[a], f[b], f[c]])
+    return (tris,)
+`);
+  BUILD_ASSEMBLY = pyodide.globals.get("build_assembly");
+  MESH_TRIANGLES = pyodide.globals.get("mesh_triangles");
+
+  document.getElementById("loading").remove();
+  statusEl.textContent = "Ready.";
+  buyBtn.addEventListener("click", downloadSTL);
+  unitToggleEl.querySelectorAll(".unit-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.unit === displayUnit) return;
+      displayUnit = btn.dataset.unit;
+      unitToggleEl.querySelectorAll(".unit-btn").forEach((b) => {
+        b.classList.toggle("active", b.dataset.unit === displayUnit);
+      });
+      refreshUnitSuffixes();
+      refreshHints();
+    });
+  });
+  renderFields();
+  resize();
+  rebuild();
+}
+
+boot().catch((e) => {
+  document.getElementById("loading").textContent =
+    "Failed to load: " + e.message;
+});
+</script>
+</body>
+</html>
