@@ -305,7 +305,7 @@ const FIELDS = [
     visible: (v) => v.advanced,
   },
   {
-    id: "target_preset", label: "Target Hose/Spigot", type: "select", def: "32",
+    id: "target_preset", label: "Target Hose/Spigot", type: "select", def: "CUSTOM",
     options: [["32", "32mm"], ["35", "35mm"], ["CUSTOM", "Custom"]],
   },
   {
@@ -318,7 +318,7 @@ const FIELDS = [
     // spigot OD (see adapter_socket_core.py's own build function - no
     // floor is enforced there either). Male Taper keeps the 0.5 floor -
     // matches adapter_taper.py's own standalone operator.
-    id: "taper_angle_deg", label: "Taper Angle", unit: "°", max: 8, step: 0.1, def: 3.0,
+    id: "taper_angle_deg", label: "Taper Angle", unit: "°", max: 8, step: 0.1, def: 0,
     minFn: (v) => (v.adapter_kind === "SOCKET" ? 0 : 0.5),
   },
   { id: "engagement_len_mm", label: "Engagement Length", unit: "mm", min: 5, max: 80, step: 0.5, def: 20.0 },
