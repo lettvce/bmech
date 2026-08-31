@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statics Solver — free body diagram truss solver</title>
+<meta name="description" content="Draw a 2D truss free body diagram — points, members, cables, supports, loads — and solve reactions and member forces (tension/compression) step by step, right in your browser.">
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; font-family: system-ui, sans-serif; }
+  .home-bar { padding: 0.6rem 1rem; font-size: 0.85rem; background: #1e2128; }
+  .home-bar a { color: #9aa0aa; text-decoration: none; }
+  .home-bar a:hover { color: #6fb1ff; }
+  #appRoot { display: flex; height: calc(100vh - 2.4rem); }
+  #sidebar { width: 300px; flex: none; padding: 12px; border-right: 1px solid #ccc; overflow-y: auto; box-sizing: border-box; }
+  #canvasWrap { flex: 1; position: relative; }
+  canvas { display: block; width: 100%; height: 100%; background: #fafafa; cursor: crosshair; }
+  h2 { font-size: 14px; margin: 16px 0 6px; }
+  h2:first-child { margin-top: 0; }
+  .tool-row { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  button { font-size: 12px; padding: 4px 8px; cursor: pointer; }
+  button.active { background: #333; color: #fff; }
+  label { font-size: 12px; display: block; margin: 4px 0 2px; }
+  input[type=number] { width: 70px; font-size: 12px; }
+  #status { font-size: 12px; color: #555; margin-bottom: 8px; min-height: 32px; white-space: pre-wrap; }
+  #result { font-size: 12px; white-space: pre-wrap; border-top: 1px solid #ccc; padding-top: 8px; margin-top: 8px; }
+  .memberRow.tension { color: #1a7f37; }
+  .memberRow.compression { color: #b3261e; }
+  .memberRow.zero-force { color: #888; }
+  .memberRow.slack { color: #999; font-style: italic; }
+  #steps { font-size: 11px; color: #333; }
+  #steps li { margin-bottom: 3px; }
+  .objRow { display: flex; gap: 4px; align-items: center; margin-bottom: 3px; }
+  .objRow input[type=text] { width: 44px; font-size: 12px; }
+  .objRow input[type=number] { width: 52px; font-size: 12px; }
+  .objRow select { font-size: 12px; width: 52px; }
+  .objRow button { padding: 1px 6px; line-height: 1; }
+  #pointsList, #loadsList, #membersList { max-height: 140px; overflow-y: auto; margin-bottom: 4px; }
+  #preciseMember { font-size: 12px; background: #f0f4ff; border: 1px solid #ccd; border-radius: 4px; padding: 6px; margin-bottom: 10px; }
+  #preciseMember.disabled { opacity: 0.5; }
+  #preciseMember .row { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+  #preciseMember label { margin: 0; }
+</style>
+</head>
+<body>
+<div class="home-bar"><a href="/">← Lettvce</a></div>
+<div id="appRoot">
+<div id="sidebar">
+  <h2>Tool</h2>
+  <div class="tool-row">
+    <button data-tool="point" class="active">Point</button>
+    <button data-tool="member">Member</button>
+    <button data-tool="cable">Cable</button>
+    <button data-tool="pin">Pin support</button>
+    <button data-tool="roller">Roller support</button>
+    <button data-tool="fixed">Fixed (welded)</button>
+    <button data-tool="load">Load</button>
+    <button data-tool="section">Section</button>
+    <button data-tool="delete">Delete</button>
+  </div>
+  <div id="toolHint" style="font-size:11px;color:#666;"></div>
+
+  <div id="preciseMember" class="disabled">
+    <b>Precise member</b>
+    <div class="row">
+      <button type="button" data-precise-mode="aligned" class="active">Aligned</button>
+      <button type="button" data-precise-mode="x">X-dist</button>
+      <button type="button" data-precise-mode="y">Y-dist</button>
+    </div>
+    <div class="row">
+      <label id="preciseDistLabel">Length (m)</label>
+      <input type="number" id="preciseDist" value="1" step="0.1" />
+    </div>
+    <div class="row">
+      <label>Angle (°, from +X, CCW)</label>
+      <input type="number" id="preciseAngle" value="0" step="1" />
+    </div>
+    <button id="preciseCreateBtn">Create point + member</button>
+  </div>
+
+  <h2>Load (for Load tool)</h2>
+  <label>Fx (N, +right)</label>
+  <input type="number" id="loadFx" value="0" step="0.5" />
+  <label>Fy (N, +up)</label>
+  <input type="number" id="loadFy" value="-10" step="0.5" />
+
+  <h2>Roller direction (for Roller tool)</h2>
+  <label>Direction</label>
+  <select id="rollerDir">
+    <option value="0,1" selected>Vertical (resists up/down)</option>
+    <option value="1,0">Horizontal (resists left/right)</option>
+  </select>
+
+  <h2>Points</h2>
+  <div id="pointsList"></div>
+
+  <h2>Members</h2>
+  <div id="membersList"></div>
+
+  <h2>Forces</h2>
+  <div id="loadsList"></div>
+
+  <div id="status"></div>
+
+  <div class="tool-row">
+    <button id="solveBtn">Solve</button>
+    <button id="clearBtn">Clear all</button>
+  </div>
+
+  <div id="result"></div>
+  <div id="sectionResult"></div>
+</div>
+<div id="canvasWrap">
+  <canvas id="canvas"></canvas>
+</div>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
