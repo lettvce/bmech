@@ -1095,6 +1095,37 @@ function renderLists() {
   }
 }
 
+// --- nonprofessional-use disclaimer gate ---
+// Shown once per browser (remembered via localStorage), not once per
+// session, so returning visitors aren't re-blocked every visit — but it
+// defaults to VISIBLE in the HTML itself and only gets hidden here, so if
+// this script fails to run for any reason the disclaimer fails closed
+// rather than silently not appearing.
+const DISCLAIMER_KEY = 'statics_solver:disclaimer_accepted:v1';
+const disclaimerOverlay = document.getElementById('disclaimerOverlay');
+
+try {
+  if (localStorage.getItem(DISCLAIMER_KEY) === '1') {
+    disclaimerOverlay.style.display = 'none';
+  }
+} catch {
+  // Storage unavailable — just leave the disclaimer up; better to ask again
+  // than to risk silently skipping it.
+}
+
+document.getElementById('disclaimerAccept').addEventListener('click', () => {
+  try {
+    localStorage.setItem(DISCLAIMER_KEY, '1');
+  } catch {
+    // Can't remember it — the user will just see it again next visit.
+  }
+  disclaimerOverlay.style.display = 'none';
+});
+
+document.getElementById('disclaimerDeny').addEventListener('click', () => {
+  window.location.href = '/';
+});
+
 loadFromStorage();
 resize();
 renderLists();
