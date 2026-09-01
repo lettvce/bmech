@@ -599,12 +599,23 @@ function draw() {
     ctx.lineTo(w, y);
     ctx.stroke();
   }
-  // ground line
-  ctx.strokeStyle = '#bbb';
+  // X and Y axes through the world origin — thicker/darker than the grid so
+  // orientation is always obvious at a glance, labeled at their positive end.
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(0, view.originY);
   ctx.lineTo(w, view.originY);
   ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(view.originX, 0);
+  ctx.lineTo(view.originX, h);
+  ctx.stroke();
+
+  ctx.fillStyle = '#555';
+  ctx.font = 'bold 13px system-ui';
+  ctx.fillText('X', w - 18, view.originY - 6);
+  ctx.fillText('Y', view.originX + 6, 16);
 
   const forceById = new Map((lastResult?.memberForces ?? []).map((m) => [m.id, m]));
   const cutMemberIds = new Set(sectionResult?.solved ? sectionResult.cutMemberIds : []);
