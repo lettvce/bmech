@@ -56,6 +56,31 @@ canvas.addEventListener('auxclick', (e) => {
   if (e.button === 1) e.preventDefault();
 });
 
+// --- zoom with the scroll wheel, centered on the cursor ---
+const MIN_SCALE = 5;
+const MAX_SCALE = 800;
+
+canvas.addEventListener(
+  'wheel',
+  (e) => {
+    e.preventDefault(); // stop the page itself from scrolling
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const worldBefore = screenToWorld(mx, my);
+
+    const factor = Math.exp(-e.deltaY * 0.001);
+    view.scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, view.scale * factor));
+
+    // Re-anchor the origin so the world point under the cursor doesn't
+    // drift — the same point stays under the mouse as it zooms.
+    view.originX = mx - worldBefore.x * view.scale;
+    view.originY = my + worldBefore.y * view.scale;
+    draw();
+  },
+  { passive: false }
+);
+
 // --- model state ---
 let points = []; // {id, x, y}
 let members = []; // {id, from, to}
@@ -69,6 +94,46 @@ let lastResult = null; // solveTrussWithCables() output, used for coloring/label
 let pendingSectionPoint = null; // world point of the first click while drawing a cutting line
 let sectionLine = null; // { p1, p2 } world points, extended to an infinite line for cutting
 let sectionResult = null; // solveSection() output
+
+// --- persistence: survive a page refresh via localStorage ---
+// Versioned key so a future schema change can't load garbage into a stale
+// structure instead of just starting fresh.
+const STORAGE_KEY = 'statics_solver:v1';
+let saveTimer = null;
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ points, members, supports, loads, nextPointNum, nextMemberNum, nextLoadNum })
+      );
+    } catch {
+      // Storage unavailable (private browsing, quota, disabled) — the
+      // canvas still works fine, it just won't survive a refresh.
+    }
+  }, 250);
+}
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    if (!s || !Array.isArray(s.points)) return false;
+    points = s.points ?? [];
+    members = s.members ?? [];
+    supports = s.supports ?? [];
+    loads = s.loads ?? [];
+    nextPointNum = s.nextPointNum ?? points.length + 1;
+    nextMemberNum = s.nextMemberNum ?? members.length + 1;
+    nextLoadNum = s.nextLoadNum ?? loads.length + 1;
+    return true;
+  } catch {
+    return false; // corrupted/stale save — just start fresh rather than crash
+  }
+}
 
 // --- undo / redo ---
 let undoStack = [];
@@ -544,7 +609,9 @@ function draw() {
   const forceById = new Map((lastResult?.memberForces ?? []).map((m) => [m.id, m]));
   const cutMemberIds = new Set(sectionResult?.solved ? sectionResult.cutMemberIds : []);
 
-  // members
+  // members — lines first, in their own pass, so a later member's line can
+  // never paint over an earlier member's force label (canvas draws are
+  // strictly paint-order-dependent, and members can cross each other).
   for (const m of members) {
     const a = points.find((p) => p.id === m.from);
     const b = points.find((p) => p.id === m.to);
@@ -573,11 +640,22 @@ function draw() {
       ctx.stroke();
       ctx.restore();
     }
+  }
 
+  // member force labels — a separate pass, painted after EVERY member line
+  // so labels always sit above the members, never underneath a crossing one.
+  for (const m of members) {
+    const a = points.find((p) => p.id === m.from);
+    const b = points.find((p) => p.id === m.to);
+    if (!a || !b) continue;
+    const sa = worldToScreen(a.x, a.y);
+    const sb = worldToScreen(b.x, b.y);
+    const f = forceById.get(m.id);
     if (f) {
+      const stateColors = { tension: '#1a7f37', compression: '#b3261e', 'zero-force': '#888', slack: '#999' };
       const mx = (sa.x + sb.x) / 2;
       const my = (sa.y + sb.y) / 2;
-      ctx.fillStyle = ctx.strokeStyle;
+      ctx.fillStyle = stateColors[f.state] ?? '#333';
       ctx.font = '11px system-ui';
       ctx.fillText(`${f.force.toFixed(1)}N`, mx + 4, my - 4);
     }
@@ -696,6 +774,7 @@ function draw() {
   }
 
   statusEl.textContent = `Points: ${points.length}  Members: ${members.length}  Supports: ${supports.length}  Loads: ${loads.length}`;
+  scheduleSave(); // debounced — draw() runs on every mutation (and on pan/zoom, harmlessly)
 }
 
 // A moment reaction has no direction to draw as an arrow — it's a couple,
@@ -1005,5 +1084,6 @@ function renderLists() {
   }
 }
 
+loadFromStorage();
 resize();
 renderLists();
