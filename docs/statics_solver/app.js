@@ -81,6 +81,71 @@ canvas.addEventListener(
   { passive: false }
 );
 
+// --- click-and-drag to connect two points with a member/cable ---
+// Layered on top of the existing click-click flow rather than replacing it:
+// a mousedown on a point just remembers it; if the mouse never actually
+// moves before mouseup, nothing here fires and the browser's normal
+// synthetic 'click' event runs the old two-click logic untouched. Only a
+// real drag (past a small threshold) creates the member directly, and it
+// suppresses that one following click so the old handler doesn't also fire.
+let dragFrom = null;
+let dragStartScreen = null;
+let dragCurrentScreen = null;
+let dragMoved = false;
+let suppressNextClick = false;
+const DRAG_THRESHOLD = 4; // px
+
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return; // left button only — middle is reserved for pan
+  if (tool !== 'member' && tool !== 'cable') return;
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const p = findPointNear(sx, sy);
+  if (!p) return;
+  dragFrom = p;
+  dragStartScreen = { x: sx, y: sy };
+  dragCurrentScreen = dragStartScreen;
+  dragMoved = false;
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!dragFrom) return;
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  dragCurrentScreen = { x: sx, y: sy };
+  if (!dragMoved && Math.hypot(sx - dragStartScreen.x, sy - dragStartScreen.y) > DRAG_THRESHOLD) {
+    dragMoved = true;
+  }
+  if (dragMoved) draw();
+});
+
+window.addEventListener('mouseup', (e) => {
+  if (e.button !== 0 || !dragFrom) return;
+  if (dragMoved) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const target = findPointNear(sx, sy);
+    if (target && target.id !== dragFrom.id) {
+      pushHistory();
+      const newMember = { id: `M${nextMemberNum++}`, from: dragFrom.id, to: target.id };
+      if (tool === 'cable') newMember.type = 'cable';
+      members.push(newMember);
+      lastResult = null;
+      resultEl.textContent = '';
+      renderLists();
+    }
+    suppressNextClick = true; // this drag's mouseup will still fire a native 'click' next
+  }
+  dragFrom = null;
+  dragStartScreen = null;
+  dragCurrentScreen = null;
+  dragMoved = false;
+  draw();
+});
+
 // --- model state ---
 let points = []; // {id, x, y}
 let members = []; // {id, from, to}
@@ -245,8 +310,8 @@ let pendingMemberFrom = null;
 
 const toolHints = {
   point: 'Click empty space to place a point (snaps to grid).',
-  member: 'Click a point, then click another point to connect them.',
-  cable: 'Click a point, then click another point to connect them with a cable (tension-only — goes slack instead of carrying compression).',
+  member: 'Click and drag from one point to another to connect them — or click, then click again.',
+  cable: 'Click and drag from one point to another to connect them with a cable (tension-only — goes slack instead of carrying compression) — or click, then click again.',
   pin: 'Click a point to add a pin support (fixes both X and Y).',
   roller: 'Click a point to add a roller support (fixes one direction, set below).',
   fixed: 'Click a point to add a fixed/welded support (fixes X, Y, AND rotation — shown as an X). Note: a pin-jointed truss can\'t transmit moment through its joints, so this will make the truss indeterminate unless it\'s the only thing holding that side up.',
@@ -353,6 +418,10 @@ document.getElementById('preciseCreateBtn').addEventListener('click', () => {
 });
 
 canvas.addEventListener('click', (e) => {
+  if (suppressNextClick) {
+    suppressNextClick = false;
+    return;
+  }
   const rect = canvas.getBoundingClientRect();
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
@@ -701,13 +770,27 @@ function draw() {
     ctx.fill();
   }
 
-  // pending member preview
-  if (tool === 'member' && pendingMemberFrom) {
+  // pending member preview (click-click flow)
+  if ((tool === 'member' || tool === 'cable') && pendingMemberFrom) {
     const s = worldToScreen(pendingMemberFrom.x, pendingMemberFrom.y);
     ctx.fillStyle = '#0969da';
     ctx.beginPath();
     ctx.arc(s.x, s.y, 8, 0, Math.PI * 2);
     ctx.stroke();
+  }
+
+  // live rubber-band line while dragging from a point (click-and-drag flow)
+  if (dragFrom && dragMoved && dragCurrentScreen) {
+    const s = worldToScreen(dragFrom.x, dragFrom.y);
+    ctx.save();
+    ctx.strokeStyle = '#0969da';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y);
+    ctx.lineTo(dragCurrentScreen.x, dragCurrentScreen.y);
+    ctx.stroke();
+    ctx.restore();
   }
 
   // supports
