@@ -1224,6 +1224,25 @@ document.getElementById('disclaimerDeny').addEventListener('click', () => {
   window.location.href = '/';
 });
 
+// --- instructions popup ---
+const instructionsOverlay = document.getElementById('instructionsOverlay');
+
+function openInstructions() {
+  instructionsOverlay.classList.add('open');
+}
+function closeInstructions() {
+  instructionsOverlay.classList.remove('open');
+}
+
+document.getElementById('instructionsBtn').addEventListener('click', openInstructions);
+document.getElementById('instructionsClose').addEventListener('click', closeInstructions);
+instructionsOverlay.addEventListener('click', (e) => {
+  if (e.target === instructionsOverlay) closeInstructions(); // click on the dark backdrop, not the box
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && instructionsOverlay.classList.contains('open')) closeInstructions();
+});
+
 loadFromStorage();
 resize();
 renderLists();

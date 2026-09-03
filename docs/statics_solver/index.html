@@ -59,6 +59,32 @@
   #disclaimerBox button { font-size: 14px; padding: 8px 18px; cursor: pointer; border-radius: 4px; border: 1px solid #ccc; }
   #disclaimerAccept { background: #1a7f37; color: #fff; border-color: #1a7f37; }
   #disclaimerDeny { background: #f3f3f3; }
+
+  #instructionsBtn { width: 100%; margin-bottom: 12px; background: #f0f4ff; border: 1px solid #ccd; font-weight: bold; }
+  #instructionsOverlay {
+    display: none;
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+    align-items: center; justify-content: center;
+    z-index: 1000; padding: 16px; box-sizing: border-box;
+  }
+  #instructionsOverlay.open { display: flex; }
+  #instructionsBox {
+    background: #fff; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto;
+    border-radius: 8px; padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    font-family: system-ui, sans-serif; position: relative;
+  }
+  #instructionsBox h2 { font-size: 16px; margin: 18px 0 6px; }
+  #instructionsBox h2:first-of-type { margin-top: 0; }
+  #instructionsBox p, #instructionsBox li { font-size: 13px; line-height: 1.5; color: #333; }
+  #instructionsBox ul { margin: 4px 0; padding-left: 20px; }
+  #instructionsBox kbd {
+    background: #eee; border: 1px solid #ccc; border-radius: 3px;
+    padding: 1px 6px; font-family: monospace; font-size: 12px;
+  }
+  #instructionsClose {
+    position: absolute; top: 12px; right: 12px; border: none; background: none;
+    font-size: 20px; cursor: pointer; line-height: 1; color: #666;
+  }
 </style>
 </head>
 <body>
@@ -78,9 +104,58 @@
   </div>
 </div>
 
+<div id="instructionsOverlay">
+  <div id="instructionsBox">
+    <button id="instructionsClose" aria-label="Close">×</button>
+
+    <h2>Tools</h2>
+    <ul>
+      <li><kbd>Q</kbd> Point — click empty space to place one (snaps to a grid).</li>
+      <li><kbd>W</kbd> Member — click-and-drag from one point to another, or click, then click again.</li>
+      <li><kbd>E</kbd> Cable — same as Member, but tension-only: it goes slack instead of carrying compression.</li>
+      <li><kbd>A</kbd> Pin support — fixes X and Y at a point.</li>
+      <li><kbd>S</kbd> Roller support — fixes one direction (pick vertical/horizontal in the sidebar).</li>
+      <li><kbd>D</kbd> Fixed/welded support — fixes X, Y, and rotation (drawn as an X). Note: a truss's joints can't transmit moment, so this usually makes the structure indeterminate unless it's the only support.</li>
+      <li><kbd>F</kbd> Load — set Fx/Fy in the sidebar, then click a point to apply it.</li>
+      <li>Section — click two points to draw a cutting line; solve the truss first.</li>
+      <li>Delete — click a point, member, or force arrow, or use the × buttons in the sidebar lists.</li>
+    </ul>
+    <p>Shortcuts are ignored while typing in any text field.</p>
+
+    <h2>Precise placement</h2>
+    <p>While placing a Member/Cable, after picking the first point, use the
+       "Precise member" panel to enter an exact <b>Length</b> and <b>Angle</b>
+       instead of clicking a second point. Toggle <b>Aligned / X-dist / Y-dist</b>
+       to dimension by the member's true length, its horizontal distance, or
+       its vertical distance — all combined with the same angle.</p>
+
+    <h2>Canvas navigation</h2>
+    <ul>
+      <li>Scroll wheel — zoom in/out, centered on the cursor.</li>
+      <li>Middle-click and drag — pan.</li>
+    </ul>
+
+    <h2>Editing</h2>
+    <p>The Points / Members / Forces lists in the sidebar let you rename,
+       reposition, and delete anything after the fact — no need to redraw.</p>
+
+    <h2>Undo / redo</h2>
+    <p><kbd>Ctrl+Z</kbd> to undo, <kbd>Ctrl+Y</kbd> (or <kbd>Ctrl+Shift+Z</kbd>) to redo.
+       Covers every action, including "Clear all".</p>
+
+    <h2>Solving</h2>
+    <p>Click <b>Solve</b> to get member forces (tension/compression) and support
+       reactions, along with the equations used to find them. If the result is
+       <i>indeterminate</i>, pure statics can't fully solve it — reactions may
+       still be shown if they're independently solvable. If it's <i>unstable</i>,
+       the structure is a mechanism under this load.</p>
+  </div>
+</div>
+
 <div class="home-bar"><a href="/">← Lettvce</a></div>
 <div id="appRoot">
 <div id="sidebar">
+  <button id="instructionsBtn">📖 Instructions</button>
   <h2>Tool</h2>
   <div class="tool-row">
     <button data-tool="point" class="active">Point (Q)</button>
