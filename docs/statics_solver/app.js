@@ -56,6 +56,19 @@ canvas.addEventListener('auxclick', (e) => {
   if (e.button === 1) e.preventDefault();
 });
 
+// --- live coordinate readout following the cursor ---
+let hoverScreen = null; // {x, y} in canvas-local pixels, or null when not hovering
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  hoverScreen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  draw();
+});
+canvas.addEventListener('mouseleave', () => {
+  hoverScreen = null;
+  draw();
+});
+
 // --- zoom with the scroll wheel, centered on the cursor ---
 const MIN_SCALE = 5;
 const MAX_SCALE = 800;
@@ -264,7 +277,25 @@ window.addEventListener('keydown', (e) => {
   const active = document.activeElement;
   if (active && (TYPING_TAGS.has(active.tagName) || active.isContentEditable)) return; // don't hijack typing
 
-  const shortcutTool = TOOL_SHORTCUTS[e.key.toLowerCase()];
+  const key = e.key.toLowerCase();
+
+  if (key === 'r') {
+    // Connect the two most recently created points with a member — a fast
+    // way to chain-build (place, place, R, place, R, ...) without clicking.
+    e.preventDefault();
+    if (points.length < 2) return;
+    const a = points[points.length - 2];
+    const b = points[points.length - 1];
+    pushHistory();
+    members.push({ id: `M${nextMemberNum++}`, from: a.id, to: b.id });
+    lastResult = null;
+    resultEl.textContent = '';
+    renderLists();
+    draw();
+    return;
+  }
+
+  const shortcutTool = TOOL_SHORTCUTS[key];
   if (!shortcutTool) return;
   e.preventDefault();
   document.querySelector(`button[data-tool="${shortcutTool}"]`)?.click();
@@ -880,6 +911,25 @@ function draw() {
     ctx.fill();
     ctx.font = '11px system-ui';
     ctx.fillText(p.id, sp.x + 6, sp.y - 6);
+  }
+
+  // live coordinate readout at the cursor — snapped when the Point tool
+  // would actually snap it, raw otherwise (still useful as a reference).
+  if (hoverScreen) {
+    const worldPos = screenToWorld(hoverScreen.x, hoverScreen.y);
+    const shown = tool === 'point' ? { x: snap(worldPos.x), y: snap(worldPos.y) } : worldPos;
+    const label = `(${shown.x.toFixed(2)}, ${shown.y.toFixed(2)})`;
+    ctx.font = '11px system-ui';
+    const textWidth = ctx.measureText(label).width;
+    const lx = hoverScreen.x + 14;
+    const ly = hoverScreen.y + 18;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillRect(lx - 3, ly - 12, textWidth + 6, 16);
+    ctx.strokeStyle = '#ccc';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(lx - 3, ly - 12, textWidth + 6, 16);
+    ctx.fillStyle = '#333';
+    ctx.fillText(label, lx, ly);
   }
 
   statusEl.textContent = `Points: ${points.length}  Members: ${members.length}  Supports: ${supports.length}  Loads: ${loads.length}`;
