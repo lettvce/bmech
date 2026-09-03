@@ -255,6 +255,21 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// --- keyboard shortcuts for tool selection ---
+const TOOL_SHORTCUTS = { q: 'point', w: 'member', e: 'cable', a: 'pin', s: 'roller', d: 'fixed', f: 'load' };
+const TYPING_TAGS = new Set(['INPUT', 'SELECT', 'TEXTAREA']);
+
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return; // leave modified keys (undo/redo etc.) alone
+  const active = document.activeElement;
+  if (active && (TYPING_TAGS.has(active.tagName) || active.isContentEditable)) return; // don't hijack typing
+
+  const shortcutTool = TOOL_SHORTCUTS[e.key.toLowerCase()];
+  if (!shortcutTool) return;
+  e.preventDefault();
+  document.querySelector(`button[data-tool="${shortcutTool}"]`)?.click();
+});
+
 const GRID = 0.5; // snap grid, meters
 const PICK_RADIUS = 14; // px
 
