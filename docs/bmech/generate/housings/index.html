@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Housings — live parametric configurator</title>
+<meta name="description" content="Configure a two-shaft gearbox housing (with a live gear-pair preview) and its friction-fit lid in your browser and download the STL — free while this is in testing.">
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+    --good: #7fd0a0;
+    --bad: #e08a8a;
+    --preview: #e0b15c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  header {
+    padding: 3rem 1.5rem 2rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 2.2rem; margin: 0 0 0.5rem; }
+  header p { color: var(--muted); max-width: 560px; margin: 0 auto; font-size: 1.05rem; }
+  .badge {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 999px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--good);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .tabs {
+    max-width: 1100px;
+    margin: 2rem auto 0;
+    padding: 0 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .tab-btn {
+    background: var(--panel);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.5rem 1.1rem;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .tab-btn:hover { color: var(--text); border-color: var(--accent); }
+  .tab-btn.active { background: var(--accent); color: #0b0d10; border-color: var(--accent); }
+
+  /* --- configurator --- */
+  .configurator {
+    max-width: 1100px;
+    margin: 1.2rem auto 2.5rem;
+    padding: 0 1.5rem;
+  }
+  .app {
+    display: flex;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    height: min(640px, 80vh);
+  }
+  #viewer { flex: 1 1 auto; min-width: 280px; position: relative; background: #101215; height: 100%; }
+  #viewer canvas { display: block; }
+  #loading {
+    position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 13px; color: var(--muted); text-align: center; padding: 1rem;
+  }
+  #legend {
+    position: absolute; left: 12px; bottom: 12px; display: none;
+    font-size: 0.72rem; color: var(--muted); background: rgba(16,18,21,0.75);
+    padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--border);
+  }
+  #legend span { display: flex; align-items: center; gap: 0.4rem; margin: 2px 0; }
+  #legend .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  #panel {
+    order: -1;
+    width: 320px; flex: 0 0 320px; padding: 1.4rem;
+    border-left: none; border-right: 1px solid var(--border);
+    overflow-y: auto; height: 100%;
+  }
+  @media (max-width: 680px) {
+    .app { flex-direction: column; height: auto; }
+    #viewer { order: -1; flex: none; height: 320px; min-width: 0; position: sticky; top: 0; z-index: 1; }
+    #panel { order: 0; width: 100%; flex: none; height: auto; border-right: none; border-top: 1px solid var(--border); }
+  }
+  #panel h2 { font-size: 1.05rem; margin: 0 0 0.25rem; border: none; padding: 0; color: var(--text); }
+  #panel .sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.1rem; }
+  .group-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--accent); margin: 1.2rem 0 0.6rem;
+  }
+  .group-label:first-of-type { margin-top: 0; }
+  .field { margin-bottom: 1rem; }
+  .field label {
+    display: flex; justify-content: space-between; font-size: 0.82rem;
+    color: var(--text); margin-bottom: 0.25rem;
+  }
+  .field label span.unit-suffix { color: var(--muted); font-weight: 600; }
+  .field input[type=number] {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem;
+    font-size: 0.9rem; font-variant-numeric: tabular-nums;
+  }
+  .field input[type=number]:focus { outline: none; border-color: var(--accent); }
+  .field .hint {
+    display: block; min-height: 1em; margin-top: 0.2rem;
+    font-size: 0.72rem; color: var(--muted);
+  }
+  .unit-toggle { display: flex; gap: 0.4rem; margin-bottom: 1.1rem; }
+  .unit-btn {
+    flex: 1; background: var(--bg); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.35rem 0; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  }
+  .unit-btn:hover { color: var(--text); border-color: var(--accent); }
+  .unit-btn.active { background: var(--accent); color: #0b0d10; border-color: var(--accent); }
+  #readouts { font-size: 0.82rem; color: var(--text); margin-bottom: 0.4rem; }
+  #readouts .readout { display: flex; justify-content: space-between; padding: 2px 0; }
+  #readouts .readout .val { color: var(--good); font-variant-numeric: tabular-nums; }
+  #status { font-size: 0.78rem; color: var(--muted); margin-top: 0.4rem; min-height: 34px; }
+  #status.err { color: var(--bad); }
+  #buy {
+    margin-top: 1.1rem; width: 100%; padding: 0.7rem; border-radius: 8px; border: none;
+    background: #3a3f4b; color: #666; font-size: 0.85rem; cursor: not-allowed; font-weight: 600;
+  }
+  #buy:not(:disabled) { background: var(--good); color: #0b0d10; cursor: pointer; }
+
+  main { max-width: 860px; margin: 0 auto; padding: 1rem 1.5rem 3rem; }
+  section { margin-bottom: 3rem; }
+  h2 { font-size: 1.4rem; border-left: 3px solid var(--accent); padding-left: 0.75rem; }
+  ul { color: var(--muted); }
+  code {
+    background: var(--panel); padding: 0.15rem 0.4rem; border-radius: 4px;
+    font-size: 0.9em; color: var(--text);
+  }
+  footer {
+    border-top: 1px solid var(--border); text-align: center; padding: 2rem 1.5rem;
+    color: var(--muted); font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+  .home-bar { max-width: 860px; margin: 0 auto; padding: 1rem 1.5rem 0; }
+  .home-bar a { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+  .home-bar a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="home-bar"><a href="../index.html">← Try bmech Live</a></div>
+
+<header>
+  <h1>Housings</h1>
+  <p>A two-shaft gearbox housing — stadium base + wall, bosses, and
+     through-bores — with a live preview of the two gears it's sized
+     around, plus its friction-fit lid. Every part a single boolean-free
+     geo_helpers solid. Dial it in and download a ready-to-print STL,
+     right here in the browser.</p>
+  <div class="badge">Free while this is in testing</div>
+</header>
+
+<div class="tabs" id="tabs" role="tablist"></div>
+
+<div class="configurator">
+  <div class="app">
+    <div id="viewer">
+      <div id="loading">Loading Python runtime…</div>
+      <div id="legend">
+        <span><span class="swatch" style="background:#9aa6b8;"></span>Housing (downloads)</span>
+        <span><span class="swatch" style="background:var(--preview);"></span>Gear preview (not exported)</span>
+      </div>
+    </div>
+    <div id="panel">
+      <h2 id="panel-title"></h2>
+      <div class="sub" id="panel-sub">Live preview — runs entirely in your browser, no server call.</div>
+      <div class="unit-toggle" id="unit-toggle">
+        <button type="button" class="unit-btn active" data-unit="mm">mm</button>
+        <button type="button" class="unit-btn" data-unit="in">in</button>
+      </div>
+      <div id="fields"></div>
+      <div id="readouts"></div>
+      <div id="status">Booting Pyodide…</div>
+      <button id="buy" disabled>Download STL (free — testing)</button>
+    </div>
+  </div>
+</div>
+
+<main>
+
+<section>
+  <h2>What this is</h2>
+  <p>The exact same Python that ships in the <a href="../../index.html" style="color: var(--accent);">bmech</a>
+     Blender extension runs unmodified in your browser via
+     <a href="https://pyodide.org/" style="color: var(--accent);">Pyodide</a>,
+     not a separate reimplementation. Nothing about the shape or your
+     chosen dimensions is uploaded anywhere — the mesh is built and the
+     STL is written entirely on your machine.</p>
+  <ul>
+    <li>The <strong>Housing</strong> tab's "Shaft Gears" fields drive a
+        live preview of the two gears the housing is being sized around
+        (amber, shown for reference only — not part of the downloaded
+        STL). Center Distance and the wall's own inner clearance radius
+        are derived from those gears' module and tooth counts, the same
+        formula the Blender operator's own Match Target picker uses when
+        you point it at two real gear objects.</li>
+    <li>The preview gears are drawn at a fixed rotation (not phase-aligned
+        to actually mesh tooth-to-tooth) — it's there to confirm the
+        housing's own wall clears both gears' tip circles, not to
+        animate them turning.</li>
+    <li>The <strong>Lid</strong> tab is plain numeric inputs — in
+        Blender, Match Target reads Center Distance / Housing OD Radius /
+        Shaft Hole Ø / Segments straight off a built housing object's own
+        stamped properties; here, type in the same four values from the
+        Housing tab (or your own housing's dimensions) by hand.</li>
+    <li>This is free during testing. If it turns into a paid product
+        later, existing free downloads aren't retroactively affected.</li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  <p>The extension's own source code is open source under GPL-3.0 —
+     <a href="https://github.com/lettvce/bmech">GitHub</a>.</p>
+  <p>Contact: <a href="mailto:blakewysocki421@gmail.com">blakewysocki421@gmail.com</a></p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+
+// ---------------------------------------------------------------------
+// Two generators, one page. "Housing" is special-cased in rebuild():
+// its module/tooth_count_a/tooth_count_b/pressure_angle_deg fields don't
+// map directly to build_gearbox_housing_mesh kwargs - they derive
+// gear_od_mm/center_distance_mm (the real kwargs) AND drive a separate
+// live preview of the two gears, drawn alongside the housing but not
+// part of the exported STL. "Lid" is a standard single-mesh generator,
+// same shape as every other family's own tabs on this site.
+// ---------------------------------------------------------------------
+const TYPES = [
+  {
+    id: "housing", label: "Housing", filename: "gearbox_housing.stl",
+    fields: [
+      { group: "Shaft Gears (preview)" },
+      { id: "module", label: "Module", unit: "mm", min: 0.3, max: 6, step: 0.1, def: 1.5 },
+      { id: "tooth_count_a", label: "Shaft 1 Teeth", unit: "", min: 4, max: 80, step: 1, def: 12, int: true },
+      { id: "tooth_count_b", label: "Shaft 2 Teeth", unit: "", min: 4, max: 80, step: 1, def: 28, int: true },
+      { id: "pressure_angle_deg", label: "Pressure Angle", unit: "°", min: 10, max: 30, step: 0.5, def: 20.0 },
+
+      { group: "Clearance & Wall" },
+      { id: "wall_clearance_mm", label: "Wall Clearance", unit: "mm", min: 0, max: 5, step: 0.05, def: 0.3 },
+      { id: "wall_thickness_mm", label: "Wall Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 2.0 },
+      { id: "wall_height_mm", label: "Wall Height", unit: "mm", min: 0.5, max: 100, step: 0.5, def: 10.0 },
+      { id: "base_thickness_mm", label: "Base Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 2.0 },
+
+      { group: "Shaft & Boss" },
+      { id: "shaft_hole_dia_mm", label: "Shaft Hole Ø", unit: "mm", min: 0.5, max: 50, step: 0.1, def: 5.0 },
+      { id: "boss_thickness_mm", label: "Boss Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 2.0 },
+      { id: "boss_height_mm", label: "Boss Height", unit: "mm", min: 0, max: 50, step: 0.5, def: 4.0,
+        note: "0 = no boss, bore straight through the floor" },
+
+      { group: "Mesh" },
+      { id: "segments", label: "Segments", unit: "", min: 8, max: 128, step: 1, def: 32, int: true },
+
+      { group: "FDM Compensation" },
+      { id: "internal_compensation_mm", label: "Internal Compensation", unit: "mm", min: 0, max: 0.5, step: 0.005, def: 0.075 },
+      { id: "external_compensation_mm", label: "External Compensation", unit: "mm", min: 0, max: 0.5, step: 0.005, def: 0.05 },
+    ],
+  },
+  {
+    id: "lid", label: "Lid", filename: "gearbox_lid.stl",
+    fields: [
+      { group: "Housing Footprint" },
+      { id: "center_distance_mm", label: "Center Distance", unit: "mm", min: 1, max: 300, step: 0.5, def: 30.0,
+        note: "Must match the housing's own shaft spacing" },
+      { id: "r_outer_mm", label: "Housing OD Radius", unit: "mm", min: 0.5, max: 200, step: 0.1, def: 14.3,
+        note: "The housing's own outer wall radius - what the skirt wraps around" },
+      { id: "shaft_hole_dia_mm", label: "Shaft Hole Ø", unit: "mm", min: 0.5, max: 50, step: 0.1, def: 5.0 },
+      { id: "segments", label: "Segments", unit: "", min: 8, max: 128, step: 1, def: 32, int: true },
+
+      { group: "Cap" },
+      { id: "lid_thickness_mm", label: "Lid Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 3.0 },
+
+      { group: "Skirt" },
+      { id: "skirt_interference_mm", label: "Skirt Interference", unit: "mm", min: 0, max: 2, step: 0.01, def: 0.15 },
+      { id: "skirt_thickness_mm", label: "Skirt Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 2.0 },
+      { id: "skirt_depth_mm", label: "Skirt Depth", unit: "mm", min: 0.5, max: 100, step: 0.5, def: 5.0 },
+
+      { group: "FDM Compensation" },
+      { id: "internal_compensation_mm", label: "Internal Compensation", unit: "mm", min: 0, max: 0.5, step: 0.005, def: 0.075 },
+      { id: "external_compensation_mm", label: "External Compensation", unit: "mm", min: 0, max: 0.5, step: 0.005, def: 0.05 },
+    ],
+  },
+];
+
+const PY_FILES = [
+  "generators/geo_helpers.py",
+  "generators/stadium_utils_core.py",
+  "generators/gearbox_housing_core.py",
+  "generators/gearbox_lid_core.py",
+  "generators/spur_gear_core.py",
+];
+
+// ---------------------------------------------------------------------
+// Three.js scene setup
+// ---------------------------------------------------------------------
+const viewerEl = document.getElementById("viewer");
+const legendEl = document.getElementById("legend");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x101215);
+
+const camera = new THREE.PerspectiveCamera(40, 1, 1, 5000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+viewerEl.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+const key = new THREE.DirectionalLight(0xffffff, 1.1);
+key.position.set(120, 200, 160);
+key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+key.shadow.bias = -0.0005;
+scene.add(key);
+scene.add(key.target);
+const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+fill.position.set(-150, 60, -100);
+scene.add(fill);
+
+let mesh = null;
+let previewMeshes = [];
+const material = new THREE.MeshStandardMaterial({
+  color: 0x9aa6b8, roughness: 0.4, metalness: 0.25, side: THREE.DoubleSide,
+  flatShading: true,
+});
+const previewMaterial = new THREE.MeshStandardMaterial({
+  color: 0xe0b15c, roughness: 0.5, metalness: 0.1, side: THREE.DoubleSide,
+  flatShading: true, transparent: true, opacity: 0.55,
+});
+
+function clearMainMesh() {
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); mesh = null; }
+}
+function clearPreviewMeshes() {
+  for (const m of previewMeshes) { scene.remove(m); m.geometry.dispose(); }
+  previewMeshes = [];
+}
+
+function resize() {
+  const w = viewerEl.clientWidth, h = viewerEl.clientHeight;
+  if (w === 0 || h === 0) return;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+window.addEventListener("resize", resize);
+resize();
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// verts: [[x,y,z], ...] in mm, Z-up (same convention every generator
+// itself uses). Three.js is Y-up, so ONLY the display geometry remaps
+// (x,z,-y); the STL export writes verts/triangles untouched, so the
+// downloaded file sits correctly oriented for slicing.
+function buildGeometry(verts, triangles) {
+  const positions = [];
+  for (const [a, b, c] of triangles) {
+    for (const idx of [a, b, c]) {
+      const [x, y, z] = verts[idx];
+      positions.push(x, z, -y);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function computeFaceNormal(a, b, c) {
+  const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+  const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+  const nx = uy * vz - uz * vy;
+  const ny = uz * vx - ux * vz;
+  const nz = ux * vy - uy * vx;
+  const len = Math.hypot(nx, ny, nz) || 1;
+  return [nx / len, ny / len, nz / len];
+}
+
+// Binary STL: 80-byte header, uint32 triangle count, then per triangle:
+// 3 float32 normal + 3x(3 float32 vertex) + uint16 attribute byte count
+// (0) = 50 bytes/triangle.
+function buildBinarySTL(verts, triangles) {
+  const buffer = new ArrayBuffer(84 + 50 * triangles.length);
+  const view = new DataView(buffer);
+  view.setUint32(80, triangles.length, true);
+  let offset = 84;
+  for (const [i0, i1, i2] of triangles) {
+    const a = verts[i0], b = verts[i1], c = verts[i2];
+    const [nx, ny, nz] = computeFaceNormal(a, b, c);
+    view.setFloat32(offset, nx, true); offset += 4;
+    view.setFloat32(offset, ny, true); offset += 4;
+    view.setFloat32(offset, nz, true); offset += 4;
+    for (const v of [a, b, c]) {
+      view.setFloat32(offset, v[0], true); offset += 4;
+      view.setFloat32(offset, v[1], true); offset += 4;
+      view.setFloat32(offset, v[2], true); offset += 4;
+    }
+    offset += 2;
+  }
+  return buffer;
+}
+
+// Fire-and-forget download counter — same sendBeacon/fetch-fallback
+// pattern as this site's other live configurators, "text/plain" so
+// sendBeacon doesn't trigger a CORS preflight.
+const SERVER_BASE = "https://api.lettvce.com";
+function trackDownload(typeId) {
+  const body = JSON.stringify({ type: "housing_" + typeId });
+  const url = SERVER_BASE + "/track/download";
+  try {
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(url, new Blob([body], { type: "text/plain" }));
+      return;
+    }
+  } catch (e) { /* fall through to fetch */ }
+  fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true })
+    .catch(() => {});
+}
+
+function downloadSTL() {
+  if (!lastVerts || !lastTriangles) return;
+  const buffer = buildBinarySTL(lastVerts, lastTriangles);
+  const blob = new Blob([buffer], { type: "model/stl" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = TYPES[activeIndex].filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  trackDownload(TYPES[activeIndex].id);
+}
+
+const DEFAULT_CAMERA_DIR = { x: 0.55, y: 0.55, z: 0.75 };
+
+function frameCamera(geo) {
+  geo.computeBoundingSphere();
+  const { center, radius } = geo.boundingSphere;
+  const dist = radius / Math.sin((camera.fov * Math.PI) / 360) * 1.15;
+  const dir = DEFAULT_CAMERA_DIR;
+  camera.position.set(center.x + dist * dir.x, center.y + dist * dir.y, center.z + dist * dir.z);
+  controls.target.copy(center);
+  camera.near = Math.max(dist * 0.01, 0.1);
+  camera.far = dist * 10;
+  camera.updateProjectionMatrix();
+  controls.update();
+
+  key.position.set(center.x + radius * 1.2, center.y + radius * 2.0, center.z + radius * 1.6);
+  key.target.position.copy(center);
+  key.target.updateMatrixWorld();
+  const sc = key.shadow.camera;
+  sc.left = -radius * 1.5; sc.right = radius * 1.5;
+  sc.top = radius * 1.5; sc.bottom = -radius * 1.5;
+  sc.near = radius * 0.1; sc.far = radius * 6;
+  sc.updateProjectionMatrix();
+}
+
+// ---------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------
+const tabsEl = document.getElementById("tabs");
+const fieldsEl = document.getElementById("fields");
+const panelTitleEl = document.getElementById("panel-title");
+const statusEl = document.getElementById("status");
+const buyBtn = document.getElementById("buy");
+const unitToggleEl = document.getElementById("unit-toggle");
+const readoutsEl = document.getElementById("readouts");
+
+let pyodide = null;
+const GENERATOR_FNS = new Map();
+let displayUnit = "mm";
+let lastVerts = null;
+let lastTriangles = null;
+let pending = null;
+let activeIndex = 0;
+let firstRunForType = true;
+
+function round(x, decimals) {
+  const p = Math.pow(10, decimals);
+  return Math.round(x * p) / p;
+}
+
+function fieldDisplayRange(f) {
+  if (f.unit !== "mm" || displayUnit === "mm") {
+    return { min: f.min, max: f.max, step: f.step, def: f.def };
+  }
+  return {
+    min: round(f.min / 25.4, 4),
+    max: round(f.max / 25.4, 4),
+    step: round(f.step / 25.4, 5),
+    def: round(f.def / 25.4, 3),
+  };
+}
+
+function hintText(displayedValue, f) {
+  if (f.unit !== "mm") return "";
+  return displayUnit === "mm"
+    ? `≈ ${(displayedValue / 25.4).toFixed(3)} in`
+    : `≈ ${(displayedValue * 25.4).toFixed(2)} mm`;
+}
+
+function refreshUnitSuffixes() {
+  fieldsEl.querySelectorAll(".unit-suffix").forEach((el) => {
+    const orig = el.dataset.origUnit;
+    el.textContent = orig === "mm" ? displayUnit : orig;
+  });
+}
+
+function refreshHints() {
+  const type = TYPES[activeIndex];
+  type.fields.forEach((f) => {
+    if (!f.id || f.type === "select" || f.type === "checkbox") return;
+    const el = document.getElementById("in-" + f.id);
+    const hintEl = document.getElementById("hint-" + f.id);
+    if (!el || !hintEl) return;
+    if (f.note) { hintEl.textContent = f.note; return; }
+    const val = parseFloat(el.value);
+    hintEl.textContent = Number.isNaN(val) ? "" : hintText(val, f);
+  });
+}
+
+function convertFieldUnits(oldUnit, newUnit) {
+  if (oldUnit === newUnit) return;
+  const type = TYPES[activeIndex];
+  type.fields.forEach((f) => {
+    if (!f.id || f.unit !== "mm" || f.type === "select" || f.type === "checkbox") return;
+    const el = document.getElementById("in-" + f.id);
+    if (!el) return;
+    const raw = parseFloat(el.value);
+    if (!Number.isNaN(raw)) {
+      const mmVal = oldUnit === "mm" ? raw : raw * 25.4;
+      el.value = newUnit === "mm" ? round(mmVal, 2) : round(mmVal / 25.4, 3);
+    }
+    const range = fieldDisplayRange(f);
+    el.min = range.min;
+    el.max = range.max;
+    el.step = range.step;
+  });
+}
+
+function currentValues() {
+  const type = TYPES[activeIndex];
+  const v = {};
+  type.fields.forEach((f) => {
+    if (!f.id) return;
+    const el = document.getElementById("in-" + f.id);
+    const raw = el ? parseFloat(el.value) : f.def;
+    let val = Number.isNaN(raw) ? f.def : raw;
+    if (f.unit === "mm" && displayUnit === "in") val *= 25.4;
+    if (f.int) val = Math.floor(val);
+    v[f.id] = val;
+  });
+  return v;
+}
+
+function renderFields() {
+  const type = TYPES[activeIndex];
+  panelTitleEl.textContent = type.label;
+  fieldsEl.innerHTML = "";
+
+  type.fields.forEach((f) => {
+    if (f.group) {
+      const label = document.createElement("div");
+      label.className = "group-label";
+      label.textContent = f.group;
+      fieldsEl.appendChild(label);
+      return;
+    }
+
+    const field = document.createElement("div");
+    field.className = "field";
+
+    const suffixDisp = f.unit === "mm" ? displayUnit : f.unit;
+    const range = fieldDisplayRange(f);
+    field.innerHTML =
+      `<label>${f.label} <span class="unit-suffix" data-orig-unit="${f.unit}">${suffixDisp}</span></label>` +
+      `<input type="number" id="in-${f.id}" min="${range.min}" max="${range.max}" step="${range.step}" value="${range.def}" ` +
+      `inputmode="${f.int ? "numeric" : "decimal"}">` +
+      `<span class="hint" id="hint-${f.id}">${f.note || ""}</span>`;
+    fieldsEl.appendChild(field);
+    const inputEl = document.getElementById("in-" + f.id);
+    const hintEl = document.getElementById("hint-" + f.id);
+    inputEl.addEventListener("input", () => {
+      if (!f.note && f.unit === "mm") {
+        const val = parseFloat(inputEl.value);
+        hintEl.textContent = Number.isNaN(val) ? "" : hintText(val, f);
+      }
+      scheduleRebuild();
+    });
+  });
+  refreshHints();
+}
+
+function renderTabs() {
+  tabsEl.innerHTML = "";
+  TYPES.forEach((t, i) => {
+    const btn = document.createElement("button");
+    btn.className = "tab-btn" + (i === activeIndex ? " active" : "");
+    btn.textContent = t.label;
+    btn.addEventListener("click", () => selectType(i));
+    tabsEl.appendChild(btn);
+  });
+}
+
+function selectType(i) {
+  activeIndex = i;
+  firstRunForType = true;
+  renderTabs();
+  renderFields();
+  rebuild();
+}
+
+function scheduleRebuild() {
+  if (pending) clearTimeout(pending);
+  pending = setTimeout(rebuild, 16);
+}
+
+function pyResultToMesh(result) {
+  const [vertsPy, facesPy, volume] = result.toJs({ create_proxies: false });
+  result.destroy();
+  const trisResult = MESH_TRIANGLES(vertsPy, facesPy);
+  const [triangles] = trisResult.toJs({ create_proxies: false });
+  trisResult.destroy();
+  return { verts: vertsPy, triangles, volume };
+}
+
+function rebuildStandard(type, kw) {
+  const fn = GENERATOR_FNS.get(type.fn);
+  const t0 = performance.now();
+  let result;
+  try {
+    result = fn.callKwargs(kw);
+  } catch (e) {
+    statusEl.textContent = "Invalid: " + String(e).trim().split("\n").pop();
+    statusEl.classList.add("err");
+    buyBtn.disabled = true;
+    return;
+  }
+  statusEl.classList.remove("err");
+  const { verts, triangles, volume } = pyResultToMesh(result);
+  const dt = (performance.now() - t0).toFixed(1);
+  statusEl.textContent = `Generated in ${dt} ms (in-browser, no server) — `
+                       + `${verts.length} verts, ${triangles.length} triangles.`;
+
+  clearMainMesh();
+  const geo = buildGeometry(verts, triangles);
+  mesh = new THREE.Mesh(geo, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  if (firstRunForType) { frameCamera(geo); firstRunForType = false; }
+
+  lastVerts = verts;
+  lastTriangles = triangles;
+  buyBtn.disabled = false;
+
+  readoutsEl.innerHTML = "";
+  const row = document.createElement("div");
+  row.className = "readout";
+  const cm3 = volume / 1000;
+  row.innerHTML = `<span>Volume</span><span class="val">${cm3.toFixed(2)} cm³</span>`;
+  readoutsEl.appendChild(row);
+}
+
+function rebuildHousing(kw) {
+  const module = kw.module, teethA = kw.tooth_count_a, teethB = kw.tooth_count_b, pa = kw.pressure_angle_deg;
+  const tipA = module * (teethA + 2.0);
+  const tipB = module * (teethB + 2.0);
+  const gearOd = Math.max(tipA, tipB);
+  const centerDistance = module * (teethA + teethB) / 2.0;
+  const halfSpan = centerDistance / 2.0;
+
+  const housingKwargs = {
+    center_distance_mm: centerDistance, gear_od_mm: gearOd,
+    wall_clearance_mm: kw.wall_clearance_mm, wall_thickness_mm: kw.wall_thickness_mm,
+    wall_height_mm: kw.wall_height_mm, base_thickness_mm: kw.base_thickness_mm,
+    shaft_hole_dia_mm: kw.shaft_hole_dia_mm, boss_thickness_mm: kw.boss_thickness_mm,
+    boss_height_mm: kw.boss_height_mm, segments: kw.segments,
+    internal_compensation_mm: kw.internal_compensation_mm, external_compensation_mm: kw.external_compensation_mm,
+  };
+
+  const fn = GENERATOR_FNS.get("build_gearbox_housing");
+  const t0 = performance.now();
+  let result;
+  try {
+    result = fn.callKwargs(housingKwargs);
+  } catch (e) {
+    statusEl.textContent = "Invalid: " + String(e).trim().split("\n").pop();
+    statusEl.classList.add("err");
+    buyBtn.disabled = true;
+    return;
+  }
+  statusEl.classList.remove("err");
+  const { verts, triangles, volume } = pyResultToMesh(result);
+  const dt = (performance.now() - t0).toFixed(1);
+  statusEl.textContent = `Generated in ${dt} ms (in-browser, no server) — `
+                       + `${verts.length} verts, ${triangles.length} triangles.`;
+
+  clearMainMesh();
+  const geo = buildGeometry(verts, triangles);
+  mesh = new THREE.Mesh(geo, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  if (firstRunForType) { frameCamera(geo); firstRunForType = false; }
+
+  lastVerts = verts;
+  lastTriangles = triangles;
+  buyBtn.disabled = false;
+
+  // Live gear-pair preview - amber, not exported. Built at a fixed
+  // rotation (not phase-aligned to mesh tooth-to-tooth) purely to show
+  // the wall clears both gears' own tip circles. A failure here (e.g.
+  // the module/tooth-count combo exceeds the pressure-angle undercut
+  // ceiling) skips that gear's own preview silently rather than
+  // blocking the housing itself, which already built successfully.
+  clearPreviewMeshes();
+  const gearFn = GENERATOR_FNS.get("build_preview_gear");
+  const gearZ = kw.base_thickness_mm;
+  for (const cx of [-halfSpan, halfSpan]) {
+    const teeth = cx < 0 ? teethA : teethB;
+    let gr;
+    try {
+      gr = gearFn.callKwargs({ module, tooth_count: Math.max(4, Math.floor(teeth)),
+                                pressure_angle_deg: pa, width_mm: kw.wall_height_mm });
+    } catch (e) {
+      continue;
+    }
+    const { verts: gv, triangles: gtris } = pyResultToMesh(gr);
+    const ggeo = buildGeometry(gv, gtris);
+    ggeo.translate(cx, 0, gearZ);
+    const gmesh = new THREE.Mesh(ggeo, previewMaterial);
+    scene.add(gmesh);
+    previewMeshes.push(gmesh);
+  }
+  legendEl.style.display = previewMeshes.length ? "block" : "none";
+
+  readoutsEl.innerHTML = "";
+  const rows = [
+    ["Center Distance", centerDistance.toFixed(2) + " mm"],
+    ["Gear OD (larger)", gearOd.toFixed(2) + " mm"],
+    ["Volume", (volume / 1000).toFixed(2) + " cm³"],
+  ];
+  for (const [label, val] of rows) {
+    const row = document.createElement("div");
+    row.className = "readout";
+    row.innerHTML = `<span>${label}</span><span class="val">${val}</span>`;
+    readoutsEl.appendChild(row);
+  }
+}
+
+function rebuild() {
+  if (!pyodide) return;
+  const type = TYPES[activeIndex];
+  const kw = currentValues();
+  if (type.id === "housing") {
+    rebuildHousing(kw);
+  } else {
+    clearPreviewMeshes();
+    legendEl.style.display = "none";
+    rebuildStandard({ ...type, fn: "build_gearbox_lid" }, kw);
+  }
+}
+
+let MESH_TRIANGLES = null;
+
+async function boot() {
+  pyodide = await loadPyodide();
+
+  pyodide.FS.mkdirTree("/app/generators");
+  for (const rel of PY_FILES) {
+    const resp = await fetch("py/" + rel);
+    if (!resp.ok) throw new Error("failed to fetch " + rel + ": " + resp.status);
+    const text = await resp.text();
+    pyodide.FS.writeFile("/app/" + rel, text);
+  }
+
+  pyodide.runPython(`
+import sys
+sys.path.insert(0, "/app/generators")
+import geo_helpers as gh
+import gearbox_housing_core
+import gearbox_lid_core
+import spur_gear_core
+
+def _mesh_result(mesh):
+    """Thin wrapper so the JS side gets a plain (verts, faces, volume)
+    tuple - toJs() can't cleanly convert a geo_helpers Mesh directly."""
+    verts, edges, faces = mesh.to_pydata()
+    return verts, faces, mesh.signed_volume()
+
+def build_gearbox_housing(**kwargs):
+    mesh, derived = gearbox_housing_core.build_gearbox_housing_mesh(**kwargs)
+    return _mesh_result(mesh)
+
+def build_gearbox_lid(**kwargs):
+    mesh, derived = gearbox_lid_core.build_gearbox_lid_mesh(**kwargs)
+    return _mesh_result(mesh)
+
+def build_preview_gear(module, tooth_count, pressure_angle_deg, width_mm):
+    """No-bore preview only - the housing tab's live gear-pair display,
+    not a downloadable part. Uses the exact same spur_gear_core.py the
+    gears family's own live configurator ships."""
+    mesh, derived = spur_gear_core.build_spur_gear_mesh(
+        module=module, tooth_count=tooth_count, pressure_angle_deg=pressure_angle_deg,
+        width_mm=width_mm, bore_enable=False, bore_diameter=0.0, bore_compensation=0.0)
+    return _mesh_result(mesh)
+
+def mesh_triangles(verts, faces):
+    """Fan-triangulating from vertex 0 only gives correct results for
+    CONVEX faces - route through geo_helpers' own ear-clipping
+    triangulate() anyway rather than assuming, same helper the other
+    configurators on this site already use."""
+    tris = []
+    for f in faces:
+        if len(f) == 3:
+            tris.append([f[0], f[1], f[2]])
+            continue
+        pts = [tuple(verts[i]) for i in f]
+        local = gh.triangulate(gh.Loop(pts, True))
+        for (a, b, c) in local:
+            tris.append([f[a], f[b], f[c]])
+    return (tris,)
+`);
+  for (const fnName of ["build_gearbox_housing", "build_gearbox_lid", "build_preview_gear"]) {
+    GENERATOR_FNS.set(fnName, pyodide.globals.get(fnName));
+  }
+  MESH_TRIANGLES = pyodide.globals.get("mesh_triangles");
+
+  document.getElementById("loading").remove();
+  statusEl.textContent = "Ready.";
+  buyBtn.addEventListener("click", downloadSTL);
+  unitToggleEl.querySelectorAll(".unit-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const newUnit = btn.dataset.unit;
+      if (newUnit === displayUnit) return;
+      convertFieldUnits(displayUnit, newUnit);
+      displayUnit = newUnit;
+      unitToggleEl.querySelectorAll(".unit-btn").forEach((b) => {
+        b.classList.toggle("active", b.dataset.unit === displayUnit);
+      });
+      refreshUnitSuffixes();
+      refreshHints();
+      rebuild();
+    });
+  });
+  renderTabs();
+  renderFields();
+  resize();
+  rebuild();
+}
+
+boot().catch((e) => {
+  document.getElementById("loading").textContent =
+    "Failed to load: " + e.message;
+});
+</script>
+</body>
+</html>
