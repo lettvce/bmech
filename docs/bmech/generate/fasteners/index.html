@@ -255,7 +255,7 @@ const TYPES = [
     fields: [
       { group: "Thread" },
       { id: "thread_diameter_mm", label: "Thread Ø", unit: "mm", min: 2, max: 40, step: 0.1, def: 8.0 },
-      { id: "pitch_mm", label: "Pitch", unit: "mm", min: 0.3, max: 6, step: 0.05, def: 1.25 },
+      { id: "pitch_mm", label: "Pitch", unit: "mm", min: 0.3, max: 6, step: 0.05, def: 1.25, tpi: true },
       { id: "flank_angle_deg", label: "Flank Angle", unit: "°", min: 10, max: 170, step: 1, def: 60.0 },
       { id: "truncation", label: "Truncation", unit: "", min: 0, max: 0.3, step: 0.01, def: 0.125 },
       { id: "thread_length_mm", label: "Thread Length", unit: "mm", min: 2, max: 150, step: 0.5, def: 20.0 },
@@ -295,7 +295,7 @@ const TYPES = [
 
       { group: "Thread" },
       { id: "diameter_mm", label: "Diameter", unit: "mm", min: 2, max: 100, step: 0.1, def: 8.0 },
-      { id: "pitch_mm", label: "Pitch", unit: "mm", min: 0.3, max: 10, step: 0.05, def: 1.25 },
+      { id: "pitch_mm", label: "Pitch", unit: "mm", min: 0.3, max: 10, step: 0.05, def: 1.25, tpi: true },
       { id: "flank_angle_deg", label: "Flank Angle", unit: "°", min: 1, max: 179, step: 1, def: 60.0 },
       { id: "truncation", label: "Truncation", unit: "", min: 0, max: 0.3, step: 0.01, def: 0.125 },
       { id: "height_mm", label: "Height", unit: "mm", min: 1, max: 200, step: 0.5, def: 12.0 },
@@ -312,7 +312,7 @@ const TYPES = [
     fields: [
       { group: "Thread" },
       { id: "thread_diameter_mm", label: "Thread Ø", unit: "mm", min: 2, max: 40, step: 0.1, def: 8.0 },
-      { id: "pitch_mm", label: "Pitch", unit: "mm", min: 0.3, max: 6, step: 0.05, def: 1.25 },
+      { id: "pitch_mm", label: "Pitch", unit: "mm", min: 0.3, max: 6, step: 0.05, def: 1.25, tpi: true },
       { id: "flank_angle_deg", label: "Flank Angle", unit: "°", min: 10, max: 170, step: 1, def: 60.0 },
       { id: "truncation", label: "Truncation", unit: "", min: 0, max: 0.3, step: 0.01, def: 0.125 },
 
@@ -332,7 +332,7 @@ const TYPES = [
     fields: [
       { group: "Thread" },
       { id: "thread_diameter_mm", label: "Thread Ø (= Container OD)", unit: "mm", min: 10, max: 250, step: 0.5, def: 60.0 },
-      { id: "pitch_mm", label: "Pitch", unit: "mm", min: 0.5, max: 15, step: 0.1, def: 4.0 },
+      { id: "pitch_mm", label: "Pitch", unit: "mm", min: 0.5, max: 15, step: 0.1, def: 4.0, tpi: true },
       { id: "flank_angle_deg", label: "Flank Angle", unit: "°", min: 10, max: 170, step: 1, def: 90.0 },
       { id: "truncation", label: "Truncation", unit: "", min: 0, max: 0.3, step: 0.01, def: 0.0 },
       { id: "thread_length_mm", label: "Thread Length", unit: "mm", min: 2, max: 100, step: 0.5, def: 10.0 },
@@ -353,7 +353,7 @@ const TYPES = [
     fields: [
       { group: "Thread" },
       { id: "thread_diameter_mm", label: "Thread Ø (= Container OD it fits)", unit: "mm", min: 10, max: 250, step: 0.5, def: 60.0 },
-      { id: "pitch_mm", label: "Pitch", unit: "mm", min: 0.5, max: 15, step: 0.1, def: 4.0 },
+      { id: "pitch_mm", label: "Pitch", unit: "mm", min: 0.5, max: 15, step: 0.1, def: 4.0, tpi: true },
       { id: "flank_angle_deg", label: "Flank Angle", unit: "°", min: 10, max: 170, step: 1, def: 90.0 },
       { id: "truncation", label: "Truncation", unit: "", min: 0, max: 0.3, step: 0.01, def: 0.25 },
       { id: "thread_length_mm", label: "Thread Length", unit: "mm", min: 2, max: 90, step: 0.5, def: 8.0 },
@@ -375,7 +375,7 @@ const TYPES = [
     fields: [
       { group: "Shared Thread" },
       { id: "thread_diameter_mm", label: "Thread Ø", unit: "mm", min: 10, max: 250, step: 0.5, def: 60.0 },
-      { id: "pitch_mm", label: "Pitch", unit: "mm", min: 0.5, max: 15, step: 0.1, def: 4.0 },
+      { id: "pitch_mm", label: "Pitch", unit: "mm", min: 0.5, max: 15, step: 0.1, def: 4.0, tpi: true },
       { id: "flank_angle_deg", label: "Flank Angle", unit: "°", min: 10, max: 170, step: 1, def: 90.0 },
       { id: "truncation", label: "Truncation", unit: "", min: 0, max: 0.3, step: 0.01, def: 0.0,
         note: "Auto-raised to whichever part (container or lid) needs the deeper cut" },
@@ -587,17 +587,68 @@ let pending = null;
 let activeIndex = 0;
 let firstRunForType = true;
 
-function hintText(displayedValue, unit) {
-  if (unit !== "mm") return "";
-  return displayUnit === "mm"
-    ? `≈ ${(displayedValue / 25.4).toFixed(3)} in`
-    : `≈ ${(displayedValue * 25.4).toFixed(2)} mm`;
+// Pitch fields (f.tpi) show Threads Per Inch instead of a plain inch
+// distance in "in" mode - an INVERSE relationship (TPI = 25.4 / pitch_mm),
+// not the linear mm<->in scaling every other field uses, so it needs its
+// own conversion path at every point a regular field converts: initial
+// render, the mm<->in toggle, the live value read for Python, and the
+// "other unit" hint underneath the box.
+function round(x, decimals) {
+  const p = Math.pow(10, decimals);
+  return Math.round(x * p) / p;
+}
+
+function mmToDisplayValue(mmVal, f) {
+  if (displayUnit === "mm") return mmVal;
+  return f.tpi ? 25.4 / mmVal : mmVal / 25.4;
+}
+
+function displayValueToMm(val, f) {
+  if (displayUnit === "mm") return val;
+  if (f.tpi) return val > 0 ? 25.4 / val : NaN;
+  return val * 25.4;
+}
+
+// min/max/step/def for a field's <input>, in whichever unit is currently
+// active. For a tpi field the relationship inverts the bounds too (the
+// mm MINIMUM pitch is the TPI MAXIMUM, and vice versa) - swapping f.min/
+// f.max here, not just converting each in place, is what keeps the slider
+// pointed the right direction.
+function fieldDisplayRange(f) {
+  if (f.unit !== "mm" || displayUnit === "mm") {
+    return { min: f.min, max: f.max, step: f.step, def: f.def };
+  }
+  if (f.tpi) {
+    return {
+      min: round(25.4 / f.max, 2),
+      max: round(25.4 / f.min, 2),
+      step: 1,
+      def: round(25.4 / f.def, 2),
+    };
+  }
+  return {
+    min: round(f.min / 25.4, 4),
+    max: round(f.max / 25.4, 4),
+    step: round(f.step / 25.4, 5),
+    def: round(f.def / 25.4, 3),
+  };
+}
+
+function hintText(displayedValue, f) {
+  if (f.unit !== "mm") return "";
+  const mmVal = displayValueToMm(displayedValue, f);
+  if (Number.isNaN(mmVal)) return "";
+  if (displayUnit === "mm") {
+    return f.tpi ? `≈ ${(25.4 / mmVal).toFixed(1)} TPI` : `≈ ${(mmVal / 25.4).toFixed(3)} in`;
+  }
+  return `≈ ${mmVal.toFixed(2)} mm`;
 }
 
 function refreshUnitSuffixes() {
   fieldsEl.querySelectorAll(".unit-suffix").forEach((el) => {
     const orig = el.dataset.origUnit;
-    el.textContent = orig === "mm" ? displayUnit : orig;
+    const isTpi = el.dataset.tpi === "true";
+    el.textContent = orig === "mm" ? (isTpi && displayUnit === "in" ? "TPI" : displayUnit) : orig;
   });
 }
 
@@ -610,13 +661,8 @@ function refreshHints() {
     if (!el || !hintEl) return;
     if (f.note) { hintEl.textContent = f.note; return; }
     const val = parseFloat(el.value);
-    hintEl.textContent = Number.isNaN(val) ? "" : hintText(val, f.unit);
+    hintEl.textContent = Number.isNaN(val) ? "" : hintText(val, f);
   });
-}
-
-function round(x, decimals) {
-  const p = Math.pow(10, decimals);
-  return Math.round(x * p) / p;
 }
 
 function convertFieldUnits(oldUnit, newUnit) {
@@ -628,12 +674,19 @@ function convertFieldUnits(oldUnit, newUnit) {
     if (!el) return;
     const raw = parseFloat(el.value);
     if (!Number.isNaN(raw)) {
-      const mmVal = oldUnit === "mm" ? raw : raw * 25.4;
-      el.value = newUnit === "mm" ? round(mmVal, 2) : round(mmVal / 25.4, 3);
+      const mmVal = oldUnit === "mm" ? raw : (f.tpi && raw > 0 ? 25.4 / raw : raw * 25.4);
+      if (newUnit === "mm") {
+        el.value = round(mmVal, 2);
+      } else if (f.tpi) {
+        el.value = mmVal > 0 ? round(25.4 / mmVal, 2) : el.value;
+      } else {
+        el.value = round(mmVal / 25.4, 3);
+      }
     }
-    el.min = newUnit === "mm" ? f.min : round(f.min / 25.4, 4);
-    el.max = newUnit === "mm" ? f.max : round(f.max / 25.4, 4);
-    el.step = newUnit === "mm" ? f.step : round(f.step / 25.4, 5);
+    const range = fieldDisplayRange(f);
+    el.min = range.min;
+    el.max = range.max;
+    el.step = range.step;
   });
 }
 
@@ -649,8 +702,9 @@ function currentValues() {
       v[f.id] = el ? el.checked : f.def;
     } else {
       const raw = el ? parseFloat(el.value) : f.def;
-      let val = Number.isNaN(raw) ? f.def : raw;
-      if (f.unit === "mm" && displayUnit === "in") val *= 25.4;
+      const val0 = Number.isNaN(raw) ? f.def : raw;
+      let val = f.unit === "mm" ? displayValueToMm(val0, f) : val0;
+      if (Number.isNaN(val)) val = f.def;
       if (f.int) val = Math.floor(val);
       v[f.id] = val;
     }
@@ -715,10 +769,11 @@ function renderFields() {
         rebuild();
       });
     } else {
-      const suffixDisp = f.unit === "mm" ? displayUnit : f.unit;
+      const suffixDisp = f.unit === "mm" ? (f.tpi && displayUnit === "in" ? "TPI" : displayUnit) : f.unit;
+      const range = fieldDisplayRange(f);
       field.innerHTML =
-        `<label>${f.label} <span class="unit-suffix" data-orig-unit="${f.unit}">${suffixDisp}</span></label>` +
-        `<input type="number" id="in-${f.id}" min="${f.min}" max="${f.max}" step="${f.step}" value="${f.def}" ` +
+        `<label>${f.label} <span class="unit-suffix" data-orig-unit="${f.unit}" data-tpi="${!!f.tpi}">${suffixDisp}</span></label>` +
+        `<input type="number" id="in-${f.id}" min="${range.min}" max="${range.max}" step="${range.step}" value="${range.def}" ` +
         `inputmode="${f.int ? "numeric" : "decimal"}">` +
         `<span class="hint" id="hint-${f.id}">${f.note || ""}</span>`;
       fieldsEl.appendChild(field);
@@ -727,7 +782,7 @@ function renderFields() {
       inputEl.addEventListener("input", () => {
         if (!f.note && f.unit === "mm") {
           const val = parseFloat(inputEl.value);
-          hintEl.textContent = Number.isNaN(val) ? "" : hintText(val, f.unit);
+          hintEl.textContent = Number.isNaN(val) ? "" : hintText(val, f);
         }
         updateFieldVisibility();
         scheduleRebuild();
