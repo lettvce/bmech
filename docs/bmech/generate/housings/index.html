@@ -763,17 +763,30 @@ function rebuildHousing(kw) {
   clearPreviewMeshes();
   const gearFn = GENERATOR_FNS.get("build_preview_gear");
   const gearZ = kw.base_thickness_mm;
-  for (const cx of [-halfSpan, halfSpan]) {
-    const teeth = cx < 0 ? teethA : teethB;
+  // build_gear_profile's own tooth i=0 sits centered exactly on angle 0
+  // (its tip_land point is (addendum_radius, 0.0) - see spur_gear_core.py)
+  // - so the LEFT gear (cx=-halfSpan) already has a tooth pointing +X,
+  // straight at the right gear, with zero extra rotation needed. The
+  // RIGHT gear needs a tooth GAP (not another tooth tip) facing back at
+  // -X: its own valleys sit at angle (k+0.5)*pitch for integer k, so
+  // rotating it by (pi - pitch/2) lands the k=0 valley exactly on the
+  // pi (i.e. -X-facing) direction - the standard external-gear meshing
+  // offset. This is a static single-frame pose (no continuous rotation
+  // sync between the two), so it only guarantees correct interlock at
+  // THIS position, same as this preview's own "reference only" framing.
+  for (const [cx, teeth] of [[-halfSpan, teethA], [halfSpan, teethB]]) {
+    const clampedTeeth = Math.max(4, Math.floor(teeth));
+    const meshRotation = cx > 0 ? (Math.PI - Math.PI / clampedTeeth) : 0.0;
     let gr;
     try {
-      gr = gearFn.callKwargs({ module, tooth_count: Math.max(4, Math.floor(teeth)),
+      gr = gearFn.callKwargs({ module, tooth_count: clampedTeeth,
                                 pressure_angle_deg: pa, width_mm: kw.wall_height_mm });
     } catch (e) {
       continue;
     }
     const { verts: gv, triangles: gtris } = pyResultToMesh(gr);
     const ggeo = buildGeometry(gv, gtris);
+    ggeo.rotateY(meshRotation);
     ggeo.translate(cx, 0, gearZ);
     const gmesh = new THREE.Mesh(ggeo, previewMaterial);
     scene.add(gmesh);
