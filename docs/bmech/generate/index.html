@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Try bmech Live</title>
+<meta name="description" content="Live, in-browser parametric configurators for bmech's mechanism generators — no install, no server, download a ready-to-print STL.">
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --text: #e8e8e8;
+    --muted: #9aa0aa;
+    --accent: #6fb1ff;
+    --border: #2c3038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  header {
+    padding: 4rem 1.5rem 3rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 2.4rem; margin: 0 0 0.5rem; }
+  header p { color: var(--muted); max-width: 560px; margin: 0 auto; font-size: 1.05rem; }
+  main { max-width: 860px; margin: 0 auto; padding: 3rem 1.5rem; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.3rem;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card h3 { margin: 0 0 0.4rem; font-size: 1.05rem; color: var(--accent); }
+  .card p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  .card .count {
+    display: inline-block; margin-top: 0.6rem; font-size: 0.75rem;
+    color: var(--muted); font-weight: 600; letter-spacing: 0.02em;
+  }
+  .soon {
+    background: transparent;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 1.3rem;
+    color: var(--muted);
+  }
+  .soon h3 { margin: 0 0 0.4rem; font-size: 1.05rem; color: var(--muted); }
+  .soon p { margin: 0; font-size: 0.92rem; }
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+  .home-bar {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1rem 1.5rem 0;
+  }
+  .home-bar a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+  .home-bar a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="home-bar"><a href="../index.html">← bmech</a></div>
+
+<header>
+  <h1>Try bmech Live</h1>
+  <p>The same Python that ships in the Blender extension, running
+     unmodified in your browser via Pyodide. Pick a family below, dial in
+     your dimensions, and download a ready-to-print STL — no install,
+     nothing uploaded.</p>
+</header>
+
+<main>
+  <div class="grid">
+    <a class="card" href="fasteners/index.html">
+      <h3>Fasteners</h3>
+      <p>Hex bolts, hex nuts, raw threads, and screw-top jar/lid pairs —
+         every thread a single boolean-free manifold.</p>
+      <span class="count">6 generators</span>
+    </a>
+    <div class="soon">
+      <h3>Gears</h3>
+      <p>Not live yet — still needs a bpy-free core extraction pass.</p>
+    </div>
+    <div class="soon">
+      <h3>Springs</h3>
+      <p>Not live yet — still needs a bpy-free core extraction pass.</p>
+    </div>
+    <div class="soon">
+      <h3>Ratchets</h3>
+      <p>Not live yet — still needs a bpy-free core extraction pass.</p>
+    </div>
+    <div class="soon">
+      <h3>Bearings</h3>
+      <p>Not live yet — still needs a bpy-free core extraction pass.</p>
+    </div>
+    <div class="soon">
+      <h3>Housings</h3>
+      <p>Not live yet — still needs a bpy-free core extraction pass.</p>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <p>Want the full extension instead? <a href="../index.html">Back to bmech</a>.</p>
+  <p>Contact: <a href="mailto:blakewysocki421@gmail.com">blakewysocki421@gmail.com</a></p>
+</footer>
+
+</body>
+</html>
