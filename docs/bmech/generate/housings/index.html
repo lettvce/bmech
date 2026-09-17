@@ -229,6 +229,11 @@
         Shaft Hole Ø / Segments straight off a built housing object's own
         stamped properties; here, type in the same four values from the
         Housing tab (or your own housing's dimensions) by hand.</li>
+    <li>The <strong>Combo</strong> tab builds both parts off the SAME
+        gear-driven footprint (no footprint fields to keep in sync by
+        hand) and lays them out side by side — blue lid, gray housing —
+        rather than assembled, and downloads both as one STL ready to
+        arrange on a print bed.</li>
     <li>This is free during testing. If it turns into a paid product
         later, existing free downloads aren't retroactively affected.</li>
   </ul>
@@ -255,44 +260,63 @@ import * as THREE from "three";
 import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
 
 // ---------------------------------------------------------------------
-// Two generators, one page. "Housing" is special-cased in rebuild():
+// Three generators, one page. "Housing" is special-cased in rebuild():
 // its module/tooth_count_a/tooth_count_b/pressure_angle_deg fields don't
 // map directly to build_gearbox_housing_mesh kwargs - they derive
 // gear_od_mm/center_distance_mm (the real kwargs) AND drive a separate
 // live preview of the two gears, drawn alongside the housing but not
 // part of the exported STL. "Lid" is a standard single-mesh generator,
-// same shape as every other family's own tabs on this site.
+// same shape as every other family's own tabs on this site - its own
+// Housing Footprint fields are typed by hand (no live object to Match
+// Target here). "Combo" reuses the SAME gear-driven fields as Housing
+// (sharing HOUSING_FIELDS below, not a second copy) plus the lid's own
+// cap/skirt fields, and builds both parts off the ONE shared footprint -
+// no footprint fields of its own to keep in sync, since Center
+// Distance/Housing OD Radius/Shaft Hole Ø/Segments all derive from the
+// same gear pickers and housing dials the Housing tab already has.
 // ---------------------------------------------------------------------
+const HOUSING_FIELDS = [
+  { group: "Shaft Gears (preview)" },
+  { id: "module", label: "Module", unit: "mm", min: 0.3, max: 6, step: 0.1, def: 1.5 },
+  { id: "tooth_count_a", label: "Shaft 1 Teeth", unit: "", min: 4, max: 80, step: 1, def: 12, int: true },
+  { id: "tooth_count_b", label: "Shaft 2 Teeth", unit: "", min: 4, max: 80, step: 1, def: 28, int: true },
+  { id: "pressure_angle_deg", label: "Pressure Angle", unit: "°", min: 10, max: 30, step: 0.5, def: 20.0 },
+
+  { group: "Clearance & Wall" },
+  { id: "wall_clearance_mm", label: "Wall Clearance", unit: "mm", min: 0, max: 5, step: 0.05, def: 0.3 },
+  { id: "wall_thickness_mm", label: "Wall Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 2.0 },
+  { id: "wall_height_mm", label: "Wall Height", unit: "mm", min: 0.5, max: 100, step: 0.5, def: 10.0 },
+  { id: "base_thickness_mm", label: "Base Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 2.0 },
+
+  { group: "Shaft & Boss" },
+  { id: "shaft_hole_dia_mm", label: "Shaft Hole Ø", unit: "mm", min: 0.5, max: 50, step: 0.1, def: 5.0 },
+  { id: "boss_thickness_mm", label: "Boss Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 2.0 },
+  { id: "boss_height_mm", label: "Boss Height", unit: "mm", min: 0, max: 50, step: 0.5, def: 4.0,
+    note: "0 = no boss, bore straight through the floor" },
+
+  { group: "Mesh" },
+  { id: "segments", label: "Segments", unit: "", min: 8, max: 128, step: 1, def: 32, int: true },
+
+  { group: "FDM Compensation" },
+  { id: "internal_compensation_mm", label: "Internal Compensation", unit: "mm", min: 0, max: 0.5, step: 0.005, def: 0.075 },
+  { id: "external_compensation_mm", label: "External Compensation", unit: "mm", min: 0, max: 0.5, step: 0.005, def: 0.05 },
+];
+
+// Just the lid's OWN dials - not center_distance_mm/r_outer_mm/
+// shaft_hole_dia_mm/segments, which the Combo tab derives from
+// HOUSING_FIELDS instead of asking for a second, independently-typed copy.
+const LID_ONLY_FIELDS = [
+  { group: "Lid Cap" },
+  { id: "lid_thickness_mm", label: "Lid Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 3.0 },
+
+  { group: "Lid Skirt" },
+  { id: "skirt_interference_mm", label: "Skirt Interference", unit: "mm", min: 0, max: 2, step: 0.01, def: 0.15 },
+  { id: "skirt_thickness_mm", label: "Skirt Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 2.0 },
+  { id: "skirt_depth_mm", label: "Skirt Depth", unit: "mm", min: 0.5, max: 100, step: 0.5, def: 5.0 },
+];
+
 const TYPES = [
-  {
-    id: "housing", label: "Housing", filename: "gearbox_housing.stl",
-    fields: [
-      { group: "Shaft Gears (preview)" },
-      { id: "module", label: "Module", unit: "mm", min: 0.3, max: 6, step: 0.1, def: 1.5 },
-      { id: "tooth_count_a", label: "Shaft 1 Teeth", unit: "", min: 4, max: 80, step: 1, def: 12, int: true },
-      { id: "tooth_count_b", label: "Shaft 2 Teeth", unit: "", min: 4, max: 80, step: 1, def: 28, int: true },
-      { id: "pressure_angle_deg", label: "Pressure Angle", unit: "°", min: 10, max: 30, step: 0.5, def: 20.0 },
-
-      { group: "Clearance & Wall" },
-      { id: "wall_clearance_mm", label: "Wall Clearance", unit: "mm", min: 0, max: 5, step: 0.05, def: 0.3 },
-      { id: "wall_thickness_mm", label: "Wall Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 2.0 },
-      { id: "wall_height_mm", label: "Wall Height", unit: "mm", min: 0.5, max: 100, step: 0.5, def: 10.0 },
-      { id: "base_thickness_mm", label: "Base Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 2.0 },
-
-      { group: "Shaft & Boss" },
-      { id: "shaft_hole_dia_mm", label: "Shaft Hole Ø", unit: "mm", min: 0.5, max: 50, step: 0.1, def: 5.0 },
-      { id: "boss_thickness_mm", label: "Boss Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 2.0 },
-      { id: "boss_height_mm", label: "Boss Height", unit: "mm", min: 0, max: 50, step: 0.5, def: 4.0,
-        note: "0 = no boss, bore straight through the floor" },
-
-      { group: "Mesh" },
-      { id: "segments", label: "Segments", unit: "", min: 8, max: 128, step: 1, def: 32, int: true },
-
-      { group: "FDM Compensation" },
-      { id: "internal_compensation_mm", label: "Internal Compensation", unit: "mm", min: 0, max: 0.5, step: 0.005, def: 0.075 },
-      { id: "external_compensation_mm", label: "External Compensation", unit: "mm", min: 0, max: 0.5, step: 0.005, def: 0.05 },
-    ],
-  },
+  { id: "housing", label: "Housing", filename: "gearbox_housing.stl", fields: HOUSING_FIELDS },
   {
     id: "lid", label: "Lid", filename: "gearbox_lid.stl",
     fields: [
@@ -303,19 +327,16 @@ const TYPES = [
         note: "The housing's own outer wall radius - what the skirt wraps around" },
       { id: "shaft_hole_dia_mm", label: "Shaft Hole Ø", unit: "mm", min: 0.5, max: 50, step: 0.1, def: 5.0 },
       { id: "segments", label: "Segments", unit: "", min: 8, max: 128, step: 1, def: 32, int: true },
-
-      { group: "Cap" },
-      { id: "lid_thickness_mm", label: "Lid Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 3.0 },
-
-      { group: "Skirt" },
-      { id: "skirt_interference_mm", label: "Skirt Interference", unit: "mm", min: 0, max: 2, step: 0.01, def: 0.15 },
-      { id: "skirt_thickness_mm", label: "Skirt Thickness", unit: "mm", min: 0.4, max: 20, step: 0.1, def: 2.0 },
-      { id: "skirt_depth_mm", label: "Skirt Depth", unit: "mm", min: 0.5, max: 100, step: 0.5, def: 5.0 },
+      ...LID_ONLY_FIELDS,
 
       { group: "FDM Compensation" },
       { id: "internal_compensation_mm", label: "Internal Compensation", unit: "mm", min: 0, max: 0.5, step: 0.005, def: 0.075 },
       { id: "external_compensation_mm", label: "External Compensation", unit: "mm", min: 0, max: 0.5, step: 0.005, def: 0.05 },
     ],
+  },
+  {
+    id: "combo", label: "Combo", filename: "gearbox_housing_and_lid.stl",
+    fields: [...HOUSING_FIELDS, ...LID_ONLY_FIELDS],
   },
 ];
 
@@ -366,6 +387,13 @@ const material = new THREE.MeshStandardMaterial({
 const previewMaterial = new THREE.MeshStandardMaterial({
   color: 0xe0b15c, roughness: 0.5, metalness: 0.1, side: THREE.DoubleSide,
   flatShading: true, transparent: true, opacity: 0.55,
+});
+// The Combo tab's second REAL part (not a ghost preview) - opaque, a
+// distinct hue from the housing's own gray so the two solids read
+// apart at a glance in the side-by-side view.
+const lidMaterial = new THREE.MeshStandardMaterial({
+  color: 0x7fa3c9, roughness: 0.4, metalness: 0.25, side: THREE.DoubleSide,
+  flatShading: true,
 });
 
 function clearMainMesh() {
@@ -479,9 +507,7 @@ function downloadSTL() {
 
 const DEFAULT_CAMERA_DIR = { x: 0.55, y: 0.55, z: 0.75 };
 
-function frameCamera(geo) {
-  geo.computeBoundingSphere();
-  const { center, radius } = geo.boundingSphere;
+function frameCameraToSphere(center, radius) {
   const dist = radius / Math.sin((camera.fov * Math.PI) / 360) * 1.15;
   const dir = DEFAULT_CAMERA_DIR;
   camera.position.set(center.x + dist * dir.x, center.y + dist * dir.y, center.z + dist * dir.z);
@@ -499,6 +525,25 @@ function frameCamera(geo) {
   sc.top = radius * 1.5; sc.bottom = -radius * 1.5;
   sc.near = radius * 0.1; sc.far = radius * 6;
   sc.updateProjectionMatrix();
+}
+
+function frameCamera(geo) {
+  geo.computeBoundingSphere();
+  frameCameraToSphere(geo.boundingSphere.center, geo.boundingSphere.radius);
+}
+
+// Combo tab: frame BOTH side-by-side parts at once, from the union of
+// their own bounding boxes - a single geo's own boundingSphere would
+// only cover whichever part it belongs to.
+function frameCameraMultiple(geos) {
+  const box = new THREE.Box3();
+  for (const g of geos) {
+    g.computeBoundingBox();
+    box.union(g.boundingBox);
+  }
+  const sphere = new THREE.Sphere();
+  box.getBoundingSphere(sphere);
+  frameCameraToSphere(sphere.center, sphere.radius);
 }
 
 // ---------------------------------------------------------------------
@@ -816,12 +861,131 @@ function rebuildHousing(kw) {
   }
 }
 
+// Combo: build the housing off the SAME gear-derived footprint the
+// Housing tab uses, then build the lid off that housing's own r_outer/
+// center_distance/shaft_hole_dia/segments (mirroring Match Target's own
+// sync in Blender - see gearbox_housing.py's execute() for the stamped
+// properties this formula reads), and lay both out side by side rather
+// than assembled (assembled they'd nest inside one another, which isn't
+// a printable or visually useful layout). Exports as ONE merged STL -
+// two separate bodies at a fixed offset, ready to arrange on a print bed.
+function rebuildCombo(kw) {
+  const module = kw.module, teethA = kw.tooth_count_a, teethB = kw.tooth_count_b, pa = kw.pressure_angle_deg;
+  const gearOd = Math.max(module * (teethA + 2.0), module * (teethB + 2.0));
+  const centerDistance = module * (teethA + teethB) / 2.0;
+
+  // Same formula as gearbox_housing_core.derive_gearbox_housing() - r_outer
+  // isn't returned by build_gearbox_housing() (only verts/faces/volume
+  // cross the Pyodide boundary, see _mesh_result), so it's recomputed
+  // here rather than adding a second Python round-trip just to fetch it.
+  const rOuter = gearOd / 2.0 + kw.wall_clearance_mm + kw.wall_thickness_mm;
+
+  const housingKwargs = {
+    center_distance_mm: centerDistance, gear_od_mm: gearOd,
+    wall_clearance_mm: kw.wall_clearance_mm, wall_thickness_mm: kw.wall_thickness_mm,
+    wall_height_mm: kw.wall_height_mm, base_thickness_mm: kw.base_thickness_mm,
+    shaft_hole_dia_mm: kw.shaft_hole_dia_mm, boss_thickness_mm: kw.boss_thickness_mm,
+    boss_height_mm: kw.boss_height_mm, segments: kw.segments,
+    internal_compensation_mm: kw.internal_compensation_mm, external_compensation_mm: kw.external_compensation_mm,
+  };
+  const lidKwargs = {
+    center_distance_mm: centerDistance, r_outer_mm: rOuter, shaft_hole_dia_mm: kw.shaft_hole_dia_mm,
+    lid_thickness_mm: kw.lid_thickness_mm, skirt_interference_mm: kw.skirt_interference_mm,
+    skirt_thickness_mm: kw.skirt_thickness_mm, skirt_depth_mm: kw.skirt_depth_mm, segments: kw.segments,
+    internal_compensation_mm: kw.internal_compensation_mm, external_compensation_mm: kw.external_compensation_mm,
+  };
+
+  const t0 = performance.now();
+  let housingResult, lidResult;
+  try {
+    housingResult = GENERATOR_FNS.get("build_gearbox_housing").callKwargs(housingKwargs);
+  } catch (e) {
+    statusEl.textContent = "Housing invalid: " + String(e).trim().split("\n").pop();
+    statusEl.classList.add("err");
+    buyBtn.disabled = true;
+    return;
+  }
+  const housingMesh = pyResultToMesh(housingResult);
+  try {
+    lidResult = GENERATOR_FNS.get("build_gearbox_lid").callKwargs(lidKwargs);
+  } catch (e) {
+    statusEl.textContent = "Lid invalid: " + String(e).trim().split("\n").pop();
+    statusEl.classList.add("err");
+    buyBtn.disabled = true;
+    return;
+  }
+  const lidMesh = pyResultToMesh(lidResult);
+  statusEl.classList.remove("err");
+
+  const dt = (performance.now() - t0).toFixed(1);
+  statusEl.textContent = `Generated in ${dt} ms (in-browser, no server) — `
+                       + `${housingMesh.verts.length + lidMesh.verts.length} verts, `
+                       + `${housingMesh.triangles.length + lidMesh.triangles.length} triangles (both parts).`;
+
+  clearMainMesh();
+  clearPreviewMeshes();
+  legendEl.style.display = "none";
+
+  // Side-by-side, not assembled: shift the lid along the housing's own
+  // long (mm Y) axis by enough to clear the skirt's own (slightly larger
+  // than r_outer) OD with margin, rather than computing the skirt radius
+  // exactly - this is a print-layout offset, not a functional dimension.
+  const sideGap = 2.0 * rOuter + 15.0;
+
+  const housingGeo = buildGeometry(housingMesh.verts, housingMesh.triangles);
+  mesh = new THREE.Mesh(housingGeo, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+
+  // mm y -> display -z (see buildGeometry's own remap comment), so a +Y
+  // shift in mm space is a -Z translate here.
+  const lidGeo = buildGeometry(lidMesh.verts, lidMesh.triangles);
+  lidGeo.translate(0, 0, -sideGap);
+  const lidDisplayMesh = new THREE.Mesh(lidGeo, lidMaterial);
+  lidDisplayMesh.castShadow = true;
+  lidDisplayMesh.receiveShadow = true;
+  scene.add(lidDisplayMesh);
+  previewMeshes.push(lidDisplayMesh);
+
+  if (firstRunForType) { frameCameraMultiple([housingGeo, lidGeo]); firstRunForType = false; }
+
+  // STL export: merge housing (as built) + lid (shifted +Y in mm space,
+  // matching the display offset above) into one vert/face list - same
+  // translate-and-concatenate trick the gears/ratchets pages use for
+  // their own multi-part assemblies, just without any rotation.
+  const mergedVerts = housingMesh.verts.map((v) => [v[0], v[1], v[2]]);
+  const mergedTris = housingMesh.triangles.map((t) => [t[0], t[1], t[2]]);
+  const base = mergedVerts.length;
+  for (const [x, y, z] of lidMesh.verts) mergedVerts.push([x, y + sideGap, z]);
+  for (const [a, b, c] of lidMesh.triangles) mergedTris.push([a + base, b + base, c + base]);
+  lastVerts = mergedVerts;
+  lastTriangles = mergedTris;
+  buyBtn.disabled = false;
+
+  readoutsEl.innerHTML = "";
+  const rows = [
+    ["Center Distance", centerDistance.toFixed(2) + " mm"],
+    ["Housing OD Radius", rOuter.toFixed(2) + " mm"],
+    ["Housing Volume", (housingMesh.volume / 1000).toFixed(2) + " cm³"],
+    ["Lid Volume", (lidMesh.volume / 1000).toFixed(2) + " cm³"],
+  ];
+  for (const [label, val] of rows) {
+    const row = document.createElement("div");
+    row.className = "readout";
+    row.innerHTML = `<span>${label}</span><span class="val">${val}</span>`;
+    readoutsEl.appendChild(row);
+  }
+}
+
 function rebuild() {
   if (!pyodide) return;
   const type = TYPES[activeIndex];
   const kw = currentValues();
   if (type.id === "housing") {
     rebuildHousing(kw);
+  } else if (type.id === "combo") {
+    rebuildCombo(kw);
   } else {
     clearPreviewMeshes();
     legendEl.style.display = "none";
