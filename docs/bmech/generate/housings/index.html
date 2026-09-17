@@ -787,7 +787,12 @@ function rebuildHousing(kw) {
     const { verts: gv, triangles: gtris } = pyResultToMesh(gr);
     const ggeo = buildGeometry(gv, gtris);
     ggeo.rotateY(meshRotation);
-    ggeo.translate(cx, 0, gearZ);
+    // buildGeometry() already remaps mm (x,y,z) -> display (x,z,-y), so a
+    // translate() here works in DISPLAY space: cx (mm x, shaft spacing)
+    // is the display-X shift, gearZ (mm z, cavity height) is the
+    // display-Y shift - NOT display-Z, which is -mm_y and should stay 0
+    // (the shaft sits on mm y=0, the housing's own long axis).
+    ggeo.translate(cx, gearZ, 0);
     const gmesh = new THREE.Mesh(ggeo, previewMaterial);
     scene.add(gmesh);
     previewMeshes.push(gmesh);
