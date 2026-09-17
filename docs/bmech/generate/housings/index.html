@@ -762,7 +762,10 @@ function rebuildHousing(kw) {
   // blocking the housing itself, which already built successfully.
   clearPreviewMeshes();
   const gearFn = GENERATOR_FNS.get("build_preview_gear");
-  const gearZ = kw.base_thickness_mm;
+  // Rests on the boss's own top face (or the bare floor when
+  // boss_height_mm is 0) - the same surface a real gear's hub bears
+  // against once it's dropped over the boss, not floating mid-cavity.
+  const gearZ = kw.base_thickness_mm + kw.boss_height_mm;
   // build_gear_profile's own tooth i=0 sits centered exactly on angle 0
   // (its tip_land point is (addendum_radius, 0.0) - see spur_gear_core.py)
   // - so the LEFT gear (cx=-halfSpan) already has a tooth pointing +X,
