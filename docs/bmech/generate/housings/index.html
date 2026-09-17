@@ -183,8 +183,9 @@
     <div id="viewer">
       <div id="loading">Loading Python runtime…</div>
       <div id="legend">
-        <span><span class="swatch" style="background:#9aa6b8;"></span>Housing (downloads)</span>
-        <span><span class="swatch" style="background:var(--preview);"></span>Gear preview (not exported)</span>
+        <span id="legend-housing"><span class="swatch" style="background:#9aa6b8;"></span>Housing (downloads)</span>
+        <span id="legend-lid"><span class="swatch" style="background:#7fa3c9;"></span>Lid (downloads)</span>
+        <span id="legend-gear"><span class="swatch" style="background:var(--preview);"></span>Gear preview (not exported)</span>
       </div>
     </div>
     <div id="panel">
@@ -353,6 +354,9 @@ const PY_FILES = [
 // ---------------------------------------------------------------------
 const viewerEl = document.getElementById("viewer");
 const legendEl = document.getElementById("legend");
+const legendHousingEl = document.getElementById("legend-housing");
+const legendLidEl = document.getElementById("legend-lid");
+const legendGearEl = document.getElementById("legend-gear");
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x101215);
 
@@ -753,6 +757,60 @@ function rebuildStandard(type, kw) {
   readoutsEl.appendChild(row);
 }
 
+// Live gear-pair preview - amber, not exported. Shared by the Housing
+// tab (gears floating solo) and the Combo tab (gears sitting on the
+// housing half of the side-by-side view) - same shaft math, same
+// rendering, just called from two different rebuild paths. Built at a
+// fixed rotation (not phase-aligned to mesh tooth-to-tooth) purely to
+// show the wall clears both gears' own tip circles. A failure here (e.g.
+// the module/tooth-count combo exceeds the pressure-angle undercut
+// ceiling) skips that gear's own preview silently rather than blocking
+// the housing itself, which already built successfully. Pushes onto
+// previewMeshes (caller clears it first) and returns true if at least
+// one gear preview built, so the caller can toggle the legend's own
+// gear row.
+function addGearPreviewMeshes(module, teethA, teethB, pa, widthMm, gearZ, halfSpan) {
+  const gearFn = GENERATOR_FNS.get("build_preview_gear");
+  let built = false;
+  // build_gear_profile's own tooth i=0 sits centered exactly on angle 0
+  // (its tip_land point is (addendum_radius, 0.0) - see spur_gear_core.py)
+  // - so the LEFT gear (cx=-halfSpan) already has a tooth pointing +X,
+  // straight at the right gear, with zero extra rotation needed. The
+  // RIGHT gear needs a tooth GAP (not another tooth tip) facing back at
+  // -X: its own valleys sit at angle (k+0.5)*pitch for integer k, so
+  // rotating it by (pi - pitch/2) lands the k=0 valley exactly on the
+  // pi (i.e. -X-facing) direction - the standard external-gear meshing
+  // offset. This is a static single-frame pose (no continuous rotation
+  // sync between the two), so it only guarantees correct interlock at
+  // THIS position, same as this preview's own "reference only" framing.
+  for (const [cx, teeth] of [[-halfSpan, teethA], [halfSpan, teethB]]) {
+    const clampedTeeth = Math.max(4, Math.floor(teeth));
+    const meshRotation = cx > 0 ? (Math.PI - Math.PI / clampedTeeth) : 0.0;
+    let gr;
+    try {
+      gr = gearFn.callKwargs({ module, tooth_count: clampedTeeth, pressure_angle_deg: pa, width_mm: widthMm });
+    } catch (e) {
+      continue;
+    }
+    const { verts: gv, triangles: gtris } = pyResultToMesh(gr);
+    const ggeo = buildGeometry(gv, gtris);
+    ggeo.rotateY(meshRotation);
+    // buildGeometry() already remaps mm (x,y,z) -> display (x,z,-y), so a
+    // translate() here works in DISPLAY space: cx (mm x, shaft spacing)
+    // is the display-X shift, gearZ (mm z, cavity height) is the
+    // display-Y shift - NOT display-Z, which is -mm_y and should stay 0
+    // (the shaft sits on mm y=0, the housing's own long axis).
+    ggeo.translate(cx, gearZ, 0);
+    const gmesh = new THREE.Mesh(ggeo, previewMaterial);
+    gmesh.castShadow = true;
+    gmesh.receiveShadow = true;
+    scene.add(gmesh);
+    previewMeshes.push(gmesh);
+    built = true;
+  }
+  return built;
+}
+
 function rebuildHousing(kw) {
   const module = kw.module, teethA = kw.tooth_count_a, teethB = kw.tooth_count_b, pa = kw.pressure_angle_deg;
   const tipA = module * (teethA + 2.0);
@@ -799,53 +857,16 @@ function rebuildHousing(kw) {
   lastTriangles = triangles;
   buyBtn.disabled = false;
 
-  // Live gear-pair preview - amber, not exported. Built at a fixed
-  // rotation (not phase-aligned to mesh tooth-to-tooth) purely to show
-  // the wall clears both gears' own tip circles. A failure here (e.g.
-  // the module/tooth-count combo exceeds the pressure-angle undercut
-  // ceiling) skips that gear's own preview silently rather than
-  // blocking the housing itself, which already built successfully.
   clearPreviewMeshes();
-  const gearFn = GENERATOR_FNS.get("build_preview_gear");
   // Rests on the boss's own top face (or the bare floor when
   // boss_height_mm is 0) - the same surface a real gear's hub bears
   // against once it's dropped over the boss, not floating mid-cavity.
   const gearZ = kw.base_thickness_mm + kw.boss_height_mm;
-  // build_gear_profile's own tooth i=0 sits centered exactly on angle 0
-  // (its tip_land point is (addendum_radius, 0.0) - see spur_gear_core.py)
-  // - so the LEFT gear (cx=-halfSpan) already has a tooth pointing +X,
-  // straight at the right gear, with zero extra rotation needed. The
-  // RIGHT gear needs a tooth GAP (not another tooth tip) facing back at
-  // -X: its own valleys sit at angle (k+0.5)*pitch for integer k, so
-  // rotating it by (pi - pitch/2) lands the k=0 valley exactly on the
-  // pi (i.e. -X-facing) direction - the standard external-gear meshing
-  // offset. This is a static single-frame pose (no continuous rotation
-  // sync between the two), so it only guarantees correct interlock at
-  // THIS position, same as this preview's own "reference only" framing.
-  for (const [cx, teeth] of [[-halfSpan, teethA], [halfSpan, teethB]]) {
-    const clampedTeeth = Math.max(4, Math.floor(teeth));
-    const meshRotation = cx > 0 ? (Math.PI - Math.PI / clampedTeeth) : 0.0;
-    let gr;
-    try {
-      gr = gearFn.callKwargs({ module, tooth_count: clampedTeeth,
-                                pressure_angle_deg: pa, width_mm: kw.wall_height_mm });
-    } catch (e) {
-      continue;
-    }
-    const { verts: gv, triangles: gtris } = pyResultToMesh(gr);
-    const ggeo = buildGeometry(gv, gtris);
-    ggeo.rotateY(meshRotation);
-    // buildGeometry() already remaps mm (x,y,z) -> display (x,z,-y), so a
-    // translate() here works in DISPLAY space: cx (mm x, shaft spacing)
-    // is the display-X shift, gearZ (mm z, cavity height) is the
-    // display-Y shift - NOT display-Z, which is -mm_y and should stay 0
-    // (the shaft sits on mm y=0, the housing's own long axis).
-    ggeo.translate(cx, gearZ, 0);
-    const gmesh = new THREE.Mesh(ggeo, previewMaterial);
-    scene.add(gmesh);
-    previewMeshes.push(gmesh);
-  }
-  legendEl.style.display = previewMeshes.length ? "block" : "none";
+  const builtPreview = addGearPreviewMeshes(module, teethA, teethB, pa, kw.wall_height_mm, gearZ, halfSpan);
+  legendHousingEl.style.display = "";
+  legendLidEl.style.display = "none";
+  legendGearEl.style.display = builtPreview ? "" : "none";
+  legendEl.style.display = "block";
 
   readoutsEl.innerHTML = "";
   const rows = [
@@ -924,7 +945,6 @@ function rebuildCombo(kw) {
 
   clearMainMesh();
   clearPreviewMeshes();
-  legendEl.style.display = "none";
 
   // Side-by-side, not assembled: shift the lid along the housing's own
   // long (mm Y) axis by enough to clear the skirt's own (slightly larger
@@ -947,6 +967,17 @@ function rebuildCombo(kw) {
   lidDisplayMesh.receiveShadow = true;
   scene.add(lidDisplayMesh);
   previewMeshes.push(lidDisplayMesh);
+
+  // Same amber gear-pair preview as the Housing tab, seated on the
+  // housing half of this side-by-side view - reuses the SAME derived
+  // gearOd/centerDistance this combo already computed for the housing
+  // itself, so the two stay in lockstep by construction.
+  const gearZ = kw.base_thickness_mm + kw.boss_height_mm;
+  const builtPreview = addGearPreviewMeshes(module, teethA, teethB, pa, kw.wall_height_mm, gearZ, centerDistance / 2.0);
+  legendHousingEl.style.display = "";
+  legendLidEl.style.display = "";
+  legendGearEl.style.display = builtPreview ? "" : "none";
+  legendEl.style.display = "block";
 
   if (firstRunForType) { frameCameraMultiple([housingGeo, lidGeo]); firstRunForType = false; }
 
