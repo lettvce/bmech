@@ -207,8 +207,6 @@
         either a male taper (plugs into a female hose port) or a female
         socket (receives a male spigot). All three sections fuse into
         one printable shell — not three separate parts.</li>
-    <li>A small "this was downloaded" ping fires when you click
-        Download — a counter, not any file content.</li>
     <li>This is free during testing. If it turns into a paid product
         later, existing free downloads aren't retroactively affected.</li>
   </ul>
@@ -231,8 +229,6 @@
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
-
-const SERVER_BASE = "https://api.lettvce.com";
 
 // ---------------------------------------------------------------------
 // One fixed field set — no tabs/types, this page only ever builds the
@@ -438,22 +434,6 @@ function buildBinarySTL(verts, triangles) {
   return buffer;
 }
 
-// Fire-and-forget download counter — same sendBeacon/fetch-fallback
-// pattern as office_organizers' own trackDownload, "text/plain" so
-// sendBeacon doesn't trigger a CORS preflight.
-function trackDownload() {
-  const body = JSON.stringify({ type: "vacuum_attachment" });
-  const url = SERVER_BASE + "/track/download";
-  try {
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(url, new Blob([body], { type: "text/plain" }));
-      return;
-    }
-  } catch (e) { /* fall through to fetch */ }
-  fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true })
-    .catch(() => {});
-}
-
 function downloadSTL() {
   if (!lastVerts || !lastTriangles) return;
   const buffer = buildBinarySTL(lastVerts, lastTriangles);
@@ -466,7 +446,6 @@ function downloadSTL() {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-  trackDownload();
 }
 
 const DEFAULT_CAMERA_DIR = { x: 0.55, y: 0.55, z: 0.75 };
