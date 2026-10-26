@@ -103,6 +103,7 @@ export const DEFAULTS = {
   wedgeDeg: 30,        // included angle of the plate taper
   lip: 3,              // plate overhang past the wall face
   meshClear: 1,        // added to the theoretical center distance
+  standGap: 10,        // space left between neighboring stands
 };
 
 export function derive(z, P) {
@@ -114,7 +115,8 @@ export function derive(z, P) {
     z, rp, rTip, rRoot, rNeck,
     rBore: rNeck + P.boreClear,
     rShoulder: rNeck + P.shoulderStep,
-    baseWidth: 2 * rp + P.meshClear,
+    // Neighbors' half-widths plus the gap add up to their center distance.
+    baseWidth: 2 * rp + P.meshClear - P.standGap,
   };
 }
 
@@ -315,7 +317,7 @@ export function buildBlock(z, P) {
 
 // --- Train layout -------------------------------------------------------
 
-// Blocks butt frame-to-frame along +X, so each center distance is
+// Blocks stand along +X, standGap apart, so each center distance is
 // rp_i + rp_j + meshClear. Gear phases are chosen so a tooth of each
 // gear sits in a gap of the previous one (tooth 0 is on +X at angle 0);
 // ratio is turns of this gear per turn of the first, signed.
@@ -354,7 +356,7 @@ export function checkBlock(z, P) {
     msgs.push({ level: "err", text: `Gear tip (r ${d.rTip.toFixed(1)}) hits the back wall - raise Frame Height to ${Math.ceil(d.rTip + 2)}+.` });
   }
   if (d.baseWidth / 2 < P.capR + 1) {
-    msgs.push({ level: "err", text: `Frame is narrower than the axle boss - shrink Boss Radius.` });
+    msgs.push({ level: "err", text: `Stand is narrower than the axle boss - shrink Stand Gap or Boss Radius.` });
   }
   if (P.capR < d.rShoulder + 2) {
     msgs.push({ level: "err", text: `Boss Radius must be at least ${(d.rShoulder + 2).toFixed(1)} to hold the shoulder.` });

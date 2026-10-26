@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gear Blocks — print-in-place gear train builder</title>
-<meta name="description" content="Design a train of print-in-place captive gear blocks that butt together and mesh, watch it spin, and download an STL per block.">
+<meta name="description" content="Design a train of print-in-place captive gear blocks on separate stands that mesh, watch it spin, and download an STL per block.">
 <style>
   :root {
     --bg: #16181d;
@@ -164,9 +164,9 @@
 
 <header>
   <h1>Gear Blocks</h1>
-  <p>Print-in-place captive gears in frames that butt together and
-     mesh — any size next to any size. Build a train, watch it turn,
-     download a ready-to-print STL for each block.</p>
+  <p>Print-in-place captive gears, each on its own stand — set them in
+     a row and they mesh, any size next to any size. Build a train,
+     watch it turn, download a ready-to-print STL for each block.</p>
   <div class="badge">Free while this is in testing</div>
 </header>
 
@@ -212,11 +212,12 @@
 
 <section>
   <h2>How the spacing works</h2>
-  <p>Every block's back wall is exactly as wide as its gear's pitch
-     diameter plus a 1 mm meshing clearance. So when two frames touch,
-     their axles sit at <code>r₁ + r₂ + 1 mm</code> — the right center
-     distance for <em>those two</em> gears, whatever their sizes. The
-     frames are the stop: kids can't push gears close enough to jam.</p>
+  <p>Each block stands on its own base. A base is as wide as its gear's
+     pitch diameter plus a 1 mm meshing clearance, minus the Stand Gap.
+     So with the stands that gap apart, their axles sit at
+     <code>r₁ + r₂ + 1 mm</code> — the right center distance for
+     <em>those two</em> gears, whatever their sizes. Set Stand Gap to 0
+     and the stands touch instead, which makes them their own spacer.</p>
   <ul>
     <li>Every block in a set must share the same <strong>Module</strong>
         (tooth size) and <strong>Frame Height</strong>, or they won't mesh.
@@ -260,6 +261,7 @@ const FIELDS = [
   { id: "face", label: "Gear Thickness", unit: "mm", min: 4, max: 60, step: 0.5 },
   { group: "Frame" },
   { id: "height", label: "Frame Height", unit: "mm", min: 30, max: 400, step: 1, hint: "Axle to back wall. Every block must match." },
+  { id: "standGap", label: "Stand Gap", unit: "mm", min: 0, max: 100, step: 0.5, hint: "Space between neighboring stands. 0 = stands touch." },
   { id: "depth", label: "Frame Depth", unit: "mm", min: 20, max: 200, step: 1 },
   { id: "plate", label: "Plate Thickness", unit: "mm", min: 1.2, max: 10, step: 0.1 },
   { id: "wall", label: "Back Wall Thickness", unit: "mm", min: 1.2, max: 10, step: 0.1 },
@@ -451,7 +453,8 @@ function renderInfo() {
   const rows = [
     ["Pitch diameter", `${fmt(2 * d.rp)} mm`],
     ["Tip diameter", `${fmt(2 * d.rTip)} mm`],
-    ["Frame width", `${fmt(d.baseWidth)} mm`],
+    ["Stand width", `${fmt(d.baseWidth)} mm`],
+    ["Gap to next stand", `${fmt(params.standGap)} mm`],
     ["Turns per turn of block 1", `${fmt(Math.abs(b.ratio), 3)} ${b.ratio < 0 ? "↺" : "↻"}`],
     ["Whole train (last ÷ first)", `${fmt(Math.abs(last.ratio), 3)}×`],
     ["Train length", `${fmt(last.x + last.d.baseWidth / 2 + layout[0].d.baseWidth / 2)} mm`],
