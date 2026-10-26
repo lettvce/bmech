@@ -103,7 +103,7 @@ export const DEFAULTS = {
   wedgeDeg: 30,        // included angle of the plate taper
   lip: 3,              // plate overhang past the wall face
   meshClear: 1,        // added to the theoretical center distance
-  standGap: 10,        // space left between neighboring stands
+  standWidth: 80,      // same for every block; the gap between stands varies
 };
 
 export function derive(z, P) {
@@ -115,8 +115,7 @@ export function derive(z, P) {
     z, rp, rTip, rRoot, rNeck,
     rBore: rNeck + P.boreClear,
     rShoulder: rNeck + P.shoulderStep,
-    // Neighbors' half-widths plus the gap add up to their center distance.
-    baseWidth: 2 * rp + P.meshClear - P.standGap,
+    baseWidth: P.standWidth,
   };
 }
 
@@ -317,8 +316,8 @@ export function buildBlock(z, P) {
 
 // --- Train layout -------------------------------------------------------
 
-// Blocks stand along +X, standGap apart, so each center distance is
-// rp_i + rp_j + meshClear. Gear phases are chosen so a tooth of each
+// Blocks stand along +X at center distance rp_i + rp_j + meshClear; the
+// gap between their stands is whatever that leaves after standWidth. Gear phases are chosen so a tooth of each
 // gear sits in a gap of the previous one (tooth 0 is on +X at angle 0);
 // ratio is turns of this gear per turn of the first, signed.
 export function layoutTrain(teeth, P) {
@@ -353,17 +352,34 @@ export function checkBlock(z, P) {
     msgs.push({ level: "err", text: `Bore leaves only ${(d.rRoot - d.rBore).toFixed(1)} mm under the teeth (need 2.5).` });
   }
   if (P.height - d.rTip < 2) {
-    msgs.push({ level: "err", text: `Gear tip (r ${d.rTip.toFixed(1)}) hits the back wall - raise Frame Height to ${Math.ceil(d.rTip + 2)}+.` });
+    msgs.push({ level: "err", text: `Gear tip (r ${d.rTip.toFixed(1)}) hits the back wall - use fewer teeth, or raise Stand Height (Advanced) to ${Math.ceil(d.rTip + 2)}+.` });
   }
   if (d.baseWidth / 2 < P.capR + 1) {
-    msgs.push({ level: "err", text: `Stand is narrower than the axle boss - shrink Stand Gap or Boss Radius.` });
+    msgs.push({ level: "err", text: `Stand is narrower than the axle boss - widen Stand Width or shrink Boss Radius.` });
   }
   if (P.capR < d.rShoulder + 2) {
     msgs.push({ level: "err", text: `Boss Radius must be at least ${(d.rShoulder + 2).toFixed(1)} to hold the shoulder.` });
   }
   const Zi = P.depth / 2 - P.plate;
   if (Zi < P.face / 2 + P.shoulderGap + P.shoulderStep + 1) {
-    msgs.push({ level: "err", text: `Frame Depth is too shallow for the gear and shoulders.` });
+    msgs.push({ level: "err", text: `Stand Depth is too shallow for the gear and shoulders.` });
+  }
+  return msgs;
+}
+
+// Per-block messages for a whole train: each block's own checks, plus
+// stands that would overlap a neighbor (two small gears are closer
+// together than one Stand Width).
+export function checkTrain(teeth, P) {
+  const msgs = teeth.map((z) => checkBlock(z, P));
+  const L = layoutTrain(teeth, P);
+  for (let i = 0; i + 1 < L.length; i++) {
+    const gap = L[i + 1].x - L[i].x - P.standWidth;
+    if (gap < 0) {
+      const text = `Stands ${i + 1} and ${i + 2} overlap by ${(-gap).toFixed(1)} mm - use more teeth or a narrower Stand Width.`;
+      msgs[i].push({ level: "err", text });
+      msgs[i + 1].push({ level: "err", text });
+    }
   }
   return msgs;
 }

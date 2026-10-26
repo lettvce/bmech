@@ -212,16 +212,18 @@
 
 <section>
   <h2>How the spacing works</h2>
-  <p>Each block stands on its own base. A base is as wide as its gear's
-     pitch diameter plus a 1 mm meshing clearance, minus the Stand Gap.
-     So with the stands that gap apart, their axles sit at
-     <code>r₁ + r₂ + 1 mm</code> — the right center distance for
-     <em>those two</em> gears, whatever their sizes. Set Stand Gap to 0
-     and the stands touch instead, which makes them their own spacer.</p>
+  <p>Every block stands on the same size base (80 mm wide by default).
+     Two gears mesh when their axles are <code>r₁ + r₂ + 1 mm</code>
+     apart — their pitch radii plus a 1 mm meshing clearance — so the
+     gap between two stands is whatever's left: wide between big gears,
+     narrow between small ones. Two very small gears can't sit next to
+     each other at all, because their stands would overlap; the builder
+     flags that.</p>
   <ul>
     <li>Every block in a set must share the same <strong>Module</strong>
-        (tooth size) and <strong>Frame Height</strong>, or they won't mesh.
-        Height only has to clear the biggest gear's tips.</li>
+        (tooth size), <strong>Stand Height</strong> and <strong>Stand
+        Width</strong>, or they won't line up and mesh. These live under
+        Advanced; at the defaults, gears up to 58 teeth fit.</li>
     <li>Below 17 teeth a 20° gear starts to undercut; it still turns,
         just with weaker tooth roots.</li>
     <li>The gear is captive: the axle necks down through the gear and
@@ -251,31 +253,39 @@ import * as THREE from "three";
 import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
 // Bump ?v= whenever gear_blocks.js changes: GitHub Pages lets browsers
 // cache it for 10 min, and a stale module under a new page breaks fields.
-import * as G from "./gear_blocks.js?v=2";
+import * as G from "./gear_blocks.js?v=3";
 
 // ---------------------------------------------------------------------
 // Train-wide fields. Every block shares these; only tooth count is per
 // block. Defaults live in gear_blocks.js's DEFAULTS.
 // ---------------------------------------------------------------------
+// Basic mode shows only Stand Depth (plus per-block teeth above);
+// everything flagged `advanced` - group labels included - appears once
+// Advanced is checked. Hidden fields keep whatever value they hold.
 const FIELDS = [
-  { group: "Gear Set" },
-  { id: "module", label: "Module", unit: "mm", min: 1, max: 8, step: 0.1, hint: "Tooth size. Every block must match." },
-  { id: "face", label: "Gear Thickness", unit: "mm", min: 4, max: 60, step: 0.5 },
-  { group: "Frame" },
-  { id: "height", label: "Frame Height", unit: "mm", min: 30, max: 400, step: 1, hint: "Axle to back wall. Every block must match." },
-  { id: "standGap", label: "Stand Gap", unit: "mm", min: 0, max: 100, step: 0.5, hint: "Space between neighboring stands. 0 = stands touch." },
-  { id: "depth", label: "Frame Depth", unit: "mm", min: 20, max: 200, step: 1 },
-  { id: "plate", label: "Plate Thickness", unit: "mm", min: 1.2, max: 10, step: 0.1 },
-  { id: "wall", label: "Back Wall Thickness", unit: "mm", min: 1.2, max: 10, step: 0.1 },
-  { id: "capR", label: "Boss Radius", unit: "mm", min: 5, max: 60, step: 0.5 },
-  { id: "wedgeDeg", label: "Wedge Angle", unit: "°", min: 0, max: 90, step: 1 },
+  { group: "Stand" },
+  { id: "depth", label: "Stand Depth", unit: "mm", min: 20, max: 200, step: 1, hint: "Front-to-back, along the axle." },
   { id: "advanced", label: "Advanced", type: "checkbox", def: false },
+
+  { group: "Gear Set", advanced: true },
+  { id: "module", label: "Module", unit: "mm", min: 1, max: 8, step: 0.1, advanced: true, hint: "Tooth size. Every block must match." },
+  { id: "face", label: "Gear Thickness", unit: "mm", min: 4, max: 60, step: 0.5, advanced: true },
   { id: "pressureAngle", label: "Pressure Angle", unit: "°", min: 14.5, max: 25, step: 0.5, advanced: true },
+
+  { group: "Stand Shape", advanced: true },
+  { id: "standWidth", label: "Stand Width", unit: "mm", min: 30, max: 300, step: 1, advanced: true, hint: "Same for every block. Every block must match." },
+  { id: "height", label: "Stand Height", unit: "mm", min: 30, max: 400, step: 1, advanced: true, hint: "Axle to back wall. Every block must match." },
+  { id: "plate", label: "Plate Thickness", unit: "mm", min: 1.2, max: 10, step: 0.1, advanced: true },
+  { id: "wall", label: "Back Wall Thickness", unit: "mm", min: 1.2, max: 10, step: 0.1, advanced: true },
+  { id: "capR", label: "Boss Radius", unit: "mm", min: 5, max: 60, step: 0.5, advanced: true },
+  { id: "wedgeDeg", label: "Wedge Angle", unit: "°", min: 0, max: 90, step: 1, advanced: true },
+  { id: "lip", label: "Plate Lip", unit: "mm", min: 0.5, max: 20, step: 0.5, advanced: true },
+
+  { group: "Axle & Clearances", advanced: true },
   { id: "neckD", label: "Axle Neck Diameter", unit: "mm", min: 4, max: 80, step: 0.5, advanced: true },
   { id: "boreClear", label: "Bore Clearance", unit: "mm", min: 0.1, max: 1, step: 0.05, advanced: true, hint: "Radial gap, gear bore to axle." },
   { id: "shoulderStep", label: "Shoulder Step", unit: "mm", min: 0.4, max: 5, step: 0.1, advanced: true, hint: "How far the shoulder stands proud of the neck." },
   { id: "shoulderGap", label: "Shoulder Gap", unit: "mm", min: 0, max: 3, step: 0.05, advanced: true, hint: "Axial gap, gear face to shoulder chamfer." },
-  { id: "lip", label: "Plate Lip", unit: "mm", min: 0.5, max: 20, step: 0.5, advanced: true },
   { id: "meshClear", label: "Mesh Clearance", unit: "mm", min: 0, max: 3, step: 0.05, advanced: true, hint: "Added to every center distance." },
 ];
 
@@ -395,6 +405,7 @@ function buildFieldsOnce() {
       const g = document.createElement("div");
       g.className = "group-label";
       g.textContent = f.group;
+      if (f.advanced) g.dataset.advanced = "1";
       fieldsEl.appendChild(g);
       continue;
     }
@@ -425,17 +436,23 @@ function buildFieldsOnce() {
 
 function updateFieldVisibility() {
   const adv = $("in-advanced").checked;
-  for (const f of FIELDS) if (f.advanced) $("field-" + f.id).style.display = adv ? "" : "none";
+  for (const f of FIELDS) if (f.advanced && f.id) $("field-" + f.id).style.display = adv ? "" : "none";
+  fieldsEl.querySelectorAll(".group-label[data-advanced]").forEach((g) => { g.style.display = adv ? "" : "none"; });
 }
+
+// One pass of checks for the whole train (per-block + neighbor overlap),
+// refreshed on every rebuild and shared by chips, readouts and downloads.
+let trainMsgs = [];
+const blockHasErr = (i) => trainMsgs[i].some((m) => m.level === "err");
 
 function renderChain() {
   chainEl.innerHTML = "";
   chain.forEach((z, i) => {
-    const msgs = G.checkBlock(z, params);
+    const msgs = trainMsgs[i];
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "chip" + (i === selected ? " sel" : "")
-      + (msgs.some((m) => m.level === "err") ? " err" : msgs.length ? " warn" : "");
+      + (blockHasErr(i) ? " err" : msgs.length ? " warn" : "");
     chip.textContent = `${i + 1}: ${z}T`;
     chip.addEventListener("click", () => select(i));
     chainEl.appendChild(chip);
@@ -456,22 +473,27 @@ function renderInfo() {
     ["Pitch diameter", `${fmt(2 * d.rp)} mm`],
     ["Tip diameter", `${fmt(2 * d.rTip)} mm`],
     ["Stand width", `${fmt(d.baseWidth)} mm`],
-    ["Gap to next stand", `${fmt(params.standGap)} mm`],
+    ["Gap to next stand", layout[selected + 1] ? `${fmt(layout[selected + 1].x - b.x - params.standWidth)} mm` : "—"],
     ["Turns per turn of block 1", `${fmt(Math.abs(b.ratio), 3)} ${b.ratio < 0 ? "↺" : "↻"}`],
     ["Whole train (last ÷ first)", `${fmt(Math.abs(last.ratio), 3)}×`],
     ["Train length", `${fmt(last.x + last.d.baseWidth / 2 + layout[0].d.baseWidth / 2)} mm`],
   ];
   readoutsEl.innerHTML = rows.map(([k, v]) => `<div class="readout"><span>${k}</span><span class="val">${v}</span></div>`).join("");
 
-  const lines = [];
-  chain.forEach((z, i) => {
-    for (const m of G.checkBlock(z, params)) lines.push(`<div class="${m.level}">Block ${i + 1}: ${m.text}</div>`);
+  // A neighbor-overlap message is attached to both blocks; list it once.
+  const seen = new Set(), lines = [];
+  trainMsgs.forEach((msgs, i) => {
+    for (const m of msgs) {
+      const text = m.text.startsWith("Stands ") ? m.text : `Block ${i + 1}: ${m.text}`;
+      if (seen.has(text)) continue;
+      seen.add(text);
+      lines.push(`<div class="${m.level}">${text}</div>`);
+    }
   });
   checksEl.innerHTML = lines.length ? lines.join("") : `<div class="ok">All blocks OK.</div>`;
 
-  const selErr = G.checkBlock(chain[selected], params).some((m) => m.level === "err");
-  $("dl-one").disabled = selErr;
-  $("dl-all").disabled = chain.some((z) => G.checkBlock(z, params).some((m) => m.level === "err")) || !window.JSZip;
+  $("dl-one").disabled = blockHasErr(selected);
+  $("dl-all").disabled = chain.some((_, i) => blockHasErr(i)) || !window.JSZip;
 }
 
 function select(i, pan = true) {
@@ -504,12 +526,13 @@ function rebuild(paramsChanged = false) {
   for (const o of blockObjs) scene.remove(o.group);
   blockObjs = [];
   layout = G.layoutTrain(chain, params);
+  trainMsgs = G.checkTrain(chain, params);
 
   let triCount = 0;
   layout.forEach((b, i) => {
     const z = chain[i];
     const m = blockMeshes(z);
-    const bad = G.checkBlock(z, params).some((msg) => msg.level === "err");
+    const bad = blockHasErr(i);
     const group = new THREE.Group();
     group.position.x = b.x;
     const frameMesh = new THREE.Mesh(m.frameGeo, bad ? errMat : frameMat);
