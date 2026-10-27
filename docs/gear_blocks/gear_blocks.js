@@ -138,25 +138,28 @@ function unwrapAngles(pts) {
 // Triangulates the flat ring between a star-shaped outer loop and a
 // circular inner loop by walking both in angle order (both CCW, inner
 // loop starting at the outer loop's first bearing). up=true -> +Z normal.
-// The profile repeats a bearing where each flank meets the root circle;
-// if a bore point sits on that same bearing, the outer step would be a
-// zero-area sliver, so the inner step goes first there.
-function zipAnnulus(tris, outerIdx, outerAng, innerIdx, innerAng, up) {
+// Angle order alone isn't enough: tooth flanks run almost radially, so
+// the angle-preferred step can be a clockwise (folded) sliver when the
+// next bore point sits just behind in angle - then the other step is
+// taken. This also covers the zero-area case where a bore point shares
+// the bearing the profile repeats at each flank/root junction.
+function zipAnnulus(tris, verts, outerIdx, outerAng, innerIdx, innerAng, up) {
   const N = outerIdx.length, M = innerIdx.length;
   const A = [...outerAng, outerAng[0] + 2 * Math.PI];
   const B = [...innerAng, innerAng[0] + 2 * Math.PI];
+  const ccw = ([a, b, c]) => {
+    const [ax, ay] = verts[a], [bx, by] = verts[b], [cx, cy] = verts[c];
+    return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax) > 1e-12;
+  };
   let i = 0, j = 0;
   while (i < N || j < M) {
-    const sliver = i < N && j < M && A[i + 1] - A[i] < 1e-12 && Math.abs(B[j] - A[i]) < 1e-9;
-    const takeOuter = j >= M || (i < N && !sliver && A[i + 1] <= B[j + 1]);
-    let t;
-    if (takeOuter) {
-      t = [outerIdx[i], outerIdx[(i + 1) % N], innerIdx[j % M]];
-      i++;
-    } else {
-      t = [outerIdx[i % N], innerIdx[(j + 1) % M], innerIdx[j]];
-      j++;
-    }
+    const tOut = i < N ? [outerIdx[i], outerIdx[(i + 1) % N], innerIdx[j % M]] : null;
+    const tIn = j < M ? [outerIdx[i % N], innerIdx[(j + 1) % M], innerIdx[j]] : null;
+    let takeOuter = !tIn || (tOut && A[i + 1] <= B[j + 1]);
+    if (takeOuter && tIn && !ccw(tOut) && ccw(tIn)) takeOuter = false;
+    else if (!takeOuter && tOut && !ccw(tIn) && ccw(tOut)) takeOuter = true;
+    const t = takeOuter ? tOut : tIn;
+    if (takeOuter) i++; else j++;
     tris.push(up ? t : [t[0], t[2], t[1]]);
   }
 }
@@ -194,8 +197,8 @@ export function buildGear(z, P, boreSegs = 96) {
     const k1 = (k + 1) % boreSegs;
     tris.push([ib[k1], ib[k], it[k]], [ib[k1], it[k], it[k1]]);
   }
-  zipAnnulus(tris, ot, ang, it, innerAng, true);
-  zipAnnulus(tris, ob, ang, ib, innerAng, false);
+  zipAnnulus(tris, verts, ot, ang, it, innerAng, true);
+  zipAnnulus(tris, verts, ob, ang, ib, innerAng, false);
   return { verts, tris };
 }
 
