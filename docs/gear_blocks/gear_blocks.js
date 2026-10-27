@@ -104,7 +104,28 @@ export const DEFAULTS = {
   lip: 3,              // plate overhang past the wall face
   meshClear: 1,        // added to the theoretical center distance
   standWidth: 80,      // same for every block; the gap between stands varies
+  pinR: 6,             // crank pin radius (drives a Geneva / yoke)
+  pinH: 15,            // pin height above the gear face
+  pinRound: 2,         // round-over on the pin top
 };
+
+const PIN_MARGIN = 1.5;  // pin wall to the edges of its face cell
+const PIN_CLEAR = 0.5;   // pin wall to the axle shoulder (print-in-place)
+const FACE_EDGE = 1.0;   // target edge length on the pin gear's top face
+
+// Allowed pin offsets (axle to pin center) for a gear: outside the bore
+// and the axle shoulder, inside the tooth roots with room for the cell.
+export function pinRange(z, P) {
+  const d = derive(z, P);
+  const lo = Math.max(d.rBore + P.pinR + PIN_MARGIN, d.rShoulder + PIN_CLEAR + P.pinR);
+  const hi = d.rRoot - 0.5 - PIN_MARGIN - P.pinR;
+  return { lo, hi, ok: hi >= lo };
+}
+
+export function clampPinOffset(z, P, off) {
+  const { lo, hi } = pinRange(z, P);
+  return Math.min(Math.max(off, lo), hi);
+}
 
 export function derive(z, P) {
   const rp = (P.module * z) / 2;
@@ -164,9 +185,148 @@ function zipAnnulus(tris, verts, outerIdx, outerAng, innerIdx, innerAng, up) {
   }
 }
 
+// zipAnnulus for any two CCW loops that are both star-shaped about
+// `center` (not just the axle), with no assumption about where either
+// loop starts. Used for the pin's face cell.
+function zipStar(tris, verts, outerIdx, innerIdx, [cx, cy], up) {
+  const TAU = 2 * Math.PI;
+  const angs = (loop, start) => {
+    const out = [];
+    let prev = null;
+    for (const i of loop) {
+      let a = Math.atan2(verts[i][1] - cy, verts[i][0] - cx);
+      if (prev === null) a = start + ((((a - start) % TAU) + TAU) % TAU);
+      else a = prev + ((((a - prev + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
+      out.push(a); prev = a;
+    }
+    return out;
+  };
+  const A = angs(outerIdx, -Math.PI);
+  // start the inner loop at its first point at/after outer[0]'s bearing
+  const lag = (i) => {
+    const a = Math.atan2(verts[i][1] - cy, verts[i][0] - cx) - A[0];
+    return ((a % TAU) + TAU) % TAU;
+  };
+  let k0 = 0;
+  for (let k = 1; k < innerIdx.length; k++) if (lag(innerIdx[k]) < lag(innerIdx[k0])) k0 = k;
+  const inner = [...innerIdx.slice(k0), ...innerIdx.slice(0, k0)];
+  zipAnnulus(tris, verts, outerIdx, A, inner, angs(inner, A[0]), up);
+}
+
+// Pin gear top face, without hole-filling: split into cells that are
+// each star-shaped about some center, so every piece is a zip.
+//   outer band : tooth outline <-> mid circle            (about the axle)
+//   inner strip: bore arc <-> mid arc, outside the cell  (quads)
+//   pin cell   : wedge from bore to mid circle <-> pin ring (about the pin)
+// The bore and mid circles share one angular grid (starting at the
+// outline's first bearing, as zipAnnulus expects); the cell's side edges
+// sit on grid lines and are subdivided to the face spacing, and the
+// strip faces beside them reuse those points so nothing T-junctions.
+function pinTopFace(verts, tris, d, P, off, ot, ang, h) {
+  const TAU = 2 * Math.PI;
+  const rMid = (off + P.pinR + d.rRoot) / 2;
+  const alpha = Math.asin((P.pinR + PIN_MARGIN) / off);
+  const K = Math.max(96, Math.ceil((TAU * rMid) / FACE_EDGE));
+  const grid = [];
+  for (let k = 0; k < K; k++) grid.push(ang[0] + (TAU * k) / K);
+  const ring = (r, zz) => grid.map((a) => { verts.push([r * Math.cos(a), r * Math.sin(a), zz]); return verts.length - 1; });
+  const bt = ring(d.rBore, h), mt = ring(rMid, h);
+  zipAnnulus(tris, verts, ot, ang, mt, grid, true);
+
+  // Cell spans grid steps kA -> kB (CCW) around the pin at bearing 0.
+  const rel = (k) => Math.atan2(Math.sin(grid[k]), Math.cos(grid[k]));
+  let kA = -1, kB = -1;
+  for (let k = 0; k < K; k++) {
+    if (rel(k) <= -alpha && (kA < 0 || rel(k) > rel(kA))) kA = k;
+    if (rel(k) >= alpha && (kB < 0 || rel(k) < rel(kB))) kB = k;
+  }
+  const nR = Math.max(2, Math.ceil((rMid - d.rBore) / FACE_EDGE));
+  const radial = (k) => {
+    const out = [];
+    for (let t = 1; t < nR; t++) {
+      const r = d.rBore + ((rMid - d.rBore) * t) / nR;
+      verts.push([r * Math.cos(grid[k]), r * Math.sin(grid[k]), h]);
+      out.push(verts.length - 1);
+    }
+    return out;   // runs outward
+  };
+  const radA = radial(kA), radB = radial(kB);
+
+  for (let k = kB; k !== kA; k = (k + 1) % K) {
+    const k1 = (k + 1) % K;
+    if (k === kB) {
+      // [bt k, radB.., mt k, mt k1, bt k1], fanned from bt k1 (off radB's line)
+      const poly = [bt[k], ...radB, mt[k], mt[k1]];
+      for (let i = 0; i + 1 < poly.length; i++) tris.push([bt[k1], poly[i], poly[i + 1]]);
+    } else if (k1 === kA) {
+      // [bt k, mt k, mt k1, radA reversed.., bt k1], fanned from bt k
+      const poly = [mt[k], mt[k1], ...radA.slice().reverse(), bt[k1]];
+      for (let i = 0; i + 1 < poly.length; i++) tris.push([bt[k], poly[i], poly[i + 1]]);
+    } else {
+      tris.push([bt[k], mt[k], mt[k1]], [bt[k], mt[k1], bt[k1]]);
+    }
+  }
+
+  const cell = [];
+  for (let k = kA; ; k = (k + 1) % K) { cell.push(bt[k]); if (k === kB) break; }
+  cell.push(...radB);
+  for (let k = kB; ; k = (k - 1 + K) % K) { cell.push(mt[k]); if (k === kA) break; }
+  cell.push(...radA.slice().reverse());
+  let area2 = 0;
+  for (let i = 0; i < cell.length; i++) {
+    const [x1, y1] = verts[cell[i]], [x2, y2] = verts[cell[(i + 1) % cell.length]];
+    area2 += x1 * y2 - x2 * y1;
+  }
+  if (area2 < 0) cell.reverse();
+
+  const S = Math.max(24, Math.ceil((TAU * P.pinR) / FACE_EDGE));
+  const pinRing = [];
+  for (let s = 0; s < S; s++) {
+    const a = (TAU * s) / S;
+    verts.push([off + P.pinR * Math.cos(a), P.pinR * Math.sin(a), h]);
+    pinRing.push(verts.length - 1);
+  }
+  zipStar(tris, verts, cell, pinRing, [off, 0], true);
+  buildPinBody(verts, tris, P, off, pinRing, h);
+  return { bt, grid };
+}
+
+// Straight wall, quarter-round top edge, flat top - lathed from the
+// face's own pin ring so the pin is welded into the gear by construction.
+function buildPinBody(verts, tris, P, off, ring0, h) {
+  const S = ring0.length;
+  const rr = Math.min(P.pinRound, P.pinR * 0.9, P.pinH * 0.9);
+  const zr = h + P.pinH - rr;
+  const SEGS = 6;
+  const prof = [[P.pinR, zr]];
+  for (let k = 1; k <= SEGS; k++) {
+    const a = (Math.PI / 2) * (k / SEGS);
+    prof.push([P.pinR - rr + rr * Math.cos(a), zr + rr * Math.sin(a)]);
+  }
+  let prev = ring0;
+  for (const [r, zz] of prof) {
+    const cur = [];
+    for (let s = 0; s < S; s++) {
+      const a = (2 * Math.PI * s) / S;
+      verts.push([off + r * Math.cos(a), r * Math.sin(a), zz]);
+      cur.push(verts.length - 1);
+    }
+    for (let s = 0; s < S; s++) {
+      const s1 = (s + 1) % S;
+      tris.push([prev[s], prev[s1], cur[s1]], [prev[s], cur[s1], cur[s]]);
+    }
+    prev = cur;
+  }
+  verts.push([off, 0, h + P.pinH]);
+  const pole = verts.length - 1;
+  for (let s = 0; s < S; s++) tris.push([pole, prev[s], prev[(s + 1) % S]]);
+}
+
 // --- Gear ---------------------------------------------------------------
 
-export function buildGear(z, P, boreSegs = 96) {
+// pinOff: null for a plain gear, else the crank pin's offset from the
+// axle (clamped into pinRange). The pin stands on the +Z face at +X.
+export function buildGear(z, P, pinOff = null, boreSegs = 96) {
   const d = derive(z, P);
   const outline = gearProfile(P.module, z, P.pressureAngle);
   const N = outline.length;
@@ -174,30 +334,31 @@ export function buildGear(z, P, boreSegs = 96) {
   const h = P.face / 2;
   const verts = [];
   const tris = [];
+  const withPin = pinOff !== null && pinRange(z, P).ok;
 
-  const ob = [], ot = [], ib = [], it = [];
+  const ob = [], ot = [];
   for (const [x, y] of outline) { ob.push(verts.length); verts.push([x, y, -h]); }
   for (const [x, y] of outline) { ot.push(verts.length); verts.push([x, y, h]); }
-  const innerAng = [];
-  for (let k = 0; k < boreSegs; k++) {
-    const a = ang[0] + (2 * Math.PI * k) / boreSegs;
-    innerAng.push(a);
-    ib.push(verts.length); verts.push([d.rBore * Math.cos(a), d.rBore * Math.sin(a), -h]);
-  }
-  for (let k = 0; k < boreSegs; k++) {
-    const a = innerAng[k];
-    it.push(verts.length); verts.push([d.rBore * Math.cos(a), d.rBore * Math.sin(a), h]);
-  }
-
   for (let k = 0; k < N; k++) {
     const k1 = (k + 1) % N;
     tris.push([ob[k], ob[k1], ot[k1]], [ob[k], ot[k1], ot[k]]);
   }
-  for (let k = 0; k < boreSegs; k++) {
-    const k1 = (k + 1) % boreSegs;
+
+  let it, innerAng;
+  if (withPin) {
+    const top = pinTopFace(verts, tris, d, P, clampPinOffset(z, P, pinOff), ot, ang, h);
+    it = top.bt; innerAng = top.grid;
+  } else {
+    innerAng = [];
+    for (let k = 0; k < boreSegs; k++) innerAng.push(ang[0] + (2 * Math.PI * k) / boreSegs);
+    it = innerAng.map((a) => { verts.push([d.rBore * Math.cos(a), d.rBore * Math.sin(a), h]); return verts.length - 1; });
+    zipAnnulus(tris, verts, ot, ang, it, innerAng, true);
+  }
+  const ib = innerAng.map((a) => { verts.push([d.rBore * Math.cos(a), d.rBore * Math.sin(a), -h]); return verts.length - 1; });
+  for (let k = 0; k < ib.length; k++) {
+    const k1 = (k + 1) % ib.length;
     tris.push([ib[k1], ib[k], it[k]], [ib[k1], it[k], it[k1]]);
   }
-  zipAnnulus(tris, verts, ot, ang, it, innerAng, true);
   zipAnnulus(tris, verts, ob, ang, ib, innerAng, false);
   return { verts, tris };
 }
@@ -313,8 +474,8 @@ export function mergeMeshes(...meshes) {
   return { verts, tris };
 }
 
-export function buildBlock(z, P) {
-  return mergeMeshes(buildFrame(z, P), buildGear(z, P));
+export function buildBlock(z, P, pinOff = null) {
+  return mergeMeshes(buildFrame(z, P), buildGear(z, P, pinOff));
 }
 
 // --- Train layout -------------------------------------------------------
@@ -345,8 +506,14 @@ export function layoutTrain(teeth, P) {
 
 // --- Checks -------------------------------------------------------------
 
-// level: "err" blocks export, "warn" is advisory.
-export function checkBlock(z, P) {
+// Fewest teeth that leave any room for the crank pin.
+export function minPinTeeth(P) {
+  for (let z = 8; z < 400; z++) if (pinRange(z, P).ok) return z;
+  return null;
+}
+
+// level: "err" blocks export, "warn" is advisory. pin: offset or null.
+export function checkBlock(z, P, pin = null) {
   const d = derive(z, P);
   const msgs = [];
   if (z < 8) msgs.push({ level: "err", text: `${z}T is too few teeth (min 8).` });
@@ -367,14 +534,24 @@ export function checkBlock(z, P) {
   if (Zi < P.face / 2 + P.shoulderGap + P.shoulderStep + 1) {
     msgs.push({ level: "err", text: `Stand Depth is too shallow for the gear and shoulders.` });
   }
+  if (pin !== null) {
+    if (!pinRange(z, P).ok) {
+      const n = minPinTeeth(P);
+      msgs.push({ level: "err", text: `${z}T has no room for a crank pin${n ? ` - use ${n}+ teeth` : ""}.` });
+    }
+    if (P.face / 2 + P.pinH > Zi - 2) {
+      msgs.push({ level: "err", text: `Crank pin reaches the stand plate - lower Pin Height to ${Math.floor(Zi - 2 - P.face / 2)} or less.` });
+    }
+  }
   return msgs;
 }
 
 // Per-block messages for a whole train: each block's own checks, plus
 // stands that would overlap a neighbor (two small gears are closer
-// together than one Stand Width).
-export function checkTrain(teeth, P) {
-  const msgs = teeth.map((z) => checkBlock(z, P));
+// together than one Stand Width). Pins never need a neighbor check: each
+// stays inside its own root circle, and meshing root circles never touch.
+export function checkTrain(teeth, P, pins = []) {
+  const msgs = teeth.map((z, i) => checkBlock(z, P, pins[i] ?? null));
   const L = layoutTrain(teeth, P);
   for (let i = 0; i + 1 < L.length; i++) {
     const gap = L[i + 1].x - L[i].x - P.standWidth;

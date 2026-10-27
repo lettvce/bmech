@@ -192,6 +192,14 @@
         <label for="in-teeth">Teeth (selected block) <span class="unit-suffix">T</span></label>
         <input type="number" id="in-teeth" min="8" max="120" step="1">
       </div>
+      <div class="field checkbox-field">
+        <label class="checkbox-label"><span>Crank pin (selected block)</span><input type="checkbox" id="in-pin"></label>
+      </div>
+      <div class="field" id="field-pinoff">
+        <label for="in-pinoff">Pin Offset <span class="unit-suffix">mm</span></label>
+        <input type="number" id="in-pinoff" min="0" max="300" step="0.5">
+        <span class="hint" id="hint-pinoff"></span>
+      </div>
       <div class="btn-row">
         <button type="button" class="btn" id="add">+ Add after</button>
         <button type="button" class="btn" id="remove">Remove</button>
@@ -229,6 +237,10 @@
     <li>The gear is captive: the axle necks down through the gear and
         steps back out to a wider shoulder on both sides, with 0.3 mm
         print-in-place clearance. Print it with supports under the gear.</li>
+    <li>Any block can have a <strong>crank pin</strong> standing on its
+        gear face, to drive a Geneva wheel or a yoke. The offset is the
+        crank throw; it stays between the axle shoulder and the tooth
+        roots, so a pin can never hit its neighbors.</li>
     <li>The tooth profile is the same involute bmech's spur gear
         generator makes in Blender.</li>
   </ul>
@@ -253,11 +265,12 @@ import * as THREE from "three";
 import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
 // Bump ?v= whenever gear_blocks.js changes: GitHub Pages lets browsers
 // cache it for 10 min, and a stale module under a new page breaks fields.
-import * as G from "./gear_blocks.js?v=4";
+import * as G from "./gear_blocks.js?v=5";
 
 // ---------------------------------------------------------------------
-// Train-wide fields. Every block shares these; only tooth count is per
-// block. Defaults live in gear_blocks.js's DEFAULTS.
+// Train-wide fields. Every block shares these; only tooth count and the
+// optional crank pin are per block. Defaults live in gear_blocks.js's
+// DEFAULTS.
 // ---------------------------------------------------------------------
 // Basic mode shows only Stand Depth (plus per-block teeth above);
 // everything flagged `advanced` - group labels included - appears once
@@ -287,9 +300,17 @@ const FIELDS = [
   { id: "shoulderStep", label: "Shoulder Step", unit: "mm", min: 0.4, max: 5, step: 0.1, advanced: true, hint: "How far the shoulder stands proud of the neck." },
   { id: "shoulderGap", label: "Shoulder Gap", unit: "mm", min: 0, max: 3, step: 0.05, advanced: true, hint: "Axial gap, gear face to shoulder chamfer." },
   { id: "meshClear", label: "Mesh Clearance", unit: "mm", min: 0, max: 3, step: 0.05, advanced: true, hint: "Added to every center distance." },
+
+  { group: "Crank Pin", advanced: true },
+  { id: "pinR", label: "Pin Radius", unit: "mm", min: 2, max: 20, step: 0.5, advanced: true, hint: "Same for every pin gear." },
+  { id: "pinH", label: "Pin Height", unit: "mm", min: 3, max: 60, step: 0.5, advanced: true, hint: "Above the gear face." },
+  { id: "pinRound", label: "Pin Round-over", unit: "mm", min: 0, max: 10, step: 0.25, advanced: true },
 ];
 
 const DEFAULT_CHAIN = [40, 20, 30, 50, 25];
+// Per-block crank pin: offset from the axle in mm, or null for none.
+const DEFAULT_PINS = [35, null, null, null, null];
+const DEFAULT_PIN_OFFSET = 35;
 const STORE_KEY = "gear_blocks_v1";
 
 // ---------------------------------------------------------------------
@@ -360,32 +381,48 @@ function toGeometry({ verts, tris }) {
 // ---------------------------------------------------------------------
 const params = { ...G.DEFAULTS };
 let chain = DEFAULT_CHAIN.slice();
+let pins = DEFAULT_PINS.slice();   // parallel to chain
 let selected = 0;
 let spinning = true;
 let spinAngle = 0;
 let layout = [];
 let blockObjs = [];          // { group, gearPivot }
-let geoCache = new Map();    // teeth -> { frame, gear, frameGeo, gearGeo }
+let geoCache = new Map();    // blockKey -> { frame, gear, frameGeo, gearGeo }
 
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
     if (!s) return;
-    if (Array.isArray(s.chain) && s.chain.length) chain = s.chain.map((z) => Math.round(z));
+    if (Array.isArray(s.chain) && s.chain.length) {
+      chain = s.chain.map((z) => Math.round(z));
+      pins = chain.map((_, i) => (Array.isArray(s.pins) && typeof s.pins[i] === "number" ? s.pins[i] : null));
+    }
     if (s.params) for (const k of Object.keys(G.DEFAULTS)) if (typeof s.params[k] === "number") params[k] = s.params[k];
   } catch (e) { /* storage unavailable: defaults */ }
 }
 function saveState() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ chain, params })); } catch (e) { /* ignore */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ chain, pins, params })); } catch (e) { /* ignore */ }
 }
 
-function blockMeshes(z) {
-  if (!geoCache.has(z)) {
-    const frame = G.buildFrame(z, params);
-    const gear = G.buildGear(z, params);
-    geoCache.set(z, { frame, gear, frameGeo: toGeometry(frame), gearGeo: toGeometry(gear) });
+// The offset a block's pin actually gets (its stored offset is what was
+// typed; the geometry clamps it into that gear's range), or null.
+function pinOffset(i) {
+  if (pins[i] === null) return null;
+  return G.pinRange(chain[i], params).ok ? G.clampPinOffset(chain[i], params, pins[i]) : pins[i];
+}
+function blockKey(i) {
+  const off = pinOffset(i);
+  return off === null ? `${chain[i]}` : `${chain[i]}|${off.toFixed(2)}`;
+}
+
+function blockMeshes(i) {
+  const key = blockKey(i);
+  if (!geoCache.has(key)) {
+    const frame = G.buildFrame(chain[i], params);
+    const gear = G.buildGear(chain[i], params, pinOffset(i));
+    geoCache.set(key, { frame, gear, frameGeo: toGeometry(frame), gearGeo: toGeometry(gear) });
   }
-  return geoCache.get(z);
+  return geoCache.get(key);
 }
 function clearCache() {
   for (const c of geoCache.values()) { c.frameGeo.dispose(); c.gearGeo.dispose(); }
@@ -397,6 +434,7 @@ function clearCache() {
 // ---------------------------------------------------------------------
 const $ = (id) => document.getElementById(id);
 const fieldsEl = $("fields"), chainEl = $("chain"), teethEl = $("in-teeth");
+const pinEl = $("in-pin"), pinOffEl = $("in-pinoff"), pinHintEl = $("hint-pinoff");
 const readoutsEl = $("readouts"), checksEl = $("checks"), statusEl = $("status");
 
 function buildFieldsOnce() {
@@ -453,17 +491,33 @@ function renderChain() {
     chip.type = "button";
     chip.className = "chip" + (i === selected ? " sel" : "")
       + (blockHasErr(i) ? " err" : msgs.length ? " warn" : "");
-    chip.textContent = `${i + 1}: ${z}T`;
+    chip.textContent = `${i + 1}: ${z}T` + (pins[i] !== null ? " + pin" : "");
     chip.addEventListener("click", () => select(i));
     chainEl.appendChild(chip);
   });
   if (document.activeElement !== teethEl) teethEl.value = chain[selected];
+  renderPinFields();
   $("prev").disabled = selected === 0;
   $("next").disabled = selected === chain.length - 1;
   $("remove").disabled = chain.length <= 1;
 }
 
 function fmt(x, d = 1) { return Number(x).toFixed(d); }
+
+// Out-of-range offsets are clamped, never rejected: the hint says what
+// the pin actually got and the allowed range for this gear.
+function renderPinFields() {
+  const has = pins[selected] !== null;
+  pinEl.checked = has;
+  $("field-pinoff").style.display = has ? "" : "none";
+  if (!has) return;
+  const r = G.pinRange(chain[selected], params);
+  if (document.activeElement !== pinOffEl) pinOffEl.value = pins[selected];
+  if (!r.ok) { pinHintEl.textContent = "No room for a pin on this gear."; return; }
+  const eff = pinOffset(selected);
+  pinHintEl.textContent = `Range ${fmt(r.lo)}–${fmt(r.hi)} mm` +
+    (Math.abs(eff - pins[selected]) > 1e-9 ? ` · clamped to ${fmt(eff)}` : "");
+}
 
 function renderInfo() {
   const b = layout[selected];
@@ -472,6 +526,7 @@ function renderInfo() {
   const rows = [
     ["Pitch diameter", `${fmt(2 * d.rp)} mm`],
     ["Tip diameter", `${fmt(2 * d.rTip)} mm`],
+    ...(pinOffset(selected) !== null ? [["Pin offset (crank throw)", `${fmt(pinOffset(selected))} mm`]] : []),
     ["Stand width", `${fmt(d.baseWidth)} mm`],
     ["Gap to next stand", layout[selected + 1] ? `${fmt(layout[selected + 1].x - b.x - params.standWidth)} mm` : "—"],
     ["Turns per turn of block 1", `${fmt(Math.abs(b.ratio), 3)} ${b.ratio < 0 ? "↺" : "↻"}`],
@@ -526,12 +581,11 @@ function rebuild(paramsChanged = false) {
   for (const o of blockObjs) scene.remove(o.group);
   blockObjs = [];
   layout = G.layoutTrain(chain, params);
-  trainMsgs = G.checkTrain(chain, params);
+  trainMsgs = G.checkTrain(chain, params, pins);
 
   let triCount = 0;
   layout.forEach((b, i) => {
-    const z = chain[i];
-    const m = blockMeshes(z);
+    const m = blockMeshes(i);
     const bad = blockHasErr(i);
     const group = new THREE.Group();
     group.position.x = b.x;
@@ -607,12 +661,15 @@ renderer.domElement.addEventListener("pointerup", (e) => {
 // ---------------------------------------------------------------------
 // Downloads
 // ---------------------------------------------------------------------
-function blockSTL(z) {
-  const m = blockMeshes(z);
+function blockSTL(i) {
+  const m = blockMeshes(i);
   const merged = G.mergeMeshes(m.frame, m.gear);
   return G.buildBinarySTL(merged.verts, merged.tris);
 }
-function fileName(z) { return `gear_block_m${params.module}_${z}T.stl`; }
+function fileName(i) {
+  const off = pinOffset(i);
+  return `gear_block_m${params.module}_${chain[i]}T${off === null ? "" : `_pin${fmt(off)}`}.stl`;
+}
 function saveBlob(blob, name) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -621,12 +678,16 @@ function saveBlob(blob, name) {
   URL.revokeObjectURL(url);
 }
 $("dl-one").addEventListener("click", () => {
-  const z = chain[selected];
-  saveBlob(new Blob([blockSTL(z)], { type: "model/stl" }), fileName(z));
+  saveBlob(new Blob([blockSTL(selected)], { type: "model/stl" }), fileName(selected));
 });
 $("dl-all").addEventListener("click", async () => {
   const zip = new window.JSZip();
-  for (const z of new Set(chain)) zip.file(fileName(z), blockSTL(z));
+  const done = new Set();   // identical blocks share one file
+  chain.forEach((_, i) => {
+    if (done.has(blockKey(i))) return;
+    done.add(blockKey(i));
+    zip.file(fileName(i), blockSTL(i));
+  });
   saveBlob(await zip.generateAsync({ type: "blob" }), `gear_blocks_m${params.module}.zip`);
 });
 
@@ -637,6 +698,7 @@ $("prev").addEventListener("click", () => select(selected - 1));
 $("next").addEventListener("click", () => select(selected + 1));
 $("add").addEventListener("click", () => {
   chain.splice(selected + 1, 0, chain[selected]);
+  pins.splice(selected + 1, 0, null);
   selected += 1;
   rebuild();
   select(selected);
@@ -644,6 +706,7 @@ $("add").addEventListener("click", () => {
 $("remove").addEventListener("click", () => {
   if (chain.length <= 1) return;
   chain.splice(selected, 1);
+  pins.splice(selected, 1);
   selected = Math.min(selected, chain.length - 1);
   rebuild();
   select(selected);
@@ -653,6 +716,23 @@ teethEl.addEventListener("input", () => {
   if (Number.isNaN(z) || z < 8 || z > 120) return;
   chain[selected] = z;
   scheduleRebuild(false);
+});
+pinEl.addEventListener("change", () => {
+  pins[selected] = pinEl.checked ? DEFAULT_PIN_OFFSET : null;
+  rebuild();
+});
+pinOffEl.addEventListener("input", () => {
+  const v = parseFloat(pinOffEl.value);
+  if (Number.isNaN(v) || pins[selected] === null) return;
+  pins[selected] = v;
+  scheduleRebuild(false);
+});
+// Once editing ends, show the value the pin actually got.
+pinOffEl.addEventListener("change", () => {
+  const eff = pinOffset(selected);
+  if (eff !== null && G.pinRange(chain[selected], params).ok) pins[selected] = eff;
+  renderPinFields();
+  saveState();
 });
 $("spin").addEventListener("click", () => {
   spinning = !spinning;
