@@ -283,12 +283,12 @@ import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/exampl
 const FIELDS = [
   { group: "Rail" },
   { id: "screw_length", set: "rail", label: "Rail Length (thread)", unit: "mm", min: 10, max: 600, step: 1, hint: "Sets the body length." },
+  { id: "thread_diameter", set: "rail", label: "Thread Diameter", unit: "mm", min: 6, max: 40, step: 0.5, hint: "Bigger threads grow the nut, knobs and spacing to fit." },
   { id: "thread_starts", set: "rail", label: "Thread Starts", unit: "", min: 1, max: 8, step: 1, hint: "More starts, fewer turns. Capped at a 20° lead angle." },
   { id: "module", set: "gear", label: "Gear Module", unit: "mm", min: 0.5, max: 6, step: 0.1, hint: "Tooth size, shared by every gear." },
   { id: "advanced", label: "Advanced", type: "checkbox", def: false },
 
   { group: "Screw & Nut", advanced: true },
-  { id: "thread_diameter", set: "rail", label: "Thread Diameter", unit: "mm", min: 6, max: 40, step: 0.5, advanced: true },
   { id: "thread_pitch", set: "rail", label: "Thread Pitch", unit: "mm", min: 0.8, max: 8, step: 0.1, advanced: true, hint: "Crest to crest along the screw." },
   { id: "nut_length", set: "rail", label: "Nut Length", unit: "mm", min: 4, max: 60, step: 0.5, advanced: true },
   { id: "nut_width", set: "rail", label: "Nut Width", unit: "mm", min: 8, max: 60, step: 0.5, advanced: true, hint: "Sets the carrier spacing." },
@@ -302,7 +302,7 @@ const FIELDS = [
   { id: "knob_diameter", set: "rail", label: "Knob Diameter", unit: "mm", min: 8, max: 80, step: 0.5, advanced: true, hint: "Limited by the carrier spacing." },
 
   { group: "Clearances", advanced: true },
-  { id: "thread_clearance", set: "rail", label: "Thread Clearance", unit: "mm", min: 0.05, max: 0.6, step: 0.05, advanced: true, hint: "Nut to screw, radial." },
+  { id: "thread_clearance", set: "rail", label: "Thread Clearance", unit: "mm", min: 0.05, max: 0.6, step: 0.05, advanced: true, hint: "Nut to screw, radial (0.3 = nut bore 0.6 over the thread)." },
   { id: "fit_clearance", set: "rail", label: "Fit Clearance", unit: "mm", min: 0.05, max: 0.6, step: 0.05, advanced: true, hint: "Nut to channel, sleeve to wall bore." },
   { id: "peg_clearance", set: "rail", label: "Peg Clearance", unit: "mm", min: 0, max: 0.4, step: 0.05, advanced: true, hint: "Square peg to the screw's socket, per side." },
   { id: "shaft_clearance", set: "rail", label: "Shaft Clearance", unit: "mm", min: 0.05, max: 0.6, step: 0.05, advanced: true, hint: "Mechanism hub to the shaft, radial." },
@@ -348,7 +348,7 @@ const DEFAULT_STATE = {
 // ---------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------
-const worker = new Worker("worker.js?v=2");
+const worker = new Worker("worker.js?v=3");
 let reqId = 0;
 const waiting = new Map();
 worker.onmessage = (e) => {
