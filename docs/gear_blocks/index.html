@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gear Blocks — print-in-place gear train builder</title>
-<meta name="description" content="Design a train of print-in-place captive gear blocks on separate stands that mesh, watch it spin, and download an STL per block.">
+<title>Shaft Rail — lead-screw rail with gears and Geneva drives</title>
+<meta name="description" content="Build a row of lead-screw carriers, drop spur gears and Geneva drives on the nut shafts, slide them into mesh with the knobs, watch it run, and download every part as STL.">
 <style>
   :root {
     --bg: #16181d;
@@ -157,61 +157,60 @@
   .home-bar { max-width: 860px; margin: 0 auto; padding: 1rem 1.5rem 0; }
   .home-bar a { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
   .home-bar a:hover { color: var(--accent); }
+  .field select {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem; font-size: 0.9rem;
+  }
+  .field input[type=range] { width: 100%; accent-color: var(--accent); }
+  .seg { display: flex; gap: 0.3rem; }
+  .seg .btn { flex: 1; }
+  #rail-fields { border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem 0.8rem 0.2rem; margin-bottom: 0.6rem; }
+  #rail-fields .title { font-size: 0.85rem; font-weight: 700; margin-bottom: 0.6rem; }
+  #loading {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 0.9rem; pointer-events: none; z-index: 1;
+  }
 </style>
 </head>
 <body>
 <div class="home-bar"><a href="/">← Lettvce</a></div>
 
 <header>
-  <h1>Gear Blocks</h1>
-  <p>Print-in-place captive gears, each on its own stand — set them in
-     a row and they mesh, any size next to any size. Build a train,
-     watch it turn, download a ready-to-print STL for each block.</p>
+  <h1>Shaft Rail</h1>
+  <p>A row of lead-screw carriers, each with its own knob. Drop spur gears
+     and Geneva drives onto the nut shafts, slide them into mesh, watch the
+     train run, and download every part ready to print.</p>
   <div class="badge">Free while this is in testing</div>
 </header>
 
 <div class="configurator">
   <div class="app">
     <div id="viewer">
+      <div id="loading">Loading the geometry engine…</div>
       <div id="view-tools">
         <button type="button" class="btn on" id="spin">Spin</button>
         <button type="button" class="btn" id="fit">Fit</button>
       </div>
     </div>
     <div id="panel">
-      <h2>Gear Train</h2>
-      <div class="sub">Click a gear (or a chip) to edit that block. Runs entirely in your browser.</div>
+      <h2>Rails</h2>
+      <div class="sub">Click a mechanism (or a chip) to edit that rail. Runs entirely in your browser.</div>
 
-      <div class="group-label">Blocks</div>
       <div id="chain"></div>
       <div class="btn-row">
-        <button type="button" class="btn" id="prev">◀ Prev</button>
-        <button type="button" class="btn" id="next">Next ▶</button>
+        <button type="button" class="btn" id="add">+ Add rail</button>
+        <button type="button" class="btn" id="remove">Remove last</button>
       </div>
-      <div class="field">
-        <label for="in-teeth">Teeth (selected block) <span class="unit-suffix">T</span></label>
-        <input type="number" id="in-teeth" min="8" max="120" step="1">
-      </div>
-      <div class="field checkbox-field">
-        <label class="checkbox-label"><span>Crank pin (selected block)</span><input type="checkbox" id="in-pin"></label>
-      </div>
-      <div class="field" id="field-pinoff">
-        <label for="in-pinoff">Pin Offset <span class="unit-suffix">mm</span></label>
-        <input type="number" id="in-pinoff" min="0" max="300" step="0.5">
-        <span class="hint" id="hint-pinoff"></span>
-      </div>
-      <div class="btn-row">
-        <button type="button" class="btn" id="add">+ Add after</button>
-        <button type="button" class="btn" id="remove">Remove</button>
-      </div>
+
+      <div id="rail-fields"></div>
       <div id="readouts"></div>
       <div id="checks"></div>
 
       <div id="fields"></div>
 
       <div id="status"></div>
-      <button class="dl" id="dl-one" disabled>Download selected block (STL)</button>
-      <button class="dl secondary" id="dl-all" disabled>Download all blocks (.zip)</button>
+      <button class="dl" id="dl-one" disabled>Download this rail's mechanism (STL)</button>
+      <button class="dl secondary" id="dl-all" disabled>Download every part (.zip)</button>
     </div>
   </div>
 </div>
@@ -219,30 +218,39 @@
 <main>
 
 <section>
-  <h2>How the spacing works</h2>
-  <p>Every block stands on the same size base (80 mm wide by default).
-     Two gears mesh when their axles are <code>r₁ + r₂ + 1 mm</code>
-     apart — their pitch radii plus a 1 mm meshing clearance — so the
-     gap between two stands is whatever's left: wide between big gears,
-     narrow between small ones. Two very small gears can't sit next to
-     each other at all, because their stands would overlap; the builder
-     flags that.</p>
+  <h2>How it fits together</h2>
+  <p>Every rail is a lead screw in its own channel. Its nut rides the
+     channel walls, and a short shaft stands on top of the nut. Turn a knob
+     and that nut, with whatever sits on its shaft, slides along the rail.</p>
   <ul>
-    <li>Every block in a set must share the same <strong>Module</strong>
-        (tooth size), <strong>Stand Height</strong> and <strong>Stand
-        Width</strong>, or they won't line up and mesh. These live under
-        Advanced; at the defaults, gears up to 58 teeth fit.</li>
-    <li>Below 17 teeth a 20° gear starts to undercut; it still turns,
-        just with weaker tooth roots.</li>
-    <li>The gear is captive: the axle necks down through the gear and
-        steps back out to a wider shoulder on both sides, with 0.3 mm
-        print-in-place clearance. Print it with supports under the gear.</li>
-    <li>Any block can have a <strong>crank pin</strong> standing on its
-        gear face, to drive a Geneva wheel or a yoke. The offset is the
-        crank throw; it stays between the axle shoulder and the tooth
-        roots, so a pin can never hit its neighbors.</li>
-    <li>The tooth profile is the same involute bmech's spur gear
-        generator makes in Blender.</li>
+    <li><strong>Mechanisms drop over the shafts.</strong> Each has a capped
+        hub that runs on the shaft with a 0.2 mm clearance. The cap rests on
+        the shaft tip and the hub floats just above the collar, so it spins
+        freely. There's no separate stop cap to lose.</li>
+    <li><strong>Meshing across rails.</strong> Neighbouring shafts are one
+        carrier spacing apart. Two gears mesh when their centres are
+        <code>m (z₁ + z₂) / 2 + backlash</code> apart, so the builder slides
+        the second nut along until that distance works out on the diagonal.
+        Gears too small to span the spacing can't reach the next rail. The
+        builder says so, and also flags anything that would hit a
+        neighbour's shaft, gear or knob.</li>
+    <li><strong>Geneva drives.</strong> A driver on one rail indexes a wheel
+        on another, at the driver's centre distance. Turn on
+        <em>Gear teeth</em> and the driver's plate becomes a spur gear
+        (same module as the rest), so a gear on a third rail can drive it.</li>
+    <li><strong>Multi-start screws.</strong> With 4 starts, the nut moves
+        4 pitches per turn, so 100 mm of travel takes about 14 turns instead
+        of 57. More starts make the screw easier to back-drive: a hard push
+        on a mechanism can turn the knob.</li>
+    <li><strong>Printing.</strong> Each STL comes out in assembly position.
+        Print gears and Geneva drivers flat side down. A Geneva wheel sits
+        partway up its hub (to clear its driver's plate), so it needs a
+        little support under the wheel. The tooth profile is the same
+        involute bmech's spur gear generator makes in Blender.</li>
+    <li><strong>Small parts.</strong> The smallest loose pieces are gone:
+        no stop cap, and the endstop is as wide as the knob. Nuts, knobs and
+        small gears can still fit a small-parts test cylinder, so this is for
+        ages 3 and up.</li>
   </ul>
 </section>
 
@@ -263,71 +271,109 @@
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
-// Bump ?v= whenever gear_blocks.js changes: GitHub Pages lets browsers
-// cache it for 10 min, and a stale module under a new page breaks fields.
-import * as G from "./gear_blocks.js?v=5";
 
 // ---------------------------------------------------------------------
-// Train-wide fields. Every block shares these; only tooth count and the
-// optional crank pin are per block. Defaults live in gear_blocks.js's
-// DEFAULTS.
+// Fields. Rail-wide ones go to shaft_rail.DEFAULTS (key "rail") or the
+// gear set (key "gear"); per-rail ones belong to the selected mechanism.
+// Basic shows rail length, thread starts and module; the rest is Advanced.
 // ---------------------------------------------------------------------
-// Basic mode shows only Stand Depth (plus per-block teeth above);
-// everything flagged `advanced` - group labels included - appears once
-// Advanced is checked. Hidden fields keep whatever value they hold.
 const FIELDS = [
-  { group: "Stand" },
-  { id: "depth", label: "Stand Depth", unit: "mm", min: 20, max: 200, step: 1, hint: "Front-to-back, along the axle." },
+  { group: "Rail" },
+  { id: "screw_length", set: "rail", label: "Rail Length (thread)", unit: "mm", min: 10, max: 600, step: 1, hint: "Sets the body length." },
+  { id: "thread_starts", set: "rail", label: "Thread Starts", unit: "", min: 1, max: 8, step: 1, hint: "More starts, fewer turns. Capped at a 20° lead angle." },
+  { id: "module", set: "gear", label: "Gear Module", unit: "mm", min: 0.5, max: 6, step: 0.1, hint: "Tooth size, shared by every gear." },
   { id: "advanced", label: "Advanced", type: "checkbox", def: false },
 
-  { group: "Gear Set", advanced: true },
-  { id: "module", label: "Module", unit: "mm", min: 1, max: 8, step: 0.1, advanced: true, hint: "Tooth size. Every block must match." },
-  { id: "face", label: "Gear Thickness", unit: "mm", min: 4, max: 60, step: 0.5, advanced: true },
-  { id: "pressureAngle", label: "Pressure Angle", unit: "°", min: 14.5, max: 25, step: 0.5, advanced: true },
+  { group: "Screw & Nut", advanced: true },
+  { id: "thread_diameter", set: "rail", label: "Thread Diameter", unit: "mm", min: 6, max: 40, step: 0.5, advanced: true },
+  { id: "thread_pitch", set: "rail", label: "Thread Pitch", unit: "mm", min: 0.8, max: 8, step: 0.1, advanced: true, hint: "Crest to crest along the screw." },
+  { id: "nut_length", set: "rail", label: "Nut Length", unit: "mm", min: 4, max: 60, step: 0.5, advanced: true },
+  { id: "nut_width", set: "rail", label: "Nut Width", unit: "mm", min: 8, max: 60, step: 0.5, advanced: true, hint: "Sets the carrier spacing." },
+  { id: "nut_height", set: "rail", label: "Nut Height", unit: "mm", min: 8, max: 60, step: 0.5, advanced: true },
+  { id: "shaft_diameter", set: "rail", label: "Shaft Diameter", unit: "mm", min: 3, max: 40, step: 0.5, advanced: true },
+  { id: "shaft_length", set: "rail", label: "Shaft Length", unit: "mm", min: 4, max: 100, step: 0.5, advanced: true, hint: "Sets how tall a mechanism can be." },
 
-  { group: "Stand Shape", advanced: true },
-  { id: "standWidth", label: "Stand Width", unit: "mm", min: 30, max: 300, step: 1, advanced: true, hint: "Same for every block. Every block must match." },
-  { id: "height", label: "Stand Height", unit: "mm", min: 30, max: 400, step: 1, advanced: true, hint: "Axle to back wall. Every block must match." },
-  { id: "plate", label: "Plate Thickness", unit: "mm", min: 1.2, max: 10, step: 0.1, advanced: true },
-  { id: "wall", label: "Back Wall Thickness", unit: "mm", min: 1.2, max: 10, step: 0.1, advanced: true },
-  { id: "capR", label: "Boss Radius", unit: "mm", min: 5, max: 60, step: 0.5, advanced: true },
-  { id: "wedgeDeg", label: "Wedge Angle", unit: "°", min: 0, max: 90, step: 1, advanced: true },
-  { id: "lip", label: "Plate Lip", unit: "mm", min: 0.5, max: 20, step: 0.5, advanced: true },
+  { group: "Body", advanced: true },
+  { id: "wall_thickness", set: "rail", label: "Wall Thickness", unit: "mm", min: 2.4, max: 10, step: 0.1, advanced: true },
+  { id: "floor_slot", set: "rail", label: "Floor Slot", unit: "mm", min: 0, max: 40, step: 0.1, advanced: true, hint: "0 for none." },
+  { id: "knob_diameter", set: "rail", label: "Knob Diameter", unit: "mm", min: 8, max: 80, step: 0.5, advanced: true, hint: "Limited by the carrier spacing." },
 
-  { group: "Axle & Clearances", advanced: true },
-  { id: "neckD", label: "Axle Neck Diameter", unit: "mm", min: 4, max: 80, step: 0.5, advanced: true },
-  { id: "boreClear", label: "Bore Clearance", unit: "mm", min: 0.1, max: 1, step: 0.05, advanced: true, hint: "Radial gap, gear bore to axle." },
-  { id: "shoulderStep", label: "Shoulder Step", unit: "mm", min: 0.4, max: 5, step: 0.1, advanced: true, hint: "How far the shoulder stands proud of the neck." },
-  { id: "shoulderGap", label: "Shoulder Gap", unit: "mm", min: 0, max: 3, step: 0.05, advanced: true, hint: "Axial gap, gear face to shoulder chamfer." },
-  { id: "meshClear", label: "Mesh Clearance", unit: "mm", min: 0, max: 3, step: 0.05, advanced: true, hint: "Added to every center distance." },
-
-  { group: "Crank Pin", advanced: true },
-  { id: "pinR", label: "Pin Radius", unit: "mm", min: 2, max: 20, step: 0.5, advanced: true, hint: "Same for every pin gear." },
-  { id: "pinH", label: "Pin Height", unit: "mm", min: 3, max: 60, step: 0.5, advanced: true, hint: "Above the gear face." },
-  { id: "pinRound", label: "Pin Round-over", unit: "mm", min: 0, max: 10, step: 0.25, advanced: true },
+  { group: "Clearances", advanced: true },
+  { id: "thread_clearance", set: "rail", label: "Thread Clearance", unit: "mm", min: 0.05, max: 0.6, step: 0.05, advanced: true, hint: "Nut to screw, radial." },
+  { id: "fit_clearance", set: "rail", label: "Fit Clearance", unit: "mm", min: 0.05, max: 0.6, step: 0.05, advanced: true, hint: "Nut to channel, sleeve to wall bore." },
+  { id: "peg_clearance", set: "rail", label: "Peg Clearance", unit: "mm", min: 0, max: 0.4, step: 0.05, advanced: true, hint: "Square peg to the screw's socket, per side." },
+  { id: "shaft_clearance", set: "rail", label: "Shaft Clearance", unit: "mm", min: 0.05, max: 0.6, step: 0.05, advanced: true, hint: "Mechanism hub to the shaft, radial." },
+  { id: "backlash", set: "gear", label: "Gear Backlash", unit: "mm", min: 0, max: 1, step: 0.05, advanced: true, hint: "Added to every gear centre distance." },
+  { id: "pressure_angle", set: "gear", label: "Pressure Angle", unit: "°", min: 10, max: 30, step: 0.5, advanced: true },
+  { id: "segments", set: "rail", label: "Segments", unit: "", min: 24, max: 128, step: 4, advanced: true, hint: "Per full circle." },
 ];
 
-const DEFAULT_CHAIN = [40, 20, 30, 50, 25];
-// Per-block crank pin: offset from the axle in mm, or null for none.
-const DEFAULT_PINS = [35, null, null, null, null];
-const DEFAULT_PIN_OFFSET = 35;
-const STORE_KEY = "gear_blocks_v1";
+const MECH_FIELDS = {
+  spur: [
+    { id: "teeth", label: "Teeth", unit: "T", min: 8, max: 200, step: 1 },
+    { id: "thickness", label: "Gear Thickness", unit: "mm", min: 0.6, max: 60, step: 0.5 },
+  ],
+  geneva_driver: [
+    { id: "slots", label: "Wheel Slots", unit: "", min: 3, max: 24, step: 1 },
+    { id: "center_distance", label: "Centre Distance", unit: "mm", min: 10, max: 200, step: 0.5, hint: "Driver to wheel; at least the rail spacing to reach the next rail." },
+    { id: "pin_diameter", label: "Pin Diameter", unit: "mm", min: 0.5, max: 20, step: 0.5 },
+    { id: "toothed", label: "Gear teeth on the plate", type: "checkbox" },
+    { id: "gear_teeth", label: "Plate Teeth", unit: "T", min: 8, max: 200, step: 1, onlyIf: "toothed" },
+    { id: "plate_thickness", label: "Plate Thickness", unit: "mm", min: 0.6, max: 20, step: 0.1 },
+    { id: "wheel_thickness", label: "Wheel Thickness", unit: "mm", min: 0.6, max: 20, step: 0.1 },
+    { id: "layer_gap", label: "Plate Gap", unit: "mm", min: 0, max: 5, step: 0.1, hint: "Under the wheel." },
+    { id: "clearance", label: "Geneva Clearance", unit: "mm", min: 0, max: 1, step: 0.05, hint: "Slot width, locking arcs, relief." },
+  ],
+  geneva_wheel: [],
+  none: [],
+};
+const MECH_LABEL = { none: "Nothing", spur: "Spur gear", geneva_driver: "Geneva driver", geneva_wheel: "Geneva wheel" };
+const MECH_SHORT = { none: "—", spur: "gear", geneva_driver: "driver", geneva_wheel: "wheel" };
+
+const STORE_KEY = "shaft_rail_v1";
+const DEFAULT_STATE = {
+  rail: {}, gear: {},
+  rails: [
+    { mech: "spur", teeth: 16, pos: 0.15 },
+    { mech: "geneva_driver", toothed: true, link: { rail: 0, side: 1 } },
+    { mech: "geneva_wheel", link: { rail: 1, side: 1 } },
+  ],
+  input: 0,
+};
 
 // ---------------------------------------------------------------------
-// Three.js scene setup (from vacuum_attachments). Display uses the
-// generator's own frame directly: Y up (back wall on the table), Z = axle.
+// Worker
+// ---------------------------------------------------------------------
+const worker = new Worker("worker.js?v=1");
+let reqId = 0;
+const waiting = new Map();
+worker.onmessage = (e) => {
+  const w = waiting.get(e.data.id);
+  if (!w) return;
+  waiting.delete(e.data.id);
+  e.data.error ? w.reject(new Error(e.data.error)) : w.resolve(e.data);
+};
+function call(cmd, spec) {
+  return new Promise((resolve, reject) => {
+    const id = ++reqId;
+    waiting.set(id, { resolve, reject });
+    worker.postMessage({ id, cmd, spec });
+  });
+}
+
+// ---------------------------------------------------------------------
+// Scene. The geometry's frame is Z up (X along the screws, Y across the
+// rails); `world` turns it to three.js's Y up.
 // ---------------------------------------------------------------------
 const viewerEl = document.getElementById("viewer");
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x101215);
-
 const camera = new THREE.PerspectiveCamera(40, 1, 1, 10000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 viewerEl.appendChild(renderer.domElement);
-
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
@@ -336,115 +382,239 @@ const key = new THREE.DirectionalLight(0xffffff, 1.1);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
 key.shadow.bias = -0.0005;
-scene.add(key);
-scene.add(key.target);
+scene.add(key, key.target);
 const fill = new THREE.DirectionalLight(0xffffff, 0.35);
 fill.position.set(-150, 60, -100);
 scene.add(fill);
-
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(1, 1),
-  new THREE.MeshStandardMaterial({ color: 0x1a1d23, roughness: 0.95 }),
-);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshStandardMaterial({ color: 0x1a1d23, roughness: 0.95 }));
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
+const world = new THREE.Group();
+world.rotation.x = -Math.PI / 2;
+scene.add(world);
 
-const frameMat = new THREE.MeshStandardMaterial({ color: 0x7c93a6, roughness: 0.6, metalness: 0.05, flatShading: true });
-const gearMat = new THREE.MeshStandardMaterial({ color: 0x62b586, roughness: 0.55, metalness: 0.05, flatShading: true });
-const gearSelMat = new THREE.MeshStandardMaterial({ color: 0xffb35c, roughness: 0.55, metalness: 0.05, flatShading: true });
-const errMat = new THREE.MeshStandardMaterial({ color: 0xc86a6a, roughness: 0.6, flatShading: true });
+const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.05, flatShading: true, ...extra });
+const MATS = {
+  body: mat(0x7c93a6), screw: mat(0xb8bcc4, { metalness: 0.3, roughness: 0.45 }), knob: mat(0xd99a5b),
+  nut: mat(0x5c7fb0), mech: mat(0x62b586), sel: mat(0xffb35c), err: mat(0xc86a6a),
+};
 
 function resize() {
   const w = viewerEl.clientWidth, h = viewerEl.clientHeight;
-  if (w === 0 || h === 0) return;
+  if (!w || !h) return;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);
 }
 window.addEventListener("resize", resize);
 
-function toGeometry({ verts, tris }) {
-  const pos = new Float32Array(verts.length * 3);
-  verts.forEach(([x, y, z], i) => { pos[3 * i] = x; pos[3 * i + 1] = y; pos[3 * i + 2] = z; });
-  const idx = new Uint32Array(tris.length * 3);
-  tris.forEach(([a, b, c], i) => { idx[3 * i] = a; idx[3 * i + 1] = b; idx[3 * i + 2] = c; });
+function geometry(m) {
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  geo.setAttribute("position", new THREE.BufferAttribute(m.pos, 3));
+  geo.setIndex(new THREE.BufferAttribute(m.idx, 1));
   geo.computeVertexNormals();
   return geo;
+}
+function meshOf(geo, material, rail) {
+  const o = new THREE.Mesh(geo, material);
+  o.castShadow = o.receiveShadow = true;
+  if (rail !== undefined) o.userData.rail = rail;
+  return o;
 }
 
 // ---------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------
-const params = { ...G.DEFAULTS };
-let chain = DEFAULT_CHAIN.slice();
-let pins = DEFAULT_PINS.slice();   // parallel to chain
+let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
 let selected = 0;
-let spinning = true;
-let spinAngle = 0;
-let layout = [];
-let blockObjs = [];          // { group, gearPivot }
-let geoCache = new Map();    // blockKey -> { frame, gear, frameGeo, gearGeo }
+let info = null;          // last layout from Python
+let meshes = {};          // name -> {pos, idx, tris}
+let geos = {};            // name -> BufferGeometry
+let objs = [];            // per rail: {handle, nut, pivot, mechMesh}
+let bodyObj = null;
+let spinning = true, theta = 0;
+let defaults = null;
 
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
-    if (!s) return;
-    if (Array.isArray(s.chain) && s.chain.length) {
-      chain = s.chain.map((z) => Math.round(z));
-      pins = chain.map((_, i) => (Array.isArray(s.pins) && typeof s.pins[i] === "number" ? s.pins[i] : null));
-    }
-    if (s.params) for (const k of Object.keys(G.DEFAULTS)) if (typeof s.params[k] === "number") params[k] = s.params[k];
-  } catch (e) { /* storage unavailable: defaults */ }
+    if (s && Array.isArray(s.rails) && s.rails.length) state = s;
+  } catch (e) { /* defaults */ }
 }
-function saveState() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ chain, pins, params })); } catch (e) { /* ignore */ }
-}
+function saveState() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } }
 
-// The offset a block's pin actually gets (its stored offset is what was
-// typed; the geometry clamps it into that gear's range), or null.
-function pinOffset(i) {
-  if (pins[i] === null) return null;
-  return G.pinRange(chain[i], params).ok ? G.clampPinOffset(chain[i], params, pins[i]) : pins[i];
+function spec() {
+  return { rail: { ...state.rail, count: state.rails.length }, gear: state.gear, rails: state.rails, input: state.input };
 }
-function blockKey(i) {
-  const off = pinOffset(i);
-  return off === null ? `${chain[i]}` : `${chain[i]}|${off.toFixed(2)}`;
-}
-
-function blockMeshes(i) {
-  const key = blockKey(i);
-  if (!geoCache.has(key)) {
-    const frame = G.buildFrame(chain[i], params);
-    const gear = G.buildGear(chain[i], params, pinOffset(i));
-    geoCache.set(key, { frame, gear, frameGeo: toGeometry(frame), gearGeo: toGeometry(gear) });
-  }
-  return geoCache.get(key);
-}
-function clearCache() {
-  for (const c of geoCache.values()) { c.frameGeo.dispose(); c.gearGeo.dispose(); }
-  geoCache = new Map();
-}
-
-// ---------------------------------------------------------------------
-// UI
-// ---------------------------------------------------------------------
+const fmt = (x, d = 1) => Number(x).toFixed(d);
 const $ = (id) => document.getElementById(id);
-const fieldsEl = $("fields"), chainEl = $("chain"), teethEl = $("in-teeth");
-const pinEl = $("in-pin"), pinOffEl = $("in-pinoff"), pinHintEl = $("hint-pinoff");
-const readoutsEl = $("readouts"), checksEl = $("checks"), statusEl = $("status");
+const valueOf = (f) => {
+  const src = f.set === "gear" ? state.gear : state.rail;
+  if (src[f.id] !== undefined) return src[f.id];
+  if (!defaults) return "";
+  return (f.set === "gear" ? defaults.gear : defaults.rail)[f.id];
+};
 
+// ---------------------------------------------------------------------
+// Build + render
+// ---------------------------------------------------------------------
+let building = false, again = false;
+async function rebuild() {
+  if (building) { again = true; return; }
+  building = true;
+  $("status").textContent = "Building…";
+  try {
+    const r = await call("build", spec());
+    info = r.info;
+    defaults = info.defaults;
+    meshes = r.meshes;
+    renderScene();
+    $("status").textContent = `Built in ${fmt(r.ms, 0)} ms — ${Object.values(meshes).reduce((a, m) => a + m.tris, 0).toLocaleString()} triangles.`;
+    $("loading").style.display = "none";
+  } catch (e) {
+    $("status").textContent = "Build failed: " + e.message;
+  }
+  building = false;
+  saveState();
+  renderPanel();
+  if (again) { again = false; rebuild(); }
+}
+let pend = null;
+function scheduleRebuild() { clearTimeout(pend); pend = setTimeout(rebuild, 150); }
+
+let framed = false;
+function renderScene() {
+  for (const g of Object.values(geos)) g.dispose();
+  geos = {};
+  for (const [name, m] of Object.entries(meshes)) geos[name] = geometry(m);
+  world.clear();
+  objs = [];
+  bodyObj = meshOf(geos.body, MATS.body);
+  world.add(bodyObj);
+  for (const r of info.rails) {
+    const handle = new THREE.Group();
+    handle.position.set(0, r.y, 0);
+    handle.add(meshOf(geos.handle, MATS.knob, r.index), meshOf(geos.screw, MATS.screw, r.index),
+               meshOf(geos.endstop, MATS.knob, r.index));
+    const nut = new THREE.Group();
+    nut.add(meshOf(geos.nut, MATS.nut, r.index));
+    const pivot = new THREE.Group();
+    nut.add(pivot);
+    let mechMesh = null;
+    if (r.mesh && geos[r.mesh]) {
+      mechMesh = meshOf(geos[r.mesh], MATS.mech, r.index);
+      pivot.add(mechMesh);
+    }
+    world.add(handle, nut);
+    objs.push({ handle, nut, pivot, mechMesh });
+  }
+  const span = Math.max(info.rail.body_length, info.rail.body_width) * 3;
+  ground.position.set(0, -info.rail.body_height + info.rail.z_top - 0.05, 0);
+  ground.scale.set(span, span, 1);
+  place();
+  colorRails();
+  if (!framed) { fitView(); framed = true; }
+}
+
+// nut x of every rail from the sliders: roots from their own position, linked rails by offset
+function nutXs() {
+  const R = info.rail, xs = [];
+  const at = (i, depth = 0) => {
+    if (xs[i] !== undefined) return xs[i];
+    const r = info.rails[i];
+    if (r.parent !== null && r.parent !== undefined && depth < 32) return (xs[i] = at(r.parent, depth + 1) + r.offset);
+    const p = Math.min(1, Math.max(0, state.rails[i].pos ?? 0.5));
+    return (xs[i] = R.x_min + p * R.travel);
+  };
+  info.rails.forEach((_, i) => at(i));
+  return xs;
+}
+
+function wheelAngle(p, t) {
+  const k = Math.floor((t + Math.PI) / (2 * Math.PI));
+  const w = t - 2 * Math.PI * k;
+  const phi = Math.abs(w) < p.alpha ? Math.atan2(p.a * Math.sin(w), p.C - p.a * Math.cos(w)) : (w > 0 ? p.beta : -p.beta);
+  return Math.PI - 2 * p.beta * k - phi;
+}
+function mechAngles() {
+  const out = [];
+  const at = (i, depth = 0) => {
+    if (out[i] !== undefined) return out[i];
+    const p = info.rails[i].prog;
+    let a = 0;
+    if (p.kind === "input") a = theta;
+    else if (p.kind === "gear" && depth < 32) a = p.phase - p.ratio * at(p.parent, depth + 1);
+    else if (p.kind === "geneva" && depth < 32) a = p.phi + wheelAngle(p, at(p.parent, depth + 1) - p.phi);
+    return (out[i] = a);
+  };
+  info.rails.forEach((_, i) => at(i));
+  return out;
+}
+
+function place() {
+  if (!info) return;
+  const xs = nutXs(), R = info.rail;
+  objs.forEach((o, i) => {
+    o.nut.position.set(xs[i], info.rails[i].y, 0);
+    o.handle.rotation.x = -2 * Math.PI * (xs[i] - R.x_ref) / R.lead;
+  });
+  turn();
+}
+function turn() {
+  const an = mechAngles();
+  objs.forEach((o, i) => { o.pivot.rotation.z = an[i]; });
+}
+
+function railsWithIssues() {
+  const bad = new Set();
+  for (const s of info ? info.issues : []) for (const m of s.matchAll(/Rails? (\d+)(?: and (\d+))?/g)) {
+    bad.add(+m[1] - 1);
+    if (m[2]) bad.add(+m[2] - 1);
+  }
+  return bad;
+}
+function colorRails() {
+  const bad = railsWithIssues();
+  objs.forEach((o, i) => {
+    if (o.mechMesh) o.mechMesh.material = bad.has(i) ? MATS.err : i === selected ? MATS.sel : MATS.mech;
+    o.nut.children[0].material = i === selected ? MATS.sel : MATS.nut;
+  });
+}
+
+function fitView() {
+  const box = new THREE.Box3().expandByObject(world);
+  const { center, radius } = box.getBoundingSphere(new THREE.Sphere());
+  const dist = (radius / Math.sin((camera.fov * Math.PI) / 360)) * 1.05;
+  const dir = new THREE.Vector3(0.45, 0.8, 0.9).normalize();
+  camera.position.copy(center).addScaledVector(dir, dist);
+  controls.target.copy(center);
+  camera.near = Math.max(dist * 0.01, 0.5);
+  camera.far = dist * 20;
+  camera.updateProjectionMatrix();
+  controls.update();
+  key.position.set(center.x + radius * 0.6, center.y + radius * 2.2, center.z + radius * 1.4);
+  key.target.position.copy(center);
+  key.target.updateMatrixWorld();
+  const sc = key.shadow.camera;
+  sc.left = -radius * 1.4; sc.right = radius * 1.4; sc.top = radius * 1.4; sc.bottom = -radius * 1.4;
+  sc.near = radius * 0.1; sc.far = radius * 6;
+  sc.updateProjectionMatrix();
+}
+
+// ---------------------------------------------------------------------
+// Panel
+// ---------------------------------------------------------------------
 function buildFieldsOnce() {
+  const el = $("fields");
   for (const f of FIELDS) {
     if (f.group) {
       const g = document.createElement("div");
       g.className = "group-label";
       g.textContent = f.group;
       if (f.advanced) g.dataset.advanced = "1";
-      fieldsEl.appendChild(g);
+      el.appendChild(g);
       continue;
     }
     const field = document.createElement("div");
@@ -452,199 +622,207 @@ function buildFieldsOnce() {
     if (f.type === "checkbox") {
       field.className = "field checkbox-field";
       field.innerHTML = `<label class="checkbox-label"><span>${f.label}</span><input type="checkbox" id="in-${f.id}"></label>`;
-      fieldsEl.appendChild(field);
+      el.appendChild(field);
       $("in-" + f.id).addEventListener("change", updateFieldVisibility);
       continue;
     }
     field.className = "field";
-    field.innerHTML =
-      `<label for="in-${f.id}">${f.label} <span class="unit-suffix">${f.unit}</span></label>` +
-      `<input type="number" id="in-${f.id}" min="${f.min}" max="${f.max}" step="${f.step}" value="${params[f.id]}">` +
+    field.innerHTML = `<label for="in-${f.id}">${f.label} <span class="unit-suffix">${f.unit}</span></label>` +
+      `<input type="number" id="in-${f.id}" min="${f.min}" max="${f.max}" step="${f.step}">` +
       (f.hint ? `<span class="hint">${f.hint}</span>` : "");
-    fieldsEl.appendChild(field);
+    el.appendChild(field);
     $("in-" + f.id).addEventListener("input", (e) => {
       const v = parseFloat(e.target.value);
       if (Number.isNaN(v) || v < f.min || v > f.max) return;
-      params[f.id] = v;
-      scheduleRebuild(true);
+      (f.set === "gear" ? state.gear : state.rail)[f.id] = v;
+      scheduleRebuild();
     });
   }
   updateFieldVisibility();
 }
-
 function updateFieldVisibility() {
   const adv = $("in-advanced").checked;
   for (const f of FIELDS) if (f.advanced && f.id) $("field-" + f.id).style.display = adv ? "" : "none";
-  fieldsEl.querySelectorAll(".group-label[data-advanced]").forEach((g) => { g.style.display = adv ? "" : "none"; });
+  $("fields").querySelectorAll(".group-label[data-advanced]").forEach((g) => { g.style.display = adv ? "" : "none"; });
+}
+function syncFields() {
+  for (const f of FIELDS) {
+    if (!f.id || f.type) continue;
+    const el = $("in-" + f.id);
+    if (document.activeElement !== el) el.value = valueOf(f);
+  }
 }
 
-// One pass of checks for the whole train (per-block + neighbor overlap),
-// refreshed on every rebuild and shared by chips, readouts and downloads.
-let trainMsgs = [];
-const blockHasErr = (i) => trainMsgs[i].some((m) => m.level === "err");
-
-function renderChain() {
-  chainEl.innerHTML = "";
-  chain.forEach((z, i) => {
-    const msgs = trainMsgs[i];
+function renderChips() {
+  const el = $("chain");
+  el.innerHTML = "";
+  const bad = info ? railsWithIssues() : new Set();
+  state.rails.forEach((r, i) => {
     const chip = document.createElement("button");
     chip.type = "button";
-    chip.className = "chip" + (i === selected ? " sel" : "")
-      + (blockHasErr(i) ? " err" : msgs.length ? " warn" : "");
-    chip.textContent = `${i + 1}: ${z}T` + (pins[i] !== null ? " + pin" : "");
+    chip.className = "chip" + (i === selected ? " sel" : "") + (bad.has(i) ? " err" : "");
+    const ri = info && info.rails[i];
+    const tag = r.mech === "spur" && ri && ri.teeth ? `${ri.teeth}T` : MECH_SHORT[r.mech || "none"];
+    chip.textContent = `${i + 1}: ${tag}${state.input === i ? " ⟳" : ""}`;
     chip.addEventListener("click", () => select(i));
-    chainEl.appendChild(chip);
+    el.appendChild(chip);
   });
-  if (document.activeElement !== teethEl) teethEl.value = chain[selected];
-  renderPinFields();
-  $("prev").disabled = selected === 0;
-  $("next").disabled = selected === chain.length - 1;
-  $("remove").disabled = chain.length <= 1;
+  $("remove").disabled = state.rails.length <= 1;
 }
 
-function fmt(x, d = 1) { return Number(x).toFixed(d); }
-
-// Out-of-range offsets are clamped, never rejected: the hint says what
-// the pin actually got and the allowed range for this gear.
-function renderPinFields() {
-  const has = pins[selected] !== null;
-  pinEl.checked = has;
-  $("field-pinoff").style.display = has ? "" : "none";
-  if (!has) return;
-  const r = G.pinRange(chain[selected], params);
-  if (document.activeElement !== pinOffEl) pinOffEl.value = pins[selected];
-  if (!r.ok) { pinHintEl.textContent = "No room for a pin on this gear."; return; }
-  const eff = pinOffset(selected);
-  pinHintEl.textContent = `Range ${fmt(r.lo)}–${fmt(r.hi)} mm` +
-    (Math.abs(eff - pins[selected]) > 1e-9 ? ` · clamped to ${fmt(eff)}` : "");
-}
-
-function renderInfo() {
-  const b = layout[selected];
-  const d = b.d;
-  const last = layout[layout.length - 1];
-  const rows = [
-    ["Pitch diameter", `${fmt(2 * d.rp)} mm`],
-    ["Tip diameter", `${fmt(2 * d.rTip)} mm`],
-    ...(pinOffset(selected) !== null ? [["Pin offset (crank throw)", `${fmt(pinOffset(selected))} mm`]] : []),
-    ["Stand width", `${fmt(d.baseWidth)} mm`],
-    ["Gap to next stand", layout[selected + 1] ? `${fmt(layout[selected + 1].x - b.x - params.standWidth)} mm` : "—"],
-    ["Turns per turn of block 1", `${fmt(Math.abs(b.ratio), 3)} ${b.ratio < 0 ? "↺" : "↻"}`],
-    ["Whole train (last ÷ first)", `${fmt(Math.abs(last.ratio), 3)}×`],
-    ["Train length", `${fmt(last.x + last.d.baseWidth / 2 + layout[0].d.baseWidth / 2)} mm`],
-  ];
-  readoutsEl.innerHTML = rows.map(([k, v]) => `<div class="readout"><span>${k}</span><span class="val">${v}</span></div>`).join("");
-
-  // A neighbor-overlap message is attached to both blocks; list it once.
-  const seen = new Set(), lines = [];
-  trainMsgs.forEach((msgs, i) => {
-    for (const m of msgs) {
-      const text = m.text.startsWith("Stands ") ? m.text : `Block ${i + 1}: ${m.text}`;
-      if (seen.has(text)) continue;
-      seen.add(text);
-      lines.push(`<div class="${m.level}">${text}</div>`);
+function renderRailFields() {
+  const el = $("rail-fields");
+  const r = state.rails[selected];
+  const kind = r.mech || "none";
+  const ri = info && info.rails[selected];
+  const mdef = (defaults && defaults.mech[kind]) || {};
+  const others = state.rails.map((_, j) => j).filter((j) => j !== selected);
+  let h = `<div class="title">Rail ${selected + 1}</div>`;
+  h += `<div class="field"><label for="rf-mech">Mechanism</label><select id="rf-mech">` +
+    Object.keys(MECH_LABEL).map((k) => `<option value="${k}"${k === kind ? " selected" : ""}>${MECH_LABEL[k]}</option>`).join("") +
+    `</select></div>`;
+  for (const f of MECH_FIELDS[kind]) {
+    if (f.onlyIf && !(r[f.onlyIf] ?? mdef[f.onlyIf])) continue;
+    const v = r[f.id] ?? mdef[f.id];
+    if (f.type === "checkbox") {
+      h += `<div class="field checkbox-field"><label class="checkbox-label"><span>${f.label}</span>` +
+        `<input type="checkbox" id="rf-${f.id}"${v ? " checked" : ""}></label></div>`;
+    } else {
+      h += `<div class="field"><label for="rf-${f.id}">${f.label} <span class="unit-suffix">${f.unit}</span></label>` +
+        `<input type="number" id="rf-${f.id}" min="${f.min}" max="${f.max}" step="${f.step}" value="${v ?? ""}">` +
+        (f.hint ? `<span class="hint">${f.hint}</span>` : "") + `</div>`;
     }
-  });
-  checksEl.innerHTML = lines.length ? lines.join("") : `<div class="ok">All blocks OK.</div>`;
-
-  $("dl-one").disabled = blockHasErr(selected);
-  $("dl-all").disabled = chain.some((_, i) => blockHasErr(i)) || !window.JSZip;
-}
-
-function select(i, pan = true) {
-  selected = Math.max(0, Math.min(chain.length - 1, i));
-  blockObjs.forEach((o, k) => {
-    o.gearMesh.material = k === selected ? gearSelMat : gearMat;
-  });
-  if (pan && layout[selected]) {
-    const dx = layout[selected].x - controls.target.x;
-    controls.target.x += dx;
-    camera.position.x += dx;
   }
-  renderChain();
-  renderInfo();
-}
+  if (kind !== "none") {
+    const L = r.link;
+    h += `<div class="field"><label for="rf-link">${kind === "geneva_wheel" ? "Driven by" : "Meshes with"}</label><select id="rf-link">` +
+      `<option value="">— nothing (own knob)</option>` +
+      others.map((j) => `<option value="${j}"${L && L.rail === j ? " selected" : ""}>Rail ${j + 1} (${MECH_LABEL[state.rails[j].mech || "none"].toLowerCase()})</option>`).join("") +
+      `</select>`;
+    if (L) {
+      h += `<div class="seg" style="margin-top:0.4rem"><button type="button" class="btn${L.side >= 0 ? " on" : ""}" id="rf-side-p">Endstop side</button>` +
+        `<button type="button" class="btn${L.side < 0 ? " on" : ""}" id="rf-side-n">Knob side</button></div>`;
+    }
+    h += `</div>`;
+  }
+  if (!r.link) {
+    h += `<div class="field"><label for="rf-pos">Nut Position <span class="unit-suffix" id="rf-pos-val"></span></label>` +
+      `<input type="range" id="rf-pos" min="0" max="1" step="0.001" value="${r.pos ?? 0.5}"></div>`;
+  }
+  if (kind !== "none" && kind !== "geneva_wheel") {
+    h += `<div class="btn-row"><button type="button" class="btn${state.input === selected ? " on" : ""}" id="rf-input">` +
+      `${state.input === selected ? "This rail drives the train" : "Drive the train from this rail"}</button></div>`;
+  }
+  el.innerHTML = h;
 
-// ---------------------------------------------------------------------
-// Scene rebuild
-// ---------------------------------------------------------------------
-let pending = null;
-function scheduleRebuild(paramsChanged) {
-  if (pending) clearTimeout(pending);
-  pending = setTimeout(() => rebuild(paramsChanged), 30);
-}
-
-let framed = false;
-function rebuild(paramsChanged = false) {
-  const t0 = performance.now();
-  if (paramsChanged) clearCache();
-  for (const o of blockObjs) scene.remove(o.group);
-  blockObjs = [];
-  layout = G.layoutTrain(chain, params);
-  trainMsgs = G.checkTrain(chain, params, pins);
-
-  let triCount = 0;
-  layout.forEach((b, i) => {
-    const m = blockMeshes(i);
-    const bad = blockHasErr(i);
-    const group = new THREE.Group();
-    group.position.x = b.x;
-    const frameMesh = new THREE.Mesh(m.frameGeo, bad ? errMat : frameMat);
-    frameMesh.castShadow = frameMesh.receiveShadow = true;
-    const gearMesh = new THREE.Mesh(m.gearGeo, i === selected ? gearSelMat : gearMat);
-    gearMesh.castShadow = gearMesh.receiveShadow = true;
-    gearMesh.userData.block = i;
-    frameMesh.userData.block = i;
-    group.add(frameMesh, gearMesh);
-    scene.add(group);
-    blockObjs.push({ group, gearMesh });
-    triCount += m.frame.tris.length + m.gear.tris.length;
+  $("rf-mech").addEventListener("change", (e) => {
+    const k = e.target.value;
+    const keep = { mech: k, pos: r.pos ?? 0.5, link: k === "none" ? null : r.link };
+    state.rails[selected] = keep;
+    rebuild();
   });
+  for (const f of MECH_FIELDS[kind]) {
+    const inp = $("rf-" + f.id);
+    if (!inp) continue;
+    if (f.type === "checkbox") {
+      inp.addEventListener("change", () => { r[f.id] = inp.checked; rebuild(); });
+    } else {
+      inp.addEventListener("input", () => {
+        const v = parseFloat(inp.value);
+        if (Number.isNaN(v) || v < f.min || v > f.max) return;
+        r[f.id] = v;
+        scheduleRebuild();
+      });
+    }
+  }
+  if ($("rf-link")) $("rf-link").addEventListener("change", (e) => {
+    r.link = e.target.value === "" ? null : { rail: +e.target.value, side: (r.link && r.link.side) || 1 };
+    rebuild();
+  });
+  if ($("rf-side-p")) {
+    $("rf-side-p").addEventListener("click", () => { r.link.side = 1; rebuild(); });
+    $("rf-side-n").addEventListener("click", () => { r.link.side = -1; rebuild(); });
+  }
+  if ($("rf-pos")) {
+    const show = () => { if (info) $("rf-pos-val").textContent = `${fmt(nutXs()[selected])} mm`; };
+    show();
+    $("rf-pos").addEventListener("input", (e) => { r.pos = parseFloat(e.target.value); place(); show(); scheduleRecheck(); });
+  }
+  if ($("rf-input")) $("rf-input").addEventListener("click", () => { state.input = selected; rebuild(); });
+}
 
-  const floorY = -params.height - params.wall;
-  const last = layout[layout.length - 1];
-  const span = last.x + 400;
-  ground.position.set(last.x / 2, floorY - 0.01, 0);
-  ground.scale.set(span * 2, span * 2, 1);
-  updateGears();
-  if (!framed) { fitView(); framed = true; }
+// a nut slider moved: positions are live, the checks follow a moment later
+let recheck = null;
+function scheduleRecheck() {
+  clearTimeout(recheck);
+  recheck = setTimeout(async () => {
+    try {
+      const r = await call("info", spec());
+      info = { ...info, issues: r.info.issues, rails: info.rails.map((x, i) => ({ ...x, prog: r.info.rails[i].prog })) };
+      colorRails();
+      renderChips();
+      renderInfo();
+      saveState();
+    } catch (e) { /* the next rebuild reports it */ }
+  }, 120);
+}
 
-  statusEl.textContent = `Built in ${(performance.now() - t0).toFixed(0)} ms — ${chain.length} blocks, ${triCount.toLocaleString()} triangles.`;
-  saveState();
-  renderChain();
+function speedOf(i, depth = 0) {
+  const p = info.rails[i].prog;
+  if (p.kind === "input") return 1;
+  if (p.kind === "gear" && depth < 32) return -p.ratio * speedOf(p.parent, depth + 1);
+  return null;
+}
+function renderInfo() {
+  if (!info) return;
+  const R = info.rail, ri = info.rails[selected];
+  const rows = [];
+  if (ri.kind === "spur") {
+    rows.push(["Teeth", `${ri.teeth}`], ["Tip diameter", `${fmt(2 * ri.tip)} mm`]);
+  } else if (ri.kind === "geneva_driver") {
+    rows.push(["Wheel slots", `${ri.slots}`], ["Centre distance", `${fmt(ri.center_distance, 2)} mm`],
+              ["Wheel locked", `${fmt(100 * ri.dwell, 0)}% of each turn`]);
+    if (ri.toothed) rows.push(["Plate teeth", `${ri.gear_teeth}`], ["Plate tip diameter", `${fmt(2 * ri.plate_r)} mm`]);
+  } else if (ri.kind === "geneva_wheel") {
+    rows.push(["Indexes", `1/${ri.slots} turn per driver turn`]);
+  }
+  if (ri.distance) rows.push(["Centre distance to rail " + (ri.parent + 1), `${fmt(ri.distance, 2)} mm`]);
+  const s = ri.kind !== "none" ? speedOf(selected) : null;
+  if (s !== null && ri.prog.kind !== "input") rows.push([`Turns per turn of rail ${state.input + 1}`, `${fmt(Math.abs(s), 3)} ${s < 0 ? "↺" : "↻"}`]);
+  rows.push(["Nut position", `${fmt(nutXs()[selected])} mm of ${fmt(R.x_min)}–${fmt(R.x_max)}`]);
+  rows.push(["Full travel", `${fmt(R.travel)} mm in ${fmt(R.turns)} turns`],
+            ["Screw lead", `${fmt(R.lead, 2)} mm/turn (${R.thread_starts}-start, ${fmt(R.lead_angle)}°)`],
+            ["Rail spacing", `${fmt(R.spacing, 2)} mm`],
+            ["Body", `${fmt(R.body_length)} × ${fmt(R.body_width)} × ${fmt(R.body_height)} mm`]);
+  $("readouts").innerHTML = rows.map(([k, v]) => `<div class="readout"><span>${k}</span><span class="val">${v}</span></div>`).join("");
+
+  const label = (where, name) => {
+    const f = FIELDS.find((x) => x.id === name) || Object.values(MECH_FIELDS).flat().find((x) => x.id === name);
+    return `${where === "rail" || where === "gear" ? "" : where[0].toUpperCase() + where.slice(1) + " "}${f ? f.label : name}`;
+  };
+  const lines = info.issues.map((t) => `<div class="err">${t}</div>`);
+  for (const [where, name, asked, used] of info.notes) {
+    lines.push(`<div class="warn">${label(where, name)}: ${typeof asked === "number" ? fmt(asked, 2) : asked} → ${typeof used === "number" ? fmt(used, 2) : used}</div>`);
+  }
+  $("checks").innerHTML = lines.length ? lines.join("") : `<div class="ok">Everything fits and meshes.</div>`;
+  $("dl-one").disabled = ri.kind === "none";
+  $("dl-all").disabled = !window.JSZip;
+}
+
+function renderPanel() {
+  renderChips();
+  renderRailFields();
   renderInfo();
+  syncFields();
 }
-
-function updateGears() {
-  layout.forEach((b, i) => { blockObjs[i].gearMesh.rotation.z = b.phase + b.ratio * spinAngle; });
-}
-
-function fitView() {
-  const box = new THREE.Box3();
-  blockObjs.forEach((o) => box.expandByObject(o.group));
-  const sphere = box.getBoundingSphere(new THREE.Sphere());
-  const { center, radius } = sphere;
-  const dist = (radius / Math.sin((camera.fov * Math.PI) / 360)) * 1.05;
-  const dir = new THREE.Vector3(0.25, 0.35, 1).normalize();
-  camera.position.copy(center).addScaledVector(dir, dist);
-  controls.target.copy(center);
-  camera.near = Math.max(dist * 0.01, 0.5);
-  camera.far = dist * 20;
-  camera.updateProjectionMatrix();
-  controls.update();
-
-  key.position.set(center.x + radius * 0.6, center.y + radius * 2.2, center.z + radius * 1.4);
-  key.target.position.copy(center);
-  key.target.updateMatrixWorld();
-  const sc = key.shadow.camera;
-  sc.left = -radius * 1.4; sc.right = radius * 1.4;
-  sc.top = radius * 1.4; sc.bottom = -radius * 1.4;
-  sc.near = radius * 0.1; sc.far = radius * 6;
-  sc.updateProjectionMatrix();
+function select(i) {
+  selected = Math.max(0, Math.min(state.rails.length - 1, i));
+  if (info) colorRails();
+  renderPanel();
 }
 
 // ---------------------------------------------------------------------
-// Picking: a click (not a drag) on any block selects it.
+// Picking
 // ---------------------------------------------------------------------
 const raycaster = new THREE.Raycaster();
 let downAt = null;
@@ -652,23 +830,30 @@ renderer.domElement.addEventListener("pointerdown", (e) => { downAt = [e.clientX
 renderer.domElement.addEventListener("pointerup", (e) => {
   if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
   const r = renderer.domElement.getBoundingClientRect();
-  const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-  raycaster.setFromCamera(ndc, camera);
-  const hit = raycaster.intersectObjects(blockObjs.map((o) => o.group), true)[0];
-  if (hit && hit.object.userData.block !== undefined) select(hit.object.userData.block, false);
+  raycaster.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+  const hit = raycaster.intersectObject(world, true).find((h) => h.object.userData.rail !== undefined);
+  if (hit) select(hit.object.userData.rail);
 });
 
 // ---------------------------------------------------------------------
-// Downloads
+// Downloads (binary STL, model frame, mm)
 // ---------------------------------------------------------------------
-function blockSTL(i) {
-  const m = blockMeshes(i);
-  const merged = G.mergeMeshes(m.frame, m.gear);
-  return G.buildBinarySTL(merged.verts, merged.tris);
-}
-function fileName(i) {
-  const off = pinOffset(i);
-  return `gear_block_m${params.module}_${chain[i]}T${off === null ? "" : `_pin${fmt(off)}`}.stl`;
+function stl(m) {
+  const n = m.idx.length / 3, P = m.pos, I = m.idx;
+  const buf = new ArrayBuffer(84 + 50 * n), v = new DataView(buf);
+  v.setUint32(80, n, true);
+  let o = 84;
+  for (let t = 0; t < n; t++) {
+    const a = 3 * I[3 * t], b = 3 * I[3 * t + 1], c = 3 * I[3 * t + 2];
+    const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2];
+    const wx = P[c] - P[a], wy = P[c + 1] - P[a + 1], wz = P[c + 2] - P[a + 2];
+    let nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+    const L = Math.hypot(nx, ny, nz) || 1;
+    for (const q of [nx / L, ny / L, nz / L]) { v.setFloat32(o, q, true); o += 4; }
+    for (const k of [a, b, c]) for (let d = 0; d < 3; d++) { v.setFloat32(o, P[k + d], true); o += 4; }
+    o += 2;
+  }
+  return buf;
 }
 function saveBlob(blob, name) {
   const url = URL.createObjectURL(blob);
@@ -677,67 +862,43 @@ function saveBlob(blob, name) {
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 }
+function mechName(i) {
+  const r = info.rails[i];
+  const what = r.kind === "spur" ? `spur_m${info.gear.module}_${r.teeth}T`
+    : r.kind === "geneva_driver" ? `geneva_driver_${r.slots}slot${r.toothed ? `_${r.gear_teeth}T` : ""}`
+    : `geneva_wheel_${r.slots}slot`;
+  return `rail${i + 1}_${what}.stl`;
+}
 $("dl-one").addEventListener("click", () => {
-  saveBlob(new Blob([blockSTL(selected)], { type: "model/stl" }), fileName(selected));
+  const r = info.rails[selected];
+  if (r.mesh) saveBlob(new Blob([stl(meshes[r.mesh])], { type: "model/stl" }), mechName(selected));
 });
 $("dl-all").addEventListener("click", async () => {
-  const zip = new window.JSZip();
-  const done = new Set();   // identical blocks share one file
-  chain.forEach((_, i) => {
-    if (done.has(blockKey(i))) return;
-    done.add(blockKey(i));
-    zip.file(fileName(i), blockSTL(i));
-  });
-  saveBlob(await zip.generateAsync({ type: "blob" }), `gear_blocks_m${params.module}.zip`);
+  const zip = new window.JSZip(), n = info.rails.length;
+  zip.file("body.stl", stl(meshes.body));
+  for (const part of ["screw", "handle", "endstop", "nut"]) zip.file(`${part}_x${n}.stl`, stl(meshes[part]));
+  info.rails.forEach((r, i) => { if (r.mesh) zip.file(mechName(i), stl(meshes[r.mesh])); });
+  saveBlob(await zip.generateAsync({ type: "blob" }), `shaft_rail_${n}_rails.zip`);
 });
 
 // ---------------------------------------------------------------------
-// Chain editing
+// Rails
 // ---------------------------------------------------------------------
-$("prev").addEventListener("click", () => select(selected - 1));
-$("next").addEventListener("click", () => select(selected + 1));
 $("add").addEventListener("click", () => {
-  chain.splice(selected + 1, 0, chain[selected]);
-  pins.splice(selected + 1, 0, null);
-  selected += 1;
+  state.rails.push({ mech: "none", pos: 0.5 });
+  selected = state.rails.length - 1;
   rebuild();
-  select(selected);
 });
 $("remove").addEventListener("click", () => {
-  if (chain.length <= 1) return;
-  chain.splice(selected, 1);
-  pins.splice(selected, 1);
-  selected = Math.min(selected, chain.length - 1);
-  rebuild();
-  select(selected);
-});
-teethEl.addEventListener("input", () => {
-  const z = parseInt(teethEl.value, 10);
-  if (Number.isNaN(z) || z < 8 || z > 120) return;
-  chain[selected] = z;
-  scheduleRebuild(false);
-});
-pinEl.addEventListener("change", () => {
-  pins[selected] = pinEl.checked ? DEFAULT_PIN_OFFSET : null;
+  if (state.rails.length <= 1) return;
+  const gone = state.rails.length - 1;
+  state.rails.pop();
+  for (const r of state.rails) if (r.link && r.link.rail === gone) r.link = null;
+  if (state.input >= state.rails.length) state.input = 0;
+  selected = Math.min(selected, state.rails.length - 1);
   rebuild();
 });
-pinOffEl.addEventListener("input", () => {
-  const v = parseFloat(pinOffEl.value);
-  if (Number.isNaN(v) || pins[selected] === null) return;
-  pins[selected] = v;
-  scheduleRebuild(false);
-});
-// Once editing ends, show the value the pin actually got.
-pinOffEl.addEventListener("change", () => {
-  const eff = pinOffset(selected);
-  if (eff !== null && G.pinRange(chain[selected], params).ok) pins[selected] = eff;
-  renderPinFields();
-  saveState();
-});
-$("spin").addEventListener("click", () => {
-  spinning = !spinning;
-  $("spin").classList.toggle("on", spinning);
-});
+$("spin").addEventListener("click", () => { spinning = !spinning; $("spin").classList.toggle("on", spinning); });
 $("fit").addEventListener("click", fitView);
 
 // ---------------------------------------------------------------------
@@ -748,19 +909,20 @@ function animate(t) {
   requestAnimationFrame(animate);
   const dt = Math.min((t - lastT) / 1000, 0.1);
   lastT = t;
-  if (spinning && layout.length) {
-    spinAngle += dt * 0.6;   // block 1 turns at ~0.1 rev/s
-    updateGears();
-  }
+  if (spinning && info) { theta += dt * 0.8; turn(); }
   controls.update();
   renderer.render(scene, camera);
 }
 
 loadState();
 buildFieldsOnce();
+renderChips();
 resize();
 rebuild();
 requestAnimationFrame(animate);
+// debugging handle (the verification scripts read the layout and pin the input angle through it)
+window.__shaftRail = { state: () => state, info: () => info, meshes: () => meshes, nutXs: () => nutXs(),
+  angles: () => mechAngles(), setTheta: (t) => { spinning = false; theta = t; turn(); } };
 </script>
 </body>
 </html>
