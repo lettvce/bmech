@@ -52,6 +52,7 @@ DEFAULTS = dict(
     wheel_bore=5.0,         # 0 = no hole
     driver_bore=5.0,        # 0 = no hole
     segments=64,            # per full circle
+    tip_round=1.0,          # radius rounding the wheel's slot-entry tips (0 = sharp)
     # toothed crank plate: the driver's plate becomes an involute spur gear (bmech conventions,
     # tooth 0 on +X, addendum 1 m, dedendum 1.25 m), so another gear of the same module can drive it
     driver_gear=False,
@@ -172,6 +173,9 @@ def clamp(p=None):
         q[name] = int(q[name])
     if q["driver_gear"]:
         _clamp_gear(q, lim)
+    lim("tip_round", 0.0)
+    if q["tip_round"] > 0 and _tip_fillet(q, q["tip_round"]) is None:
+        q["tip_round"] = math.floor(_largest(0.0, q["tip_round"], lambda r: _tip_fillet(q, r) is not None) * 100) / 100
     notes = [(n, asked[n], q[n]) for n in DEFAULTS if abs(q[n] - asked[n]) > 1e-9]
     return q, notes
 
@@ -307,6 +311,30 @@ def wheel_outline(q):
     return out
 
 
+def _tip_fillet(q, rf):
+    """Fillet of radius rf at slot 0's upper tip, tangent to the slot edge (y = w2) and to the locking
+    arc (the wheel is outside that circle). Returns (F, T, t_arc) - fillet centre, tangent point on the
+    arc, its angle about the arc centre - with the slot edge's tangent point at (F.x, w2); None if it
+    doesn't fit (the straight slot edge must keep a slot width of length, and T must stay on the arc)."""
+    k = q if "s_tip" in q else _core(q)
+    beta, w2, C = k["beta"], k["w2"], k["center_distance"]
+    cbx, cby = C * math.cos(beta), C * math.sin(beta)
+    R = k["r_arc"] + rf
+    h = R * R - (w2 + rf - cby) ** 2
+    if h < 0:
+        return None
+    fx, fy = cbx - math.sqrt(h), w2 + rf
+    tx, ty = cbx + (fx - cbx) * k["r_arc"] / R, cby + (fy - cby) * k["r_arc"] / R
+    t_arc = math.atan2(ty - cby, tx - cbx)
+    t1 = math.pi + beta
+    t_tip = math.atan2(w2 - cby, k["s_tip"] - cbx)
+    span = _wrap(t1 - t_tip)                        # the arc runs from the tip to the bisector
+    used = _wrap(t_arc - t_tip)
+    if fx < k["s_end"] + k["w2"] or not (0 <= used * (1 if span > 0 else -1) < abs(span) - 1e-6):
+        return None
+    return (fx, fy), (tx, ty), t_arc
+
+
 def _wheel_unit(q):
     """Slot 0's stretch of the outline: from just past the bisector at -beta, around slot 0, to the
     bisector point at +beta (inclusive). n rotated copies make the whole outline."""
@@ -315,8 +343,16 @@ def _wheel_unit(q):
     cbx, cby = C * math.cos(beta), C * math.sin(beta)
     # half sector: slot 0's end apex -> upper slot edge -> tip -> locking arc -> bisector
     half = _arc(s_end, 0.0, w2, math.pi, math.pi / 2, segs)          # quarter of the slot end
-    half.append((q["s_tip"], w2))                                     # slot edge up to the tip
-    t0 = math.atan2(w2 - cby, q["s_tip"] - cbx)
+    rf = q.get("tip_round", 0.0)
+    fil = _tip_fillet(q, rf) if rf > 0 else None
+    if fil:
+        (fx, fy), _t, t0 = fil
+        # slot edge to the fillet, then round the tip (convex: inscribed chords only add clearance)
+        a_end = math.atan2(_t[1] - fy, _t[0] - fx)
+        half += _arc(fx, fy, rf, -math.pi / 2, -math.pi / 2 + (a_end + math.pi / 2) % (2 * math.pi), segs)
+    else:
+        half.append((q["s_tip"], w2))                                 # slot edge up to the tip
+        t0 = math.atan2(w2 - cby, q["s_tip"] - cbx)
     t1 = math.pi + beta                                               # deepest point, on the bisector
     half += _arc(cbx, cby, q["r_arc"], t0, t0 + _wrap(t1 - t0), segs, include_start=False)
     mirror = [(x, -y) for x, y in reversed(half)]                     # bisector(-) -> apex

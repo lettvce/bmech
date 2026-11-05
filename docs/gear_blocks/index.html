@@ -235,7 +235,10 @@
         builder says so, and also flags anything that would hit a
         neighbour's shaft, gear or knob.</li>
     <li><strong>Geneva drives.</strong> A driver on one rail indexes a wheel
-        on another, at the driver's centre distance. Turn on
+        on another, at the driver's centre distance. The wheel's slot tips
+        are rounded (1 mm by default) so they aren't knife-sharp; the pin
+        catches the wheel a few degrees later and the rounded tip cams it
+        into line. Turn on
         <em>Gear teeth</em> and the driver's plate becomes a spur gear
         (same module as the rest), so a gear on a third rail can drive it.</li>
     <li><strong>Multi-start screws.</strong> With 4 starts, the nut moves
@@ -323,6 +326,7 @@ const MECH_FIELDS = {
     { id: "wheel_thickness", label: "Wheel Thickness", unit: "mm", min: 0.6, max: 20, step: 0.1 },
     { id: "layer_gap", label: "Plate Gap", unit: "mm", min: 0, max: 5, step: 0.1, hint: "Under the wheel." },
     { id: "clearance", label: "Geneva Clearance", unit: "mm", min: 0, max: 1, step: 0.05, hint: "Slot width, locking arcs, relief." },
+    { id: "tip_round", label: "Slot Entry Rounding", unit: "mm", min: 0, max: 3, step: 0.1, hint: "Rounds the wheel's sharp slot tips. 0 = sharp; capped to what fits." },
   ],
   geneva_wheel: [],
   none: [],
@@ -335,7 +339,7 @@ const DEFAULT_STATE = {
   rail: {}, gear: {},
   rails: [
     { mech: "spur", teeth: 16, pos: 0.15 },
-    { mech: "geneva_driver", toothed: true, link: { rail: 0, side: 1 } },
+    { mech: "geneva_driver", toothed: true, gear_teeth: 24, link: { rail: 0, side: 1 } },
     { mech: "geneva_wheel", link: { rail: 1, side: 1 } },
   ],
   input: 0,
@@ -344,7 +348,7 @@ const DEFAULT_STATE = {
 // ---------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------
-const worker = new Worker("worker.js?v=1");
+const worker = new Worker("worker.js?v=2");
 let reqId = 0;
 const waiting = new Map();
 worker.onmessage = (e) => {

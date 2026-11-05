@@ -32,13 +32,13 @@ HUB_LIFT = 0.4          # hub bottom above the collar top; the roof rests on the
 STACK_ROOM = 0.5        # top of a Geneva stack below the shaft tip (hub roof sits above)
 COLLIDE_GAP = 0.3       # parts that are not meant to touch keep at least this apart
 
-GEAR_DEFAULTS = dict(module=2.0, pressure_angle=20.0, backlash=0.25)
+GEAR_DEFAULTS = dict(module=2.4, pressure_angle=20.0, backlash=0.25)    # chunky teeth, still many ratios
 MECH_DEFAULTS = {
     "none": {},
     "spur": dict(teeth=16, thickness=5.0),
     "geneva_driver": dict(slots=6, center_distance=40.0, pin_diameter=5.0, clearance=0.2,
                           plate_thickness=3.0, layer_gap=0.4, wheel_thickness=5.0,
-                          toothed=False, gear_teeth=28),
+                          toothed=False, gear_teeth=24, tip_round=1.0),
     "geneva_wheel": {},     # takes every dimension from the driver it links to
 }
 
@@ -175,7 +175,7 @@ def geneva_q(q, g, spec):
              wheel_thickness=spec.get("wheel_thickness", 5.0), wheel_bore=2 * h["rh"], driver_bore=2 * h["rh"],
              segments=q["segments"], driver_gear=bool(spec.get("toothed", False)),
              gear_module=g["module"], gear_teeth=spec.get("gear_teeth", 28),
-             pressure_angle=g["pressure_angle"], mate_teeth=0)
+             pressure_angle=g["pressure_angle"], mate_teeth=0, tip_round=spec.get("tip_round", 1.0))
     # stack: plate + gap + wheel under the shaft tip
     room = h["room"] - STACK_ROOM
     for name, lo in (("wheel_thickness", 0.6), ("plate_thickness", 0.6)):
