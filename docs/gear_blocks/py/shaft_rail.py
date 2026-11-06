@@ -47,7 +47,7 @@ DEFAULTS = dict(
     knob_diameter=20.67,
     thread_clearance=0.3,   # nut to screw, radial (0.15 printed too tight, 2026-11-05)
     fit_clearance=0.15,     # nut to channel, sleeve to wall bore
-    peg_clearance=0.1,      # square peg to the screw's socket, per side
+    peg_clearance=0.05,     # square peg to the screw's socket, per side (0 too tight, 0.1 too loose)
     shaft_clearance=0.3,    # mechanism hub bore to the shaft, radial (0.2 printed too tight, 2026-11-05)
     segments=64,            # per full circle, rounded to a multiple of 4
 )
