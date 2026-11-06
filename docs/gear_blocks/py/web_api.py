@@ -134,8 +134,9 @@ def build(spec_json, with_meshes=True):
                         tip=mq["tip_r"] if it["kind"] == "geneva_wheel" else mq["plate_r"],
                         z_wheel=mq["z_wheel"], z_top=mq["z_top"], plate_thickness=mq["plate_thickness"],
                         wheel_thickness=mq["wheel_thickness"])
-        elif it["kind"] == "mount":
-            info.update(deck_x=2 * mq["hx"], deck_y=2 * mq["hy"], z_deck=mq["z_deck"], grip=mq["grip"])
+        elif it["kind"] == "yoke_holder":
+            info.update(width=mq["width"], length=2 * mq["hx"], z_groove=mq["z_groove"], z_deck=mq["z_deck"],
+                        grip=mq["grip"], groove=mq["groove"])
         rails.append(info)
     summary = {k: q[k] for k in ("count", "spacing", "x_min", "x_max", "x_ref", "lead", "lead_angle", "travel",
                                  "turns", "body_length", "body_width", "body_height", "thread_pitch",
