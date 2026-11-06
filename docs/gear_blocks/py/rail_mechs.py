@@ -245,7 +245,9 @@ def build_geneva_driver(q, g, gq):
 
 
 def build_geneva_wheel(q, g, gq):
-    """Wheel raised to plate + gap on its hub; slot 0 on +X."""
+    """Wheel raised to plate + gap on its hub; slot 0 on +X. The wheel runs up to the hub's top, so the
+    top is one flat face (print it upside down, no support). Taller than the driver's pin is fine: the
+    slots are through-cuts, and geneva's bore clamp keeps the wheel >= 1 mm off the driver's hub."""
     h, segs = hub(q), q["segments"]
     n = gq["slots"]
     out = geneva.wheel_outline(gq)
@@ -254,17 +256,15 @@ def build_geneva_wheel(q, g, gq):
     kb = _kb(n, segs)
     B = _Build()
     zb = h["zb"]
-    zw, zt = zb + gq["z_wheel"], zb + gq["z_top"]
+    zw = zb + gq["z_wheel"]
     c = _circle(h["rh"], n * kb, -math.pi / n)
     lo = B.loop(c, zb)
     B.face(lo, [B.bore(h, segs, zb)], False)
     ob, ib = B.ring(out, U, n, h["rh"], kb, zw, False)
-    ot, it = B.ring(out, U, n, h["rh"], kb, zt, True)
     B.wall(lo, ib)
+    ot, it = B.ring(out, U, n, h["rh"], kb, h["z_top"], True)
     B.wall(ob, ot)
-    top = B.loop(c, h["z_top"])
-    B.wall(it, top)
-    B.ngon(top, True)
+    B.ngon(it, True)                          # flat top: the wheel's top runs over the hub roof
     return B.done()
 
 
@@ -477,7 +477,7 @@ def primitives(q, it):
         out.append(("gear" if mq["driver_gear"] else "plate", mq["plate_r"], zb, zb + mq["plate_thickness"]))
         out.append(("crank", mq["a"] + mq["pr"], zb + mq["plate_thickness"], zb + mq["z_top"]))
     elif k == "geneva_wheel":
-        out.append(("wheel", mq["tip_r"], zb + mq["z_wheel"], zb + mq["z_top"]))
+        out.append(("wheel", mq["tip_r"], zb + mq["z_wheel"], h["z_top"]))     # flat top at the hub roof
     return out
 
 

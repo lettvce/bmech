@@ -224,7 +224,7 @@
      and that nut, with whatever sits on its shaft, slides along the rail.</p>
   <ul>
     <li><strong>Mechanisms drop over the shafts.</strong> Each has a capped
-        hub that runs on the shaft with a 0.3 mm clearance. The cap rests on
+        hub that runs on the shaft with a 0.4 mm clearance. The cap rests on
         the shaft tip and the hub floats just above the collar, so it spins
         freely. There's no separate stop cap to lose.</li>
     <li><strong>Meshing across rails.</strong> Neighbouring shafts are one
@@ -240,7 +240,9 @@
         catches the wheel a few degrees later and the rounded tip cams it
         into line. Turn on
         <em>Gear teeth</em> and the driver's plate becomes a spur gear
-        (same module as the rest), so a gear on a third rail can drive it.</li>
+        (same module as the rest), so a gear on a third rail can drive it.
+        The wheel's top is one flat face, level with its hub's cap, so it
+        prints upside down without supports.</li>
     <li><strong>Multi-start screws.</strong> With 4 starts, the nut moves
         4 pitches per turn, so 100 mm of travel takes about 14 turns instead
         of 57. More starts make the screw easier to back-drive: a hard push
@@ -348,7 +350,7 @@ const DEFAULT_STATE = {
 // ---------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------
-const worker = new Worker("worker.js?v=5");
+const worker = new Worker("worker.js?v=6");
 let reqId = 0;
 const waiting = new Map();
 worker.onmessage = (e) => {

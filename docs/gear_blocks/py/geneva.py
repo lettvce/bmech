@@ -847,18 +847,36 @@ def build_wheel(q):
     return m.verts, m.faces
 
 
-def build_driver(q):
+def pin_outline(q):
+    return circle(q["pr"], max(12, q["segments"] // 2), q["a"], 0.0)
+
+
+def build_pin(q):
+    """The pin alone (plate top to z_top), for build_driver(q, pin=False)."""
+    m = _Mesh()
+    pin = pin_outline(q)
+    nb, nt = m.loop(pin, q["plate_thickness"]), m.loop(pin, q["z_top"])
+    m.wall(nb, nt)
+    m.faces.append(tuple(nt))
+    m.faces.append(tuple(nb[::-1]))
+    return m.verts, m.faces
+
+
+def build_driver(q, pin=True):
+    """pin=False leaves the pin off (the plate top runs under it), e.g. to colour it as its own object
+    with build_pin()."""
     m = _Mesh()
     segs = q["segments"]
     zp, zt = q["plate_thickness"], q["z_top"]
-    plate = circle(q["plate_r"], segs)
     lock = _ccw(lock_outline(q))
-    pin = circle(q["pr"], max(12, segs // 2), q["a"], 0.0)
     lb, lt = m.loop(lock, zp), m.loop(lock, zt)
-    nb, nt = m.loop(pin, zp), m.loop(pin, zt)
     m.wall(lb, lt)
-    m.wall(nb, nt)
-    m.faces.append(tuple(nt))                                        # pin top: convex n-gon
+    pin_holes = []
+    if pin:
+        nb, nt = m.loop(pin_outline(q), zp), m.loop(pin_outline(q), zt)
+        m.wall(nb, nt)
+        m.faces.append(tuple(nt))                                    # pin top: convex n-gon
+        pin_holes = [nb[::-1]]
     bottom_holes = []
     if q["driver_bore"] > 0:
         b = circle(q["driver_bore"] / 2, segs)[::-1]
@@ -873,12 +891,12 @@ def build_driver(q):
         kin = q["gear_teeth"] * max(1, int(math.ceil(segs / q["gear_teeth"])))
         assert q["a"] + q["pr"] < ri * math.cos(math.pi / kin), "pin outside the gear's inner disc"
         _gear_body(m, q["gear_module"], q["gear_teeth"], q["pressure_angle"], segs, ri, 0.0, zp,
-                   bottom_holes, [lb[::-1], nb[::-1]])
+                   bottom_holes, [lb[::-1]] + pin_holes)
     else:
         plate = circle(q["plate_r"], segs)
         pb, pt = m.loop(plate, 0.0), m.loop(plate, zp)
         m.wall(pb, pt)
-        m.cap(pt, [lb[::-1], nb[::-1]], True)                        # plate top around both
+        m.cap(pt, [lb[::-1]] + pin_holes, True)                      # plate top around both
         m.cap(pb, bottom_holes, False)
     return m.verts, m.faces
 
