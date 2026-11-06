@@ -49,7 +49,7 @@ GROOVE_SIDE = 3.0       # least wall beside the groove's widest point
 GEAR_DEFAULTS = dict(module=2.4, pressure_angle=20.0, backlash=0.25)    # chunky teeth, still many ratios
 MECH_DEFAULTS = {
     "none": {},
-    "spur": dict(teeth=16, thickness=5.0),
+    "spur": dict(teeth=16),                 # teeth run the hub's full height: flat top (Blake, 2026-11-06)
     "geneva_driver": dict(slots=6, center_distance=40.0, pin_diameter=5.0, clearance=0.2,
                           plate_thickness=3.0, layer_gap=0.4, wheel_thickness=5.0,
                           toothed=False, gear_teeth=24, tip_round=1.0),
@@ -139,7 +139,9 @@ def _kb(n_sym, segs):
 # ── Mechanisms ───────────────────────────────────────────────────────────────
 
 def spur_q(q, g, spec):
-    """Clamped spur gear: teeth so the root leaves a 1 mm wall around the hub; thickness fits the hub."""
+    """Clamped spur gear: teeth so the root leaves a 1 mm wall around the hub. The teeth run the hub's full
+    height (bottom to roof), so the top is one flat face (room for a crank pin, prints either way up
+    without support) and the gear meets a toothed Geneva driver's plate at the bottom."""
     h = hub(q)
     m = g["module"]
     notes = []
@@ -148,11 +150,7 @@ def spur_q(q, g, spec):
     if z < zmin or z > 400:
         notes.append(("teeth", z, min(max(z, zmin), 400)))
         z = min(max(z, zmin), 400)
-    t = float(spec.get("thickness", 5.0))
-    tmax = h["room"] - 0.5
-    if t < 0.6 or t > tmax:
-        notes.append(("thickness", t, min(max(t, 0.6), tmax)))
-        t = min(max(t, 0.6), tmax)
+    t = h["z_top"] - h["zb"]
     rp = m * z / 2
     return dict(kind="spur", teeth=z, thickness=t, rp=rp, ra=rp + geneva.ADDENDUM * m,
                 rd=rp - geneva.DEDENDUM * m), notes
@@ -165,16 +163,12 @@ def build_spur(q, g, sq):
     out = geneva.gear_outline(m, N, g["pressure_angle"], segs)
     U = len(out) // N
     B = _Build()
-    zb, z1 = h["zb"], h["zb"] + sq["thickness"]
+    zb, z1 = h["zb"], h["zb"] + sq["thickness"]          # z1 = the hub roof
     ob, hb_ = B.ring(out, U, N, h["rh"], kb, zb, False)
     ot, ht = B.ring(out, U, N, h["rh"], kb, z1, True)
     B.wall(ob, ot)
     B.face(hb_, [B.bore(h, segs, zb)], False)          # annulus under the hub, between rh and rb
-    # the hub above the gear: its bottom loop is the ring's inner loop at z1
-    c = _circle(h["rh"], N * kb, -math.pi / N)
-    top = B.loop(c, h["z_top"])
-    B.wall(ht, top)
-    B.ngon(top, True)
+    B.ngon(ht, True)                                     # flat top runs over the hub roof
     return B.done()
 
 
@@ -362,8 +356,14 @@ def build_holder(q, mq):
 
 # ── Layout ───────────────────────────────────────────────────────────────────
 
+RENAMED = {"mount": "yoke_holder"}     # the short-lived "Fixed mount" (2026-11-06) became the yoke holder
+
+
 def _mech_spec(r):
-    kind = r.get("mech", "none")
+    kind = r.get("mech", "none") or "none"
+    kind = RENAMED.get(kind, kind)
+    if kind not in MECH_DEFAULTS:         # unknown (old saved page state, typo): treat as nothing
+        kind = "none"
     spec = dict(MECH_DEFAULTS.get(kind, {}))
     spec.update({k: v for k, v in r.items() if k not in ("mech", "link", "pos")})
     return kind, spec
@@ -402,6 +402,9 @@ def layout(spec):
     out = []
     for i, r in enumerate(rs):
         kind, ms = _mech_spec(r)
+        asked = r.get("mech", "none") or "none"
+        if kind != asked and RENAMED.get(asked) != kind:
+            issues.append("Rail %d: unknown mechanism %r, left empty." % (i + 1, asked))
         item = dict(index=i, kind=kind, y=sr.carrier_y(q, i), link=r.get("link"), pos=float(r.get("pos", 0.5)))
         if kind == "spur":
             item["mq"], nn = spur_q(q, g, ms)

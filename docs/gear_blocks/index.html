@@ -322,7 +322,6 @@ const FIELDS = [
 const MECH_FIELDS = {
   spur: [
     { id: "teeth", label: "Teeth", unit: "T", min: 8, max: 200, step: 1 },
-    { id: "thickness", label: "Gear Thickness", unit: "mm", min: 0.6, max: 60, step: 0.5 },
   ],
   geneva_driver: [
     { id: "slots", label: "Wheel Slots", unit: "", min: 3, max: 24, step: 1 },
@@ -359,7 +358,7 @@ const DEFAULT_STATE = {
 // ---------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------
-const worker = new Worker("worker.js?v=10");
+const worker = new Worker("worker.js?v=11");
 let reqId = 0;
 const waiting = new Map();
 worker.onmessage = (e) => {
@@ -455,7 +454,15 @@ let defaults = null;
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
-    if (s && Array.isArray(s.rails) && s.rails.length) state = s;
+    if (s && Array.isArray(s.rails) && s.rails.length) {
+      // saved by an older page: renamed or retired mechanisms
+      for (const r of s.rails) {
+        if (r.mech === "mount") r.mech = "yoke_holder";
+        if (!r.mech || !(r.mech in MECH_LABEL)) { r.mech = "none"; r.link = null; }
+        if (r.mech === "yoke_holder") r.link = null;
+      }
+      state = s;
+    }
   } catch (e) { /* defaults */ }
 }
 function saveState() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } }
@@ -797,7 +804,8 @@ function renderInfo() {
   const R = info.rail, ri = info.rails[selected];
   const rows = [];
   if (ri.kind === "spur") {
-    rows.push(["Teeth", `${ri.teeth}`], ["Tip diameter", `${fmt(2 * ri.tip)} mm`]);
+    rows.push(["Teeth", `${ri.teeth}`], ["Tip diameter", `${fmt(2 * ri.tip)} mm`],
+              ["Thickness", `${fmt(ri.thickness)} mm (flat top, level with the hubs)`]);
   } else if (ri.kind === "geneva_driver") {
     rows.push(["Wheel slots", `${ri.slots}`], ["Centre distance", `${fmt(ri.center_distance, 2)} mm`],
               ["Wheel locked", `${fmt(100 * ri.dwell, 0)}% of each turn`]);
