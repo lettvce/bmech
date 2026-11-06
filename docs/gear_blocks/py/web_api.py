@@ -134,13 +134,10 @@ def build(spec_json, with_meshes=True):
                         tip=mq["tip_r"] if it["kind"] == "geneva_wheel" else mq["plate_r"],
                         z_wheel=mq["z_wheel"], z_top=mq["z_top"], plate_thickness=mq["plate_thickness"],
                         wheel_thickness=mq["wheel_thickness"])
-        elif it["kind"] == "yoke_holder":
-            info.update(width=mq["width"], length=2 * mq["hx"], z_groove=mq["z_groove"], z_deck=mq["z_deck"],
-                        grip=mq["grip"], groove=mq["groove"])
         rails.append(info)
     summary = {k: q[k] for k in ("count", "spacing", "x_min", "x_max", "x_ref", "lead", "lead_angle", "travel",
                                  "turns", "body_length", "body_width", "body_height", "thread_pitch",
-                                 "thread_starts", "knob_diameter", "z_top", "z_nut", "z_tip", "shaft_length",
+                                 "thread_starts", "knob_diameter", "z_top", "z_tip", "shaft_length",
                                  "r_shaft", "segments", "x_out0", "x_out1")}
     summary["rail_y"] = [sr.carrier_y(q, i) for i in range(q["count"])]
     return dict(rail=summary, gear=lay["gear"], hub=lay["hub"], rails=rails, notes=lay["notes"],

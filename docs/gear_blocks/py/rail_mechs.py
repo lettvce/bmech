@@ -8,10 +8,6 @@ Gravity holds it on (the shafts stand vertical); there is no separate stop cap t
     spur           involute spur gear (bmech profile, geneva.gear_outline)
     geneva_driver  Geneva crank: plate (plain disc or spur teeth), locking disc and pin
     geneva_wheel   the slotted wheel, raised on its hub to sit over its driver's plate
-    yoke_holder    a Scotch yoke's FIXED guide (after Blake's hand-modelled holder, 2026-11-06): a block
-                   that rests on the shaft tip like a hub, with two walls gripping the nut's front and
-                   back faces (the nut stands shaft_rail.NUT_RISE above the body) so it can't turn, and a
-                   dovetail groove across the rail on top for the yoke's tongue to slide in.
 
 Frames: a mechanism is built in its nut's local frame (shaft axis on x = y = 0, z as in
 shaft_rail.build_nut), so it is placed at the same (x, y) as its nut.
@@ -35,26 +31,15 @@ HUB_ROOF = 1.6          # cap over the shaft tip
 HUB_LIFT = 0.4          # hub bottom above the collar top; the roof rests on the shaft tip
 STACK_ROOM = 0.5        # top of a Geneva stack below the shaft tip (hub roof sits above)
 COLLIDE_GAP = 0.3       # parts that are not meant to touch keep at least this apart
-HOLDER_WALL = 3.2       # grip wall thickness along the rail (Blake's holder)
-HOLDER_FIT = 0.1        # grip wall to the nut's face (Blake's holder)
-HOLDER_FLOAT = 0.4      # grip walls above the body top; block bottom above the collar top
-HOLDER_ROOF = 4.6       # bore ceiling (on the shaft tip) to the groove floor
-# dovetail groove across the rail, (height above its floor, half width): Blake's holder (2026-11-06, for
-# print-in-place). Its yoke tongue (half widths 2.5 / 4.5 / 2.5 / 2.5 at 0 / 2 / 4 / 5.4) sits
-# YOKE_FLOOR_GAP above the floor, flush with the deck, with 0.3 mm per side (0.21 normal to the 45 deg faces)
-YOKE_FLOOR_GAP = 0.4
-GROOVE = ((0.0, 2.4), (2.4, 4.8), (4.4, 2.8), (5.8, 2.8))
-GROOVE_SIDE = 3.0       # least wall beside the groove's widest point
 
 GEAR_DEFAULTS = dict(module=2.4, pressure_angle=20.0, backlash=0.25)    # chunky teeth, still many ratios
 MECH_DEFAULTS = {
     "none": {},
-    "spur": dict(teeth=16),                 # teeth run the hub's full height: flat top (Blake, 2026-11-06)
+    "spur": dict(teeth=16, thickness=5.0),
     "geneva_driver": dict(slots=6, center_distance=40.0, pin_diameter=5.0, clearance=0.2,
                           plate_thickness=3.0, layer_gap=0.4, wheel_thickness=5.0,
                           toothed=False, gear_teeth=24, tip_round=1.0),
     "geneva_wheel": {},     # takes every dimension from the driver it links to
-    "yoke_holder": dict(width=27.0),    # across the rail = the groove's length (Blake's holder: 27)
 }
 
 
@@ -139,9 +124,7 @@ def _kb(n_sym, segs):
 # ── Mechanisms ───────────────────────────────────────────────────────────────
 
 def spur_q(q, g, spec):
-    """Clamped spur gear: teeth so the root leaves a 1 mm wall around the hub. The teeth run the hub's full
-    height (bottom to roof), so the top is one flat face (room for a crank pin, prints either way up
-    without support) and the gear meets a toothed Geneva driver's plate at the bottom."""
+    """Clamped spur gear: teeth so the root leaves a 1 mm wall around the hub; thickness fits the hub."""
     h = hub(q)
     m = g["module"]
     notes = []
@@ -150,7 +133,11 @@ def spur_q(q, g, spec):
     if z < zmin or z > 400:
         notes.append(("teeth", z, min(max(z, zmin), 400)))
         z = min(max(z, zmin), 400)
-    t = h["z_top"] - h["zb"]
+    t = float(spec.get("thickness", 5.0))
+    tmax = h["room"] - 0.5
+    if t < 0.6 or t > tmax:
+        notes.append(("thickness", t, min(max(t, 0.6), tmax)))
+        t = min(max(t, 0.6), tmax)
     rp = m * z / 2
     return dict(kind="spur", teeth=z, thickness=t, rp=rp, ra=rp + geneva.ADDENDUM * m,
                 rd=rp - geneva.DEDENDUM * m), notes
@@ -163,12 +150,16 @@ def build_spur(q, g, sq):
     out = geneva.gear_outline(m, N, g["pressure_angle"], segs)
     U = len(out) // N
     B = _Build()
-    zb, z1 = h["zb"], h["zb"] + sq["thickness"]          # z1 = the hub roof
+    zb, z1 = h["zb"], h["zb"] + sq["thickness"]
     ob, hb_ = B.ring(out, U, N, h["rh"], kb, zb, False)
     ot, ht = B.ring(out, U, N, h["rh"], kb, z1, True)
     B.wall(ob, ot)
     B.face(hb_, [B.bore(h, segs, zb)], False)          # annulus under the hub, between rh and rb
-    B.ngon(ht, True)                                     # flat top runs over the hub roof
+    # the hub above the gear: its bottom loop is the ring's inner loop at z1
+    c = _circle(h["rh"], N * kb, -math.pi / N)
+    top = B.loop(c, h["z_top"])
+    B.wall(ht, top)
+    B.ngon(top, True)
     return B.done()
 
 
@@ -277,92 +268,11 @@ def build_geneva_wheel(q, g, gq):
     return B.done()
 
 
-def holder_q(q, spec):
-    """Yoke holder dimensions in the nut frame (x along the rail, y across). Rests on the shaft tip; its
-    grip walls hug the nut's +-X faces; the groove runs along y. Returns (mq, notes)."""
-    h = hub(q)
-    notes = []
-    width = float(spec.get("width", 27.0))
-    w_c = min(max(width, 10.0), 200.0)
-    if abs(w_c - width) > 1e-9:
-        notes.append(("width", width, w_c))
-    gw = max(r for _z, r in GROOVE)
-    a = q["nut_length"] / 2 + HOLDER_FIT                   # grip face
-    A = max(a + HOLDER_WALL, gw + GROOVE_SIDE)              # block half-length (a short nut still gets walls)
-    zb = q["z_shaft0"] + HOLDER_FLOAT                       # block bottom, above the collar
-    zg = q["z_tip"] + HOLDER_ROOF                           # groove floor
-    return dict(a=a, hx=A, hy=w_c / 2, ws=min(q["nut_width"] / 2, w_c / 2), rb=h["rb"],
-                z_grip=q["z_top"] + HOLDER_FLOAT, z_block=zb, z_ceiling=q["z_tip"], z_groove=zg,
-                z_deck=zg + GROOVE[-1][0], grip=q["z_nut"] - (q["z_top"] + HOLDER_FLOAT),
-                width=w_c, groove=[(zg + dz, r) for dz, r in GROOVE]), notes
-
-
-def build_holder(q, mq):
-    """One closed solid, all faces planar: block (with the groove notch in its y-end faces), grip walls
-    under its x-ends, blind bore from the block bottom to the shaft tip. No booleans."""
-    m = _Mesh()
-    V = m.v
-    a, A, hy, ws, rb = mq["a"], mq["hx"], mq["hy"], mq["ws"], mq["rb"]
-    zs, zb, zc, zd = mq["z_grip"], mq["z_block"], mq["z_ceiling"], mq["z_deck"]
-    g = mq["groove"]                                     # [(z, half width)] floor .. top
-    notch = ws < hy - 1e-9                               # block wider than the grip walls
-    # groove profile from the deck on +x, down, across the floor, up to the deck on -x
-    gp = [(r, z) for z, r in reversed(g)] + [(-r, z) for z, r in g]
-    for sy in (1.0, -1.0):                               # y-end faces: block outline with the groove notch
-        y = sy * hy
-        if notch:
-            out = [(-A, zb), (A, zb)]
-        else:
-            out = [(-A, zs), (-a, zs), (-a, zb), (a, zb), (a, zs), (A, zs)]
-        out += [(A, zd)] + gp + [(-A, zd)]
-        m.face([V(x, y, z) for x, z in out], [], (0.0, sy, 0.0))
-    for k in range(len(gp) - 1):                         # groove faces along y
-        (x0, z0), (x1, z1) = gp[k], gp[k + 1]
-        nx, nz = (z1 - z0), -(x1 - x0)                   # toward the groove's air
-        L = (nx * nx + nz * nz) ** 0.5
-        m.face([V(x0, -hy, z0), V(x1, -hy, z1), V(x1, hy, z1), V(x0, hy, z0)], [], (nx / L, 0.0, nz / L))
-    r_top = g[-1][1]
-    for sx in (1.0, -1.0):
-        m.face([V(sx * r_top, -hy, zd), V(sx * A, -hy, zd), V(sx * A, hy, zd), V(sx * r_top, hy, zd)], [],
-               (0.0, 0.0, 1.0))                          # deck strips
-        x = sx * A                                       # x-end faces: block end plus its grip wall below
-        if notch:
-            yz = [(-hy, zb), (-ws, zb), (-ws, zs), (ws, zs), (ws, zb), (hy, zb), (hy, zd), (-hy, zd)]
-        else:
-            yz = [(-hy, zs), (hy, zs), (hy, zd), (-hy, zd)]
-        m.face([V(x, y, z) for y, z in yz], [], (sx, 0.0, 0.0))
-        xi = sx * a
-        m.face([V(xi, -ws, zs), V(xi, ws, zs), V(xi, ws, zb), V(xi, -ws, zb)], [], (-sx, 0.0, 0.0))  # grip face
-        m.face([V(xi, -ws, zs), V(x, -ws, zs), V(x, ws, zs), V(xi, ws, zs)], [], (0.0, 0.0, -1.0))   # wall bottom
-        if notch:
-            for sy in (1.0, -1.0):                       # the grip wall's sides
-                m.face([V(xi, sy * ws, zs), V(x, sy * ws, zs), V(x, sy * ws, zb), V(xi, sy * ws, zb)], [],
-                       (0.0, sy, 0.0))
-    n = q["segments"]
-    lo = [V(rb * math.cos(2 * math.pi * k / n), rb * math.sin(2 * math.pi * k / n), zb) for k in range(n)]
-    hi = [V(rb * math.cos(2 * math.pi * k / n), rb * math.sin(2 * math.pi * k / n), zc) for k in range(n)]
-    for k in range(n):                                   # bore wall, facing the axis
-        j = (k + 1) % n
-        m.faces.append((lo[j], lo[k], hi[k], hi[j]))
-    m.faces.append(tuple(hi[::-1]))                      # bore ceiling: rests on the shaft tip
-    if notch:
-        bot = [(-A, -hy), (A, -hy), (A, -ws), (a, -ws), (a, ws), (A, ws), (A, hy), (-A, hy), (-A, ws),
-               (-a, ws), (-a, -ws), (-A, -ws)]
-    else:
-        bot = [(-a, -hy), (a, -hy), (a, hy), (-a, hy)]
-    m.face([V(x, y, zb) for x, y in bot], [lo], (0.0, 0.0, -1.0))
-    return m.verts, m.faces
-
-
 # ── Layout ───────────────────────────────────────────────────────────────────
-
-RENAMED = {"mount": "yoke_holder"}     # the short-lived "Fixed mount" (2026-11-06) became the yoke holder
-
 
 def _mech_spec(r):
     kind = r.get("mech", "none") or "none"
-    kind = RENAMED.get(kind, kind)
-    if kind not in MECH_DEFAULTS:         # unknown (old saved page state, typo): treat as nothing
+    if kind not in MECH_DEFAULTS:         # unknown: old saved page state (the retired yoke holder, 2026-11-06)
         kind = "none"
     spec = dict(MECH_DEFAULTS.get(kind, {}))
     spec.update({k: v for k, v in r.items() if k not in ("mech", "link", "pos")})
@@ -403,17 +313,14 @@ def layout(spec):
     for i, r in enumerate(rs):
         kind, ms = _mech_spec(r)
         asked = r.get("mech", "none") or "none"
-        if kind != asked and RENAMED.get(asked) != kind:
-            issues.append("Rail %d: unknown mechanism %r, left empty." % (i + 1, asked))
+        if kind != asked:
+            issues.append("Rail %d: %r isn't available any more, so it's left empty." % (i + 1, asked))
         item = dict(index=i, kind=kind, y=sr.carrier_y(q, i), link=r.get("link"), pos=float(r.get("pos", 0.5)))
         if kind == "spur":
             item["mq"], nn = spur_q(q, g, ms)
             notes += [("rail %d" % (i + 1), a, b, c) for a, b, c in nn]
         elif kind == "geneva_driver":
             item["mq"], nn = geneva_q(q, g, ms)
-            notes += [("rail %d" % (i + 1), a, b, c) for a, b, c in nn]
-        elif kind == "yoke_holder":
-            item["mq"], nn = holder_q(q, ms)
             notes += [("rail %d" % (i + 1), a, b, c) for a, b, c in nn]
         out.append(item)
     # wheels take their driver's dimensions
@@ -456,8 +363,6 @@ def layout(spec):
                 issues.append("Rails %d and %d link to each other in a loop." % (i + 1, j + 1))
             elif it["kind"] == "none" or out[j]["kind"] == "none":
                 issues.append("Rail %d links to rail %d, but one of them has no mechanism." % (i + 1, j + 1))
-            elif "yoke_holder" in (it["kind"], out[j]["kind"]):
-                issues.append("Rail %d links to rail %d, but a yoke holder doesn't turn or mesh." % (i + 1, j + 1))
             else:
                 d = centre_distance(it, out[j])
                 if d is None:
@@ -497,8 +402,6 @@ def layout(spec):
     if out[k_in]["kind"] == "geneva_wheel":
         issues.append("Rail %d: a Geneva wheel can't be the input; turn its driver instead." % (k_in + 1))
         progs[k_in] = dict(kind="static")
-    elif out[k_in]["kind"] == "yoke_holder":
-        progs[k_in] = dict(kind="static")         # a yoke holder never turns
     queue = [k_in] if progs[k_in]["kind"] == "input" else []
     while queue:
         p = queue.pop(0)
@@ -531,8 +434,7 @@ def layout(spec):
                 prims=prims, knobs=knobs)
 
 
-LABELS = dict(none="nothing", spur="spur gear", geneva_driver="Geneva driver", geneva_wheel="Geneva wheel",
-              yoke_holder="yoke holder")
+LABELS = dict(none="nothing", spur="spur gear", geneva_driver="Geneva driver", geneva_wheel="Geneva wheel")
 
 
 # ── Geneva / gear angle (mirrors the JS animation) ───────────────────────────
@@ -566,17 +468,12 @@ def _depth(lay, i):
 # ── Collision primitives (plan circles in z bands) ───────────────────────────
 
 def primitives(q, it):
-    """[(tag, r, z0, z1)] about the rail's shaft axis (nut frame z): plan circles. A box footprint adds
-    its half-sizes: (tag, r, z0, z1, hx, hy), with r the circle around the box."""
+    """[(tag, r, z0, z1)] about the rail's shaft axis (nut frame z)."""
     h = hub(q)
     k = it["kind"]
     if k == "none":
-        return [("shaft", q["r_collar"], q["z_nut"], q["z_tip"])]
-    if k == "yoke_holder":
-        mq = it["mq"]
-        return [("holder", math.hypot(mq["hx"], mq["ws"]), mq["z_grip"], mq["z_block"], mq["hx"], mq["ws"]),
-                ("holder", math.hypot(mq["hx"], mq["hy"]), mq["z_block"], mq["z_deck"], mq["hx"], mq["hy"])]
-    out = [("hub", h["rh"], q["z_nut"], h["z_top"])]
+        return [("shaft", q["r_collar"], q["z_top"], q["z_tip"])]
+    out = [("hub", h["rh"], q["z_top"], h["z_top"])]
     mq = it["mq"]
     zb = h["zb"]
     if k == "spur":
@@ -604,21 +501,6 @@ def knob_boxes(q):
     return out
 
 
-def _gap(pa, xa, ya, pb, xb, yb):
-    """Plan clearance between two primitives (circle or box), centred at their rails' shafts."""
-    ba, bb = len(pa) > 4, len(pb) > 4
-    dx, dy = abs(xa - xb), abs(ya - yb)
-    if not ba and not bb:
-        return math.hypot(dx, dy) - pa[1] - pb[1]
-    if ba and bb:
-        gx, gy = dx - pa[4] - pb[4], dy - pa[5] - pb[5]
-        return math.hypot(max(gx, 0.0), max(gy, 0.0)) if gx > 0 or gy > 0 else max(gx, gy)
-    box, circ = (pa, pb) if ba else (pb, pa)
-    gx, gy = dx - box[4], dy - box[5]
-    out = math.hypot(max(gx, 0.0), max(gy, 0.0)) if gx > 0 or gy > 0 else max(gx, gy)
-    return out - circ[1]
-
-
 def collisions(q, rails, prims, knobs, xs=None):
     """Plain-language list of parts that would touch. Meshing pairs are skipped where they are meant
     to overlap in plan (gear tips with gear tips, a Geneva driver with its wheel)."""
@@ -631,35 +513,31 @@ def collisions(q, rails, prims, knobs, xs=None):
     for i in range(len(rails)):
         for j in range(i + 1, len(rails)):
             pair = frozenset((i, j))
+            d = math.hypot(xs[i] - xs[j], rails[i]["y"] - rails[j]["y"])
             geneva_pair = pair in linked and {rails[i]["kind"], rails[j]["kind"]} == {"geneva_driver", "geneva_wheel"}
-            for pa in prims[i]:
-                ta, ra, a0, a1 = pa[:4]
-                for pb in prims[j]:
-                    tb, rb, b0, b1 = pb[:4]
+            for ta, ra, a0, a1 in prims[i]:
+                for tb, rb, b0, b1 in prims[j]:
                     if min(a1, b1) - max(a0, b0) <= 1e-6:
                         continue
                     if pair in linked and (geneva_pair or (ta == "gear" and tb == "gear")):
                         continue
-                    gap = _gap(pa, xs[i], rails[i]["y"], pb, xs[j], rails[j]["y"])
-                    if gap < COLLIDE_GAP - 1e-9:
+                    if d < ra + rb + COLLIDE_GAP - 1e-9:
                         msgs.append("Rail %d's %s hits rail %d's %s (%.1f mm short)."
-                                    % (i + 1, _part(ta), j + 1, _part(tb), COLLIDE_GAP - gap))
+                                    % (i + 1, _part(ta), j + 1, _part(tb), ra + rb + COLLIDE_GAP - d))
                         break
                 else:
                     continue
                 break
     for i, it in enumerate(rails):
-        for pr in prims[i]:
-            tag, r, z0, z1 = pr[:4]
+        for tag, r, z0, z1 in prims[i]:
             if tag in ("shaft",):
                 continue
-            hx, hy = (pr[4], pr[5]) if len(pr) > 4 else (0.0, 0.0)
             for x0, x1, y0, y1, ztop in knobs:
                 if z0 >= ztop:
                     continue
-                dx = max(x0 - xs[i] - hx, 0.0, xs[i] - hx - x1)
-                dy = max(y0 - it["y"] - hy, 0.0, it["y"] - hy - y1)
-                if math.hypot(dx, dy) < (r if len(pr) <= 4 else 0.0) + COLLIDE_GAP:
+                dx = max(x0 - xs[i], 0.0, xs[i] - x1)
+                dy = max(y0 - it["y"], 0.0, it["y"] - y1)
+                if math.hypot(dx, dy) < r + COLLIDE_GAP:
                     msgs.append("Rail %d's %s hits a knob or endstop; move the nut in." % (i + 1, _part(tag)))
                     break
             else:
@@ -670,7 +548,7 @@ def collisions(q, rails, prims, knobs, xs=None):
 
 def _part(tag):
     return dict(shaft="shaft", hub="hub", gear="gear", plate="crank plate", crank="pin and locking disc",
-                wheel="wheel", holder="yoke holder").get(tag, tag)
+                wheel="wheel").get(tag, tag)
 
 
 # ── Meshes ───────────────────────────────────────────────────────────────────
@@ -684,6 +562,4 @@ def build_mech(lay, i):
         return build_geneva_driver(q, g, it["mq"])
     if it["kind"] == "geneva_wheel":
         return build_geneva_wheel(q, g, it["mq"])
-    if it["kind"] == "yoke_holder":
-        return build_holder(q, it["mq"])
     return None

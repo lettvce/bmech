@@ -8,9 +8,7 @@ screw, x = 0 at the start of the thread, screw axis on y = z = 0):
     handle   knurled knob; its sleeve runs in the end wall, its square peg plugs into the screw
     endstop  same sleeve and peg on the far end, holds the screw axially against the handle; its cap is
              a disc as wide as the knob, so it is not a tiny loose part
-    nut      block guided by the channel walls, threaded through, carries a collar and shaft; its top
-             stands NUT_RISE above the body, so a part that must not spin can grip its front and back
-             faces (rail_mechs "mount") instead of relying on the round shaft
+    nut      block guided by the channel walls, threaded through, carries a collar and shaft
 
 Mechanisms drop over a shaft with a capped hub (rail_mechs.py), so there is no separate stop cap.
 
@@ -70,7 +68,6 @@ KNOB_CHAMFER = 0.6
 KNURL_DEPTH = 0.258
 KNURL_PITCH = 2.03          # along the circumference
 KNOB_GAP = 1.0              # between neighbouring knobs
-NUT_RISE = 3.0              # nut top above the body top: grip for fixed mounts (Blake, 2026-11-06)
 COLLAR_LIP, MIN_COLLAR_LIP = 1.0, 0.6
 COLLAR_HEIGHT, COLLAR_FILLET = 2.0, 0.4
 COLLAR_INSET = 0.05         # keeps the collar off the block's edge, which would pinch the top face
@@ -165,8 +162,7 @@ def derive(p=None):
     q["r_shaft"] = q["shaft_diameter"] / 2
     collar_max = min(q["nut_length"], q["nut_width"]) / 2 - COLLAR_INSET
     q["r_collar"] = min(q["r_shaft"] + COLLAR_LIP, collar_max)
-    q["z_nut"] = q["z_top"] + NUT_RISE           # nut top; z_top stays the body top
-    q["z_shaft0"] = q["z_nut"] + COLLAR_HEIGHT
+    q["z_shaft0"] = q["z_top"] + COLLAR_HEIGHT
     q["z_tip"] = q["z_shaft0"] + q["shaft_length"]
     q["r_hub_bore"] = q["r_shaft"] + q["shaft_clearance"]
     q["shaft_usable"] = q["shaft_length"]
@@ -385,9 +381,8 @@ def build_nut(q):
     m = _Mesh()
     n = q["segments"]
     hl, hw, hh = q["nut_length"] / 2, q["nut_width"] / 2, q["nut_height"] / 2
-    ht = q["z_nut"]                                  # top: NUT_RISE above the body
     lo, hi = _helix_wall(m, q, -hl, hl, q["thread_clearance"], True)
-    corners = lambda x: [m.v(x, hw, -hh), m.v(x, hw, ht), m.v(x, -hw, ht), m.v(x, -hw, -hh)]
+    corners = lambda x: [m.v(x, hw, -hh), m.v(x, hw, hh), m.v(x, -hw, hh), m.v(x, -hw, -hh)]
     a, b = corners(-hl), corners(hl)
     for j in (0, 2, 3):     # the top side comes last, with the collar's hole in it
         m.faces.append((a[j], a[(j + 1) % 4], b[(j + 1) % 4], b[j]))
@@ -395,7 +390,7 @@ def build_nut(q):
     m.face(b, [hi], (1.0, 0.0, 0.0))
     # collar and shaft stand on the top face
     rc, rs = q["r_collar"], q["r_shaft"]
-    z0, z1, z_tip = q["z_nut"], q["z_shaft0"], q["z_tip"]
+    z0, z1, z_tip = q["z_top"], q["z_shaft0"], q["z_tip"]
     fc = min(COLLAR_FILLET, 0.5 * (rc - rs))
     ft = min(1.0, 0.5 * rs)
     rows = [(z0, rc)] + _fillet(z1 - fc, rc, z1, rc - fc)
@@ -403,7 +398,7 @@ def build_nut(q):
     rings = [_ring_z(m, z, r, n) for z, r in rows]
     _loft(m, rings)
     _ngon(m, rings[-1], (0.0, 0.0, 1.0))
-    top = [m.v(-hl, -hw, ht), m.v(hl, -hw, ht), m.v(hl, hw, ht), m.v(-hl, hw, ht)]
+    top = [m.v(-hl, -hw, hh), m.v(hl, -hw, hh), m.v(hl, hw, hh), m.v(-hl, hw, hh)]
     m.face(top, [rings[0]], (0.0, 0.0, 1.0))
     return m.verts, m.faces
 

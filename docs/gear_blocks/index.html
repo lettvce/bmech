@@ -223,12 +223,6 @@
      channel walls, and a short shaft stands on top of the nut. Turn a knob
      and that nut, with whatever sits on its shaft, slides along the rail.</p>
   <ul>
-    <li><strong>Yoke holders.</strong> Every nut stands 3 mm above the
-        body. A yoke holder sits on the shaft tip like the hubs do, and two
-        walls hug the nut's front and back faces, so it can't turn. The
-        dovetail groove across its top guides a Scotch yoke's tongue, with
-        0.3 mm clearance per side and 0.4 mm under it, so the two can print
-        in place, top down.</li>
     <li><strong>Mechanisms drop over the shafts.</strong> Each has a capped
         hub that runs on the shaft with a 0.4 mm clearance. The cap rests on
         the shaft tip and the hub floats just above the collar, so it spins
@@ -322,6 +316,7 @@ const FIELDS = [
 const MECH_FIELDS = {
   spur: [
     { id: "teeth", label: "Teeth", unit: "T", min: 8, max: 200, step: 1 },
+    { id: "thickness", label: "Gear Thickness", unit: "mm", min: 0.6, max: 60, step: 0.5 },
   ],
   geneva_driver: [
     { id: "slots", label: "Wheel Slots", unit: "", min: 3, max: 24, step: 1 },
@@ -336,13 +331,10 @@ const MECH_FIELDS = {
     { id: "tip_round", label: "Slot Entry Rounding", unit: "mm", min: 0, max: 3, step: 0.1, hint: "Rounds the wheel's sharp slot tips. 0 = sharp; capped to what fits." },
   ],
   geneva_wheel: [],
-  yoke_holder: [
-    { id: "width", label: "Holder Width", unit: "mm", min: 10, max: 200, step: 0.5, hint: "Across the rail: the groove's length. 27 matches the hand-made holder." },
-  ],
   none: [],
 };
-const MECH_LABEL = { none: "Nothing", spur: "Spur gear", geneva_driver: "Geneva driver", geneva_wheel: "Geneva wheel", yoke_holder: "Yoke holder" };
-const MECH_SHORT = { none: "—", spur: "gear", geneva_driver: "driver", geneva_wheel: "wheel", yoke_holder: "holder" };
+const MECH_LABEL = { none: "Nothing", spur: "Spur gear", geneva_driver: "Geneva driver", geneva_wheel: "Geneva wheel" };
+const MECH_SHORT = { none: "—", spur: "gear", geneva_driver: "driver", geneva_wheel: "wheel" };
 
 const STORE_KEY = "shaft_rail_v1";
 const DEFAULT_STATE = {
@@ -358,7 +350,7 @@ const DEFAULT_STATE = {
 // ---------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------
-const worker = new Worker("worker.js?v=11");
+const worker = new Worker("worker.js?v=13");
 let reqId = 0;
 const waiting = new Map();
 worker.onmessage = (e) => {
@@ -455,12 +447,8 @@ function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
     if (s && Array.isArray(s.rails) && s.rails.length) {
-      // saved by an older page: renamed or retired mechanisms
-      for (const r of s.rails) {
-        if (r.mech === "mount") r.mech = "yoke_holder";
-        if (!r.mech || !(r.mech in MECH_LABEL)) { r.mech = "none"; r.link = null; }
-        if (r.mech === "yoke_holder") r.link = null;
-      }
+      // saved by an older page: retired mechanisms (the yoke holder) load as empty rails
+      for (const r of s.rails) if (!r.mech || !(r.mech in MECH_LABEL)) { r.mech = "none"; r.link = null; }
       state = s;
     }
   } catch (e) { /* defaults */ }
@@ -715,7 +703,7 @@ function renderRailFields() {
         (f.hint ? `<span class="hint">${f.hint}</span>` : "") + `</div>`;
     }
   }
-  if (kind !== "none" && kind !== "yoke_holder") {
+  if (kind !== "none") {
     const L = r.link;
     h += `<div class="field"><label for="rf-link">${kind === "geneva_wheel" ? "Driven by" : "Meshes with"}</label><select id="rf-link">` +
       `<option value="">— nothing (own knob)</option>` +
@@ -731,11 +719,7 @@ function renderRailFields() {
     h += `<div class="field"><label for="rf-pos">Nut Position <span class="unit-suffix" id="rf-pos-val"></span></label>` +
       `<input type="range" id="rf-pos" min="0" max="1" step="0.001" value="${r.pos ?? 0.5}"></div>`;
   }
-  if (kind === "yoke_holder") {
-    h += `<div class="field"><span class="hint">Doesn't turn: its walls grip the nut's front and back. ` +
-      `The dovetail groove across the top guides a Scotch yoke's tongue.</span></div>`;
-  }
-  if (kind !== "none" && kind !== "geneva_wheel" && kind !== "yoke_holder") {
+  if (kind !== "none" && kind !== "geneva_wheel") {
     h += `<div class="btn-row"><button type="button" class="btn${state.input === selected ? " on" : ""}" id="rf-input">` +
       `${state.input === selected ? "This rail drives the train" : "Drive the train from this rail"}</button></div>`;
   }
@@ -743,7 +727,7 @@ function renderRailFields() {
 
   $("rf-mech").addEventListener("change", (e) => {
     const k = e.target.value;
-    const keep = { mech: k, pos: r.pos ?? 0.5, link: k === "none" || k === "yoke_holder" ? null : r.link };
+    const keep = { mech: k, pos: r.pos ?? 0.5, link: k === "none" ? null : r.link };
     state.rails[selected] = keep;
     rebuild();
   });
@@ -804,18 +788,13 @@ function renderInfo() {
   const R = info.rail, ri = info.rails[selected];
   const rows = [];
   if (ri.kind === "spur") {
-    rows.push(["Teeth", `${ri.teeth}`], ["Tip diameter", `${fmt(2 * ri.tip)} mm`],
-              ["Thickness", `${fmt(ri.thickness)} mm (flat top, level with the hubs)`]);
+    rows.push(["Teeth", `${ri.teeth}`], ["Tip diameter", `${fmt(2 * ri.tip)} mm`]);
   } else if (ri.kind === "geneva_driver") {
     rows.push(["Wheel slots", `${ri.slots}`], ["Centre distance", `${fmt(ri.center_distance, 2)} mm`],
               ["Wheel locked", `${fmt(100 * ri.dwell, 0)}% of each turn`]);
     if (ri.toothed) rows.push(["Plate teeth", `${ri.gear_teeth}`], ["Plate tip diameter", `${fmt(2 * ri.plate_r)} mm`]);
   } else if (ri.kind === "geneva_wheel") {
     rows.push(["Indexes", `1/${ri.slots} turn per driver turn`]);
-  } else if (ri.kind === "yoke_holder") {
-    rows.push(["Holder", `${fmt(ri.length)} mm along the rail × ${fmt(ri.width)} mm across`],
-              ["Groove", `5.6 mm neck, 9.6 mm wide, 5.8 deep; floor ${fmt(ri.z_groove)} mm above the screw axis`],
-              ["Grips the nut", `${fmt(ri.grip)} mm of its raised faces`]);
   }
   if (ri.distance) rows.push(["Centre distance to rail " + (ri.parent + 1), `${fmt(ri.distance, 2)} mm`]);
   const s = ri.kind !== "none" ? speedOf(selected) : null;
@@ -897,7 +876,6 @@ function mechName(i) {
   const r = info.rails[i];
   const what = r.kind === "spur" ? `spur_m${info.gear.module}_${r.teeth}T`
     : r.kind === "geneva_driver" ? `geneva_driver_${r.slots}slot${r.toothed ? `_${r.gear_teeth}T` : ""}`
-    : r.kind === "yoke_holder" ? `yoke_holder_${r.width}mm`
     : `geneva_wheel_${r.slots}slot`;
   return `rail${i + 1}_${what}.stl`;
 }
