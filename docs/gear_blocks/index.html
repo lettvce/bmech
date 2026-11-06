@@ -223,6 +223,12 @@
      channel walls, and a short shaft stands on top of the nut. Turn a knob
      and that nut, with whatever sits on its shaft, slides along the rail.</p>
   <ul>
+    <li><strong>Fixed mounts.</strong> Every nut stands 3 mm above the
+        body. A fixed mount sits on the shaft tip like the hubs do, and two
+        walls hug the nut's front and back faces, so it can't turn: a base
+        for a Scotch yoke's guide, a bracket, or anything else that has to
+        stay put while the gears spin. Its top is flat to build on, and it's
+        open underneath, so it prints top-down without supports.</li>
     <li><strong>Mechanisms drop over the shafts.</strong> Each has a capped
         hub that runs on the shaft with a 0.4 mm clearance. The cap rests on
         the shaft tip and the hub floats just above the collar, so it spins
@@ -331,10 +337,11 @@ const MECH_FIELDS = {
     { id: "tip_round", label: "Slot Entry Rounding", unit: "mm", min: 0, max: 3, step: 0.1, hint: "Rounds the wheel's sharp slot tips. 0 = sharp; capped to what fits." },
   ],
   geneva_wheel: [],
+  mount: [],
   none: [],
 };
-const MECH_LABEL = { none: "Nothing", spur: "Spur gear", geneva_driver: "Geneva driver", geneva_wheel: "Geneva wheel" };
-const MECH_SHORT = { none: "—", spur: "gear", geneva_driver: "driver", geneva_wheel: "wheel" };
+const MECH_LABEL = { none: "Nothing", spur: "Spur gear", geneva_driver: "Geneva driver", geneva_wheel: "Geneva wheel", mount: "Fixed mount" };
+const MECH_SHORT = { none: "—", spur: "gear", geneva_driver: "driver", geneva_wheel: "wheel", mount: "mount" };
 
 const STORE_KEY = "shaft_rail_v1";
 const DEFAULT_STATE = {
@@ -350,7 +357,7 @@ const DEFAULT_STATE = {
 // ---------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------
-const worker = new Worker("worker.js?v=7");
+const worker = new Worker("worker.js?v=8");
 let reqId = 0;
 const waiting = new Map();
 worker.onmessage = (e) => {
@@ -699,7 +706,7 @@ function renderRailFields() {
         (f.hint ? `<span class="hint">${f.hint}</span>` : "") + `</div>`;
     }
   }
-  if (kind !== "none") {
+  if (kind !== "none" && kind !== "mount") {
     const L = r.link;
     h += `<div class="field"><label for="rf-link">${kind === "geneva_wheel" ? "Driven by" : "Meshes with"}</label><select id="rf-link">` +
       `<option value="">— nothing (own knob)</option>` +
@@ -715,7 +722,11 @@ function renderRailFields() {
     h += `<div class="field"><label for="rf-pos">Nut Position <span class="unit-suffix" id="rf-pos-val"></span></label>` +
       `<input type="range" id="rf-pos" min="0" max="1" step="0.001" value="${r.pos ?? 0.5}"></div>`;
   }
-  if (kind !== "none" && kind !== "geneva_wheel") {
+  if (kind === "mount") {
+    h += `<div class="field"><span class="hint">Doesn't turn: its walls grip the nut's front and back. ` +
+      `Build your part on its flat top (download the STL), and print it top-down.</span></div>`;
+  }
+  if (kind !== "none" && kind !== "geneva_wheel" && kind !== "mount") {
     h += `<div class="btn-row"><button type="button" class="btn${state.input === selected ? " on" : ""}" id="rf-input">` +
       `${state.input === selected ? "This rail drives the train" : "Drive the train from this rail"}</button></div>`;
   }
@@ -723,7 +734,7 @@ function renderRailFields() {
 
   $("rf-mech").addEventListener("change", (e) => {
     const k = e.target.value;
-    const keep = { mech: k, pos: r.pos ?? 0.5, link: k === "none" ? null : r.link };
+    const keep = { mech: k, pos: r.pos ?? 0.5, link: k === "none" || k === "mount" ? null : r.link };
     state.rails[selected] = keep;
     rebuild();
   });
@@ -791,6 +802,9 @@ function renderInfo() {
     if (ri.toothed) rows.push(["Plate teeth", `${ri.gear_teeth}`], ["Plate tip diameter", `${fmt(2 * ri.plate_r)} mm`]);
   } else if (ri.kind === "geneva_wheel") {
     rows.push(["Indexes", `1/${ri.slots} turn per driver turn`]);
+  } else if (ri.kind === "mount") {
+    rows.push(["Deck", `${fmt(ri.deck_x)} × ${fmt(ri.deck_y)} mm, ${fmt(ri.z_deck)} mm above the screw axis`],
+              ["Grips the nut", `${fmt(ri.grip)} mm of its raised faces`]);
   }
   if (ri.distance) rows.push(["Centre distance to rail " + (ri.parent + 1), `${fmt(ri.distance, 2)} mm`]);
   const s = ri.kind !== "none" ? speedOf(selected) : null;
@@ -872,6 +886,7 @@ function mechName(i) {
   const r = info.rails[i];
   const what = r.kind === "spur" ? `spur_m${info.gear.module}_${r.teeth}T`
     : r.kind === "geneva_driver" ? `geneva_driver_${r.slots}slot${r.toothed ? `_${r.gear_teeth}T` : ""}`
+    : r.kind === "mount" ? "fixed_mount"
     : `geneva_wheel_${r.slots}slot`;
   return `rail${i + 1}_${what}.stl`;
 }
