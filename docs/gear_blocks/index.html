@@ -224,7 +224,7 @@
      and that nut, with whatever sits on its shaft, slides along the rail.</p>
   <ul>
     <li><strong>Mechanisms drop over the shafts.</strong> Each has a capped
-        hub that runs on the shaft with a 0.2 mm clearance. The cap rests on
+        hub that runs on the shaft with a 0.3 mm clearance. The cap rests on
         the shaft tip and the hub floats just above the collar, so it spins
         freely. There's no separate stop cap to lose.</li>
     <li><strong>Meshing across rails.</strong> Neighbouring shafts are one
@@ -348,7 +348,7 @@ const DEFAULT_STATE = {
 // ---------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------
-const worker = new Worker("worker.js?v=3");
+const worker = new Worker("worker.js?v=4");
 let reqId = 0;
 const waiting = new Map();
 worker.onmessage = (e) => {

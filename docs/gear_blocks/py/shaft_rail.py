@@ -48,7 +48,7 @@ DEFAULTS = dict(
     thread_clearance=0.3,   # nut to screw, radial (0.15 printed too tight, 2026-11-05)
     fit_clearance=0.15,     # nut to channel, sleeve to wall bore
     peg_clearance=0.1,      # square peg to the screw's socket, per side
-    shaft_clearance=0.2,    # mechanism hub bore to the shaft, radial (running fit)
+    shaft_clearance=0.3,    # mechanism hub bore to the shaft, radial (0.2 printed too tight, 2026-11-05)
     segments=64,            # per full circle, rounded to a multiple of 4
 )
 ROOT_W, FLANK_W, CREST_W = 0.25, 0.3125, 0.125   # thread profile, x pitch
