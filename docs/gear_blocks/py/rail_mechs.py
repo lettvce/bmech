@@ -6,7 +6,8 @@ Every mechanism is one closed solid fused to a capped hub: the hub's bore runs o
 Gravity holds it on (the shafts stand vertical); there is no separate stop cap to lose.
 
     spur           involute spur gear (bmech profile, geneva.gear_outline)
-    cluster        two spur gears fused on one hub, a bottom and a top gear (2026-11-11)
+    cluster        two spur gears fused on one hub, a bottom and a top gear (2026-11-11); the top gear runs up
+                   to the hub's top, so the top is one flat face: print the bigger gear down, either way up
     geneva_driver  Geneva crank: plate (plain disc or spur teeth), locking disc and pin
     geneva_wheel   the slotted wheel, raised on its hub to sit over its driver's plate
 
@@ -38,12 +39,13 @@ HUB_ROOF = 1.6          # cap over the shaft tip
 HUB_LIFT = 0.4          # hub bottom above the collar top; the roof rests on the shaft tip
 STACK_ROOM = 0.5        # top of a Geneva stack below the shaft tip (hub roof sits above)
 COLLIDE_GAP = 0.3       # parts that are not meant to touch keep at least this apart
+CLUSTER_MIN_TOP = 2.0   # a cluster's top gear, at least this thick (it runs from the step to the hub top)
 
 GEAR_DEFAULTS = dict(module=2.4, pressure_angle=20.0, backlash=0.25)    # chunky teeth, still many ratios
 MECH_DEFAULTS = {
     "none": {},
     "spur": dict(teeth=16, thickness=5.0),
-    "cluster": dict(teeth=30, thickness=5.0, teeth_top=14, thickness_top=5.0),
+    "cluster": dict(teeth=30, thickness=5.0, teeth_top=14),       # the top gear fills up to the hub top
     "geneva_driver": dict(slots=6, center_distance=40.0, pin_diameter=5.0, clearance=0.2,
                           plate_thickness=3.0, layer_gap=0.4, wheel_thickness=5.0,
                           toothed=False, gear_teeth=24, tip_round=1.0),
@@ -153,13 +155,21 @@ def spur_q(q, g, spec):
 
 def cluster_q(q, g, spec):
     """Clamped cluster: two gears on one hub, each clamped like a spur. The smaller one's tips stay
-    0.4 mm inside the larger one's root circle, so the step between them is a flat ring; both
-    thicknesses together fit the hub."""
+    0.4 mm inside the larger one's root circle, so the step between them is a flat ring. The top gear
+    runs from the step up to the hub's top (flat top, like the Geneva wheel), so only the bottom
+    gear's thickness is asked for; thickness_top here is for an unlifted cluster (layout() redoes it)."""
     h = hub(q)
     m = g["module"]
-    lo, nn = spur_q(q, g, dict(teeth=spec.get("teeth", 30), thickness=spec.get("thickness", 5.0)))
-    hi, nt = spur_q(q, g, dict(teeth=spec.get("teeth_top", 14), thickness=spec.get("thickness_top", 5.0)))
-    notes = list(nn) + [(n + "_top", a, b) for n, a, b in nt]
+    full = h["z_top"] - h["zb"]
+    lo, nn = spur_q(q, g, dict(teeth=spec.get("teeth", 30), thickness=0.6))
+    hi, nt = spur_q(q, g, dict(teeth=spec.get("teeth_top", 14), thickness=0.6))
+    notes = [n for n in nn if n[0] == "teeth"] + [(n + "_top", a, b) for n, a, b in nt if n == "teeth"]
+    t = float(spec.get("thickness", 5.0))
+    tmax = full - CLUSTER_MIN_TOP
+    if t < 0.6 or t > tmax:
+        notes.append(("thickness", t, min(max(t, 0.6), tmax)))
+        t = min(max(t, 0.6), tmax)
+    lo["thickness"], hi["thickness"] = t, full - t
     zmin = max(geneva.MIN_TEETH, int(math.ceil(2 * (h["rh"] + 1.0) / m + 2 * geneva.DEDENDUM - 1e-9)))
     dz = int(math.ceil(2 * (geneva.ADDENDUM + geneva.DEDENDUM) + 0.8 / m - 1e-9))
     z1, z2 = lo["teeth"], hi["teeth"]
@@ -169,14 +179,6 @@ def cluster_q(q, g, spec):
         z2n = up if (z2 >= z1 or down < zmin) and up <= 400 else down
         notes.append(("teeth_top", z2, z2n))
         hi, _n = spur_q(q, g, dict(teeth=z2n, thickness=hi["thickness"]))
-    tmax = h["room"] - 0.5
-    over = lo["thickness"] + hi["thickness"] - tmax
-    for d, name in ((hi, "thickness_top"), (lo, "thickness")):
-        if over > 1e-9:
-            v = max(0.6, d["thickness"] - over)
-            notes.append((name, d["thickness"], v))
-            over -= d["thickness"] - v
-            d["thickness"] = v
     return dict(kind="cluster", teeth=lo["teeth"], thickness=lo["thickness"], rp=lo["rp"], ra=lo["ra"], rd=lo["rd"],
                 teeth_top=hi["teeth"], thickness_top=hi["thickness"], rp_top=hi["rp"], ra_top=hi["ra"],
                 rd_top=hi["rd"]), notes
@@ -204,13 +206,14 @@ def build_spur(q, g, sq):
 
 def build_cluster(q, g, cq):
     return build_gear_stack(q, g, [(cq["teeth"], cq["thickness"]), (cq["teeth_top"], cq["thickness_top"])],
-                            cq.get("lift", 0.0))
+                            cq.get("lift", 0.0), flat_top=True)
 
 
-def build_gear_stack(q, g, stack, lift=0.0):
+def build_gear_stack(q, g, stack, lift=0.0, flat_top=False):
     """Gears [(teeth, thickness)] stacked from the hub bottom + lift, fused to the hub. Below a lifted
     stack the hub runs down to its bottom; between two gears the step is a flat ring: the larger gear's
-    ring in to a circle, then that circle to the smaller outline."""
+    ring in to a circle, then that circle to the smaller outline. flat_top: the last gear ends at the
+    hub's top (its thickness has to say so) and covers it, one flat face."""
     h, segs = hub(q), q["segments"]
     m, pa = g["module"], g["pressure_angle"]
     B = _Build()
@@ -231,8 +234,13 @@ def build_gear_stack(q, g, stack, lift=0.0):
     for k, (out, U, N, kb, t) in enumerate(outs):
         z1 = z + t
         if k == len(outs) - 1:
+            if flat_top:
+                z1 = h["z_top"]
             ot, it_ = B.ring(out, U, N, h["rh"], kb, z1, True)
             B.wall(ob, ot)
+            if flat_top:
+                B.ngon(it_, True)
+                break
             top = B.loop(_circle(h["rh"], N * kb, -math.pi / N), h["z_top"])
             B.wall(it_, top)
             B.ngon(top, True)
@@ -528,14 +536,17 @@ def layout(spec):
                             it["mesh_layers"] = (mi, ti)
                             it["mesh_teeth"] = (la[mi][0], lb[ti][0])
                             lift = out[j]["lift"] + lb[ti][1] - la[mi][1]
-                            top = lift + la[-1][2]
+                            if it["kind"] == "cluster":     # its top gear runs to the hub top, keeping CLUSTER_MIN_TOP
+                                top, limit = lift + la[0][2] + CLUSTER_MIN_TOP, h["z_top"] - h["zb"]
+                            else:
+                                top, limit = lift + la[-1][2], room
                             if abs(lift) > 1e-9 and it["kind"] not in LIFTABLE:
                                 issues.append("Rail %s's %s can't be raised on its hub to meet rail %s's %s gear."
                                               % (lab(i), LABELS[it["kind"]], lab(j),
                                                  "top" if ti else "bottom"))
-                            elif lift < -1e-9 or top > room + 1e-9:
+                            elif lift < -1e-9 or top > limit + 1e-9:
                                 issues.append("Rail %s's gear would sit %.1f mm %s its hub to meet rail %s; %s."
-                                              % (lab(i), -lift if lift < 0 else top - room,
+                                              % (lab(i), -lift if lift < 0 else top - limit,
                                                  "below" if lift < 0 else "above", lab(j),
                                                  "mesh another layer" if lift < 0 else "lengthen the shafts"))
                             else:
@@ -544,6 +555,8 @@ def layout(spec):
         it["x"] = x
         if it["kind"] in LIFTABLE:
             it["mq"] = dict(it["mq"], lift=it["lift"])
+        if it["kind"] == "cluster":
+            it["mq"]["thickness_top"] = h["z_top"] - h["zb"] - it["lift"] - it["mq"]["thickness"]
         lo, hi = x_range(q, i)
         if x < lo - 1e-6 or x > hi + 1e-6:
             issues.append("Rail %s's nut would be %.1f mm past the end of its travel."

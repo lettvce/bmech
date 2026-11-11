@@ -253,12 +253,15 @@
         little support under the wheel. The tooth profile is the same
         involute bmech's spur gear generator makes in Blender.</li>
     <li><strong>Cluster gears.</strong> Two gears fused on one hub, a bottom
-        and a top gear, for big reductions in a short space. A gear linked to
-        a cluster meets its top gear by default (switch to the bottom gear
+        and a top gear, for big reductions in a short space. The top gear
+        runs up to the hub's top, so the top is one flat face like the
+        Geneva wheel's. Either gear can be the bigger one and it still prints
+        without supports: bigger bottom gear, print it as it sits; bigger top
+        gear, print it upside down on its flat top. A gear linked to a
+        cluster meets its top gear by default (switch to the bottom gear
         under the link) and rides up its own hub to that height. A gear on
-        the top gear has to keep its hub clear of the big bottom gear, so it
-        needs enough teeth; the builder flags it if not. Print a cluster big
-        gear down.</li>
+        the top gear has to keep its hub clear of a bigger bottom gear, so
+        it needs enough teeth; the builder flags it if not.</li>
     <li><strong>Two-sided.</strong> Tick <em>Two-Sided</em> and a second
         rail, turned end for end, joins the first past an open middle. Each
         row gets a knob and nut on both sides (1L, 1R, …), each moved by its
@@ -335,9 +338,8 @@ const MECH_FIELDS = {
   ],
   cluster: [
     { id: "teeth", label: "Bottom Teeth", unit: "T", min: 8, max: 200, step: 1 },
-    { id: "thickness", label: "Bottom Thickness", unit: "mm", min: 0.6, max: 60, step: 0.5 },
+    { id: "thickness", label: "Bottom Thickness", unit: "mm", min: 0.6, max: 60, step: 0.5, hint: "Sets the step; the top gear runs from there to the hub's top, one flat face." },
     { id: "teeth_top", label: "Top Teeth", unit: "T", min: 8, max: 200, step: 1, hint: "Kept at least 5 teeth from the bottom gear (for module 2.4), so the step between them is flat." },
-    { id: "thickness_top", label: "Top Thickness", unit: "mm", min: 0.6, max: 60, step: 0.5 },
   ],
   geneva_driver: [
     { id: "slots", label: "Wheel Slots", unit: "", min: 3, max: 24, step: 1 },
@@ -371,7 +373,7 @@ const DEFAULT_STATE = {
 // ---------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------
-const worker = new Worker("worker.js?v=15");
+const worker = new Worker("worker.js?v=16");
 let reqId = 0;
 const waiting = new Map();
 worker.onmessage = (e) => {
@@ -864,7 +866,9 @@ function renderInfo() {
     rows.push(["Teeth", `${ri.teeth}`], ["Tip diameter", `${fmt(2 * ri.tip)} mm`]);
   } else if (ri.kind === "cluster") {
     rows.push(["Teeth (bottom / top)", `${ri.teeth} / ${ri.teeth_top}`],
-              ["Tip diameters", `${fmt(2 * ri.tip)} / ${fmt(2 * ri.tip_top)} mm`]);
+              ["Tip diameters", `${fmt(2 * ri.tip)} / ${fmt(2 * ri.tip_top)} mm`],
+              ["Gear thickness (bottom / top)", `${fmt(ri.thickness)} / ${fmt(ri.thickness_top)} mm`],
+              ["Print", ri.teeth_top > ri.teeth ? "flat top down (upside down)" : "bottom gear down"]);
   } else if (ri.kind === "geneva_driver") {
     rows.push(["Wheel slots", `${ri.slots}`], ["Centre distance", `${fmt(ri.center_distance, 2)} mm`],
               ["Wheel locked", `${fmt(100 * ri.dwell, 0)}% of each turn`]);
