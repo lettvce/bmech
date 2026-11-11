@@ -14,8 +14,11 @@ Mechanisms drop over a shaft with a capped hub (rail_mechs.py), so there is no s
 
 The wall bores pass the thread, so a screw slides in through one end wall and drops into its channel.
 
-Public API: DEFAULTS, clamp(params), derive(params), carrier_y(q, i), nut_x(q, t), build_body(q),
-build_screw(q), build_handle(q), build_endstop(q), build_nut(q).
+Two-sided (EXTRA_DEFAULTS two_sided=True): a second rail, the first turned 180 degrees about Z, past an
+open middle; turned(q, p) maps a point of the first rail onto the second.
+
+Public API: DEFAULTS, EXTRA_DEFAULTS, clamp(params), derive(params), carrier_y(q, i), nut_x(q, t),
+turned(q, p), build_body(q), build_screw(q), build_handle(q), build_endstop(q), build_nut(q).
 """
 
 import math
@@ -73,11 +76,22 @@ COLLAR_HEIGHT, COLLAR_FILLET = 2.0, 0.4
 COLLAR_INSET = 0.05         # keeps the collar off the block's edge, which would pinch the top face
 MAX_LEAD_ANGLE = 20.0       # degrees at the pitch diameter; caps the thread starts
 
+# Two-sided rail (Blake, 2026-11-10): a second whole rail, turned 180 degrees about Z, past an open
+# middle where only the two outer side walls carry on. Turned, not mirrored, so both screws keep the
+# same right-hand thread. Kept out of DEFAULTS so the web page is unchanged.
+EXTRA_DEFAULTS = dict(
+    two_sided=False,
+    center_gap=30.0,            # between the two inner end walls (Blake's model: 30)
+)
+CAP_GAP = 0.5               # two-sided: endstop cap to the outer side walls, radial
+MIN_CAP_GAP = 1.0           # two-sided: between the facing endstop caps
 
 def clamp(p=None):
     """(params, notes): out-of-range values replaced, notes = [(name, asked, used)]."""
     q = dict(DEFAULTS)
+    q.update(EXTRA_DEFAULTS)
     q.update(p or {})
+    q["two_sided"] = bool(q["two_sided"])
     asked = dict(q)
 
     def lim(name, lo=None, hi=None):
@@ -120,7 +134,11 @@ def clamp(p=None):
     spacing = q["nut_width"] + 2 * q["fit_clearance"] + q["wall_thickness"]
     neck = 2 * (q["thread_diameter"] / 2 + NECK_LIP)
     lim("knob_diameter", neck + 2.0, spacing - KNOB_GAP if q["count"] > 1 else 400.0)
-    notes = [(n, asked[n], q[n]) for n in DEFAULTS if abs(q[n] - asked[n]) > 1e-9]
+    # the facing endstop caps (each stands this far past its inner wall) must clear each other
+    cap_out = JOURNAL_EXTRA + ENDSTOP_FLOAT + ENDSTOP_CAP
+    lim("center_gap", 2 * cap_out + MIN_CAP_GAP, 1000.0)
+    names = list(DEFAULTS) + list(EXTRA_DEFAULTS)
+    notes = [(n, asked[n], q[n]) for n in names if abs(q[n] - asked[n]) > 1e-9]
     return q, notes
 
 
@@ -134,6 +152,7 @@ def derive(p=None):
     q["r_root"] = q["r_maj"] - THREAD_DEPTH * P
     q["r_journal"] = min(q["r_root"], q["r_maj"] - JOURNAL_CLEARANCE - MIN_SLEEVE)
     q["r_cup"] = q["r_journal"] + JOURNAL_CLEARANCE
+    two = q["two_sided"]
     q["r_bore"] = q["r_maj"] + q["fit_clearance"]
     q["r_neck"] = q["r_maj"] + NECK_LIP
     t = q["wall_thickness"]
@@ -142,14 +161,16 @@ def derive(p=None):
     q["peg_length"] = q["journal"] - 1.0
     q["chan_half"] = q["nut_width"] / 2 + q["fit_clearance"]
     q["spacing"] = 2 * q["chan_half"] + t
-    q["z_top"] = q["nut_height"] / 2
+    q["z_top"] = q["nut_height"] / 2            # body top, flush with the nut block's top
     q["z_floor"] = -q["nut_height"] / 2 - FLOOR_GAP
     q["z_bottom"] = q["z_floor"] - t
     q["x_in0"] = -GAP_HANDLE                      # inside faces of the end walls
     q["x_in1"] = q["screw_length"] + GAP_ENDSTOP
     q["x_out0"] = q["x_in0"] - t
     q["x_out1"] = q["x_in1"] + t
-    q["body_length"] = q["x_out1"] - q["x_out0"]
+    # two-sided: the second rail is the first turned about Z through (x_mid, 0)
+    q["x_mid"] = q["x_out1"] + q["center_gap"] / 2
+    q["body_length"] = (2 * (q["x_mid"] - q["x_out0"])) if two else q["x_out1"] - q["x_out0"]
     q["body_width"] = q["count"] * q["spacing"] + t
     q["body_height"] = q["z_top"] - q["z_bottom"]
     # nut centre range; the nut is modelled for a centre on a whole number of pitches
@@ -166,6 +187,11 @@ def derive(p=None):
     q["z_tip"] = q["z_shaft0"] + q["shaft_length"]
     q["r_hub_bore"] = q["r_shaft"] + q["shaft_clearance"]
     q["shaft_usable"] = q["shaft_length"]
+    # endstop cap as wide as the knob (no tiny loose part); two-sided, it sits in the open middle and
+    # must clear the outer side walls that carry on there (Blake, 2026-11-10)
+    q["r_cap"] = q["knob_diameter"] / 2
+    if two:
+        q["r_cap"] = min(q["r_cap"], q["chan_half"] - CAP_GAP)
     return q
 
 
@@ -174,8 +200,13 @@ def carrier_y(q, i):
 
 
 def nut_x(q, t):
-    """Nut centre for t in 0..1 along its travel."""
+    """Nut centre for t in 0..1 along its travel (in the first rail's frame on a two-sided rail)."""
     return q["x_min"] + t * q["travel"]
+
+
+def turned(q, p):
+    """Two-sided: a point of the first rail -> the same point on the second (180 degrees about Z)."""
+    return 2 * q["x_mid"] - p[0], -p[1], p[2]
 
 
 # ── Mesh helpers ─────────────────────────────────────────────────────────────
@@ -355,7 +386,7 @@ def build_endstop(q):
     x_tip, x_sh = q["x_in1"], q["x_out1"]
     x_floor = q["screw_length"] + q["journal"] + ENDSTOP_FLOAT
     x_end = x_floor + ENDSTOP_CAP
-    rc = q["knob_diameter"] / 2                # cap as wide as the knob: no tiny loose part
+    rc = q["r_cap"]
     ch = min(KNOB_CHAMFER, 0.3 * ENDSTOP_CAP)
     # cup wall, sleeve tip, sleeve, shoulder, cap (chamfered outer edge)
     _loft(m, [_ring(m, x_floor, q["r_cup"], n), _ring(m, x_tip, q["r_cup"], n), _ring(m, x_tip, q["r_maj"], n),
@@ -381,8 +412,9 @@ def build_nut(q):
     m = _Mesh()
     n = q["segments"]
     hl, hw, hh = q["nut_length"] / 2, q["nut_width"] / 2, q["nut_height"] / 2
+    zt = q["z_top"]                 # block top: flush with the body's top
     lo, hi = _helix_wall(m, q, -hl, hl, q["thread_clearance"], True)
-    corners = lambda x: [m.v(x, hw, -hh), m.v(x, hw, hh), m.v(x, -hw, hh), m.v(x, -hw, -hh)]
+    corners = lambda x: [m.v(x, hw, -hh), m.v(x, hw, zt), m.v(x, -hw, zt), m.v(x, -hw, -hh)]
     a, b = corners(-hl), corners(hl)
     for j in (0, 2, 3):     # the top side comes last, with the collar's hole in it
         m.faces.append((a[j], a[(j + 1) % 4], b[(j + 1) % 4], b[j]))
@@ -398,14 +430,37 @@ def build_nut(q):
     rings = [_ring_z(m, z, r, n) for z, r in rows]
     _loft(m, rings)
     _ngon(m, rings[-1], (0.0, 0.0, 1.0))
-    top = [m.v(-hl, -hw, hh), m.v(hl, -hw, hh), m.v(hl, hw, hh), m.v(-hl, hw, hh)]
+    top = [m.v(-hl, -hw, zt), m.v(hl, -hw, zt), m.v(hl, hw, zt), m.v(-hl, hw, zt)]
     m.face(top, [rings[0]], (0.0, 0.0, 1.0))
     return m.verts, m.faces
 
 
 def build_body(q):
     """All the outer and channel faces stay one planar piece each, so the block keeps quads and
-    n-gons; only the faces with a bore are triangulated."""
+    n-gons; only the faces with a bore are triangulated. Two-sided: the rail, the same rail turned
+    about Z, and the two outer side walls carried across the open middle between them."""
+    half = _body_half(q, q["two_sided"])
+    if not q["two_sided"]:
+        return half.verts, half.faces
+    m = _Mesh()
+    for f in half.faces:
+        m.faces.append(tuple(m.v(*half.verts[i]) for i in f))
+    for f in half.faces:            # a turn keeps the winding
+        m.faces.append(tuple(m.v(*turned(q, half.verts[i])) for i in f))
+    xd, xe = q["x_out1"], 2 * q["x_mid"] - q["x_out1"]
+    zb, zt, t = q["z_bottom"], q["z_top"], q["wall_thickness"]
+    y_lo = carrier_y(q, 0) - q["chan_half"] - t
+    for ya, yb in ((y_lo, y_lo + t), (-y_lo - t, -y_lo)):
+        a = [m.v(xd, ya, zb), m.v(xd, yb, zb), m.v(xd, yb, zt), m.v(xd, ya, zt)]
+        b = [m.v(xe, ya, zb), m.v(xe, yb, zb), m.v(xe, yb, zt), m.v(xe, ya, zt)]
+        for j in range(4):
+            m.faces.append((a[j], a[(j + 1) % 4], b[(j + 1) % 4], b[j]))
+    return m.verts, m.faces
+
+
+def _body_half(q, open_inner):
+    """One rail's body as a _Mesh. open_inner: leave the far end wall's two outermost side-wall
+    pieces off, for the bridge across the middle to carry on from."""
     m = _Mesh()
     n, c = q["segments"], q["count"]
     xa, xb, xc, xd = q["x_out0"], q["x_in0"], q["x_in1"], q["x_out1"]
@@ -452,7 +507,8 @@ def build_body(q):
             y0, y1 = ys[w], ys[w + 1]
             rect = [m.v(x, y0, zb), m.v(x, y1, zb), m.v(x, y1, zt), m.v(x, y0, zt)]
             if w % 2 == 0:
-                _ngon(m, rect, (s, 0.0, 0.0))
+                if not (open_inner and s > 0 and w in (0, len(ys) - 2)):
+                    _ngon(m, rect, (s, 0.0, 0.0))
             else:
                 cy = carrier_y(q, w // 2)
                 m.face(rect, [_bore_ring(m, q, x, cy)], (s, 0.0, 0.0))
@@ -483,10 +539,9 @@ def build_body(q):
         _band(m, rd, rc_)
         m.face([m.v(xb, a, zf) for a in fl] + [m.v(xb, y1, zt), m.v(xb, y0, zt)], [rb], (1.0, 0.0, 0.0))
         m.face([m.v(xc, a, zf) for a in fl] + [m.v(xc, y1, zt), m.v(xc, y0, zt)], [rc_], (-1.0, 0.0, 0.0))
-    return m.verts, m.faces
+    return m
 
 
 def _bore_ring(m, q, x, y):
-    n = q["segments"]
-    r = q["r_bore"]
+    n, r = q["segments"], q["r_bore"]
     return [m.v(x, y + r * math.cos(2 * math.pi * j / n), r * math.sin(2 * math.pi * j / n)) for j in range(n)]

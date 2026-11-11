@@ -268,6 +268,39 @@ def build_geneva_wheel(q, g, gq):
     return B.done()
 
 
+# ── Rails (nuts) ─────────────────────────────────────────────────────────────
+# One-sided: rail i is carrier row i. Two-sided: rails come in pairs, 2k = row k's left nut (its knob at
+# -X), 2k + 1 = row k's right nut on the turned rail (its knob at +X). pos 0 is always at the nut's own
+# knob end.
+
+def rail_count(q):
+    return q["count"] * (2 if q["two_sided"] else 1)
+
+
+def row_side(q, i):
+    return (i // 2, i % 2) if q["two_sided"] else (i, 0)
+
+
+def rail_label(q, i):
+    row, side = row_side(q, i)
+    return "%d%s" % (row + 1, "LR"[side]) if q["two_sided"] else "%d" % (i + 1)
+
+
+def rail_y(q, i):
+    return sr.carrier_y(q, row_side(q, i)[0])
+
+
+def rail_x(q, i, t):
+    x = sr.nut_x(q, t)
+    return 2 * q["x_mid"] - x if row_side(q, i)[1] else x
+
+
+def x_range(q, i):
+    if row_side(q, i)[1]:
+        return 2 * q["x_mid"] - q["x_max"], 2 * q["x_mid"] - q["x_min"]
+    return q["x_min"], q["x_max"]
+
+
 # ── Layout ───────────────────────────────────────────────────────────────────
 
 def _mech_spec(r):
@@ -288,8 +321,8 @@ def layout(spec):
     rail_notes = sr.clamp(spec.get("rail", {}))[1]
     g = dict(GEAR_DEFAULTS)
     g.update(spec.get("gear", {}))
-    rs = list(spec.get("rails", []))[:q["count"]]
-    while len(rs) < q["count"]:
+    rs = list(spec.get("rails", []))[:rail_count(q)]
+    while len(rs) < rail_count(q):
         rs.append(dict(mech="none"))
     notes = [("rail", n, a, u) for n, a, u in rail_notes]
     issues = []
@@ -309,19 +342,22 @@ def layout(spec):
     g["module"] = m_c
     g["backlash"] = min(max(float(g["backlash"]), 0.0), 1.0)
 
+    lab = lambda i: rail_label(q, i)       # noqa: E731
     out = []
     for i, r in enumerate(rs):
         kind, ms = _mech_spec(r)
         asked = r.get("mech", "none") or "none"
         if kind != asked:
-            issues.append("Rail %d: %r isn't available any more, so it's left empty." % (i + 1, asked))
-        item = dict(index=i, kind=kind, y=sr.carrier_y(q, i), link=r.get("link"), pos=float(r.get("pos", 0.5)))
+            issues.append("Rail %s: %r isn't available any more, so it's left empty." % (lab(i), asked))
+        row, side = row_side(q, i)
+        item = dict(index=i, kind=kind, y=rail_y(q, i), row=row, side=side, label=lab(i), link=r.get("link"),
+                    pos=float(r.get("pos", 0.5)))
         if kind == "spur":
             item["mq"], nn = spur_q(q, g, ms)
-            notes += [("rail %d" % (i + 1), a, b, c) for a, b, c in nn]
+            notes += [("rail %s" % lab(i), a, b, c) for a, b, c in nn]
         elif kind == "geneva_driver":
             item["mq"], nn = geneva_q(q, g, ms)
-            notes += [("rail %d" % (i + 1), a, b, c) for a, b, c in nn]
+            notes += [("rail %s" % lab(i), a, b, c) for a, b, c in nn]
         out.append(item)
     # wheels take their driver's dimensions
     for it in out:
@@ -329,7 +365,7 @@ def layout(spec):
             L = it["link"]
             drv = out[L["rail"]] if L and 0 <= L["rail"] < len(out) else None
             if drv is None or drv["kind"] != "geneva_driver":
-                issues.append("Rail %d: a Geneva wheel has to link to a rail with a Geneva driver." % (it["index"] + 1))
+                issues.append("Rail %s: a Geneva wheel has to link to a rail with a Geneva driver." % lab(it["index"]))
                 it["kind"] = "none"
             else:
                 it["mq"] = drv["mq"]
@@ -354,37 +390,40 @@ def layout(spec):
         if i in placed:
             return placed[i]
         it = out[i]
-        x = sr.nut_x(q, min(max(it["pos"], 0.0), 1.0))
+        x = rail_x(q, i, min(max(it["pos"], 0.0), 1.0))
         L = it["link"]
         it["parent"] = None
         if L and L.get("rail") is not None and 0 <= L["rail"] < len(out) and L["rail"] != i:
             j = L["rail"]
             if j in seen:
-                issues.append("Rails %d and %d link to each other in a loop." % (i + 1, j + 1))
+                issues.append("Rails %s and %s link to each other in a loop." % (lab(i), lab(j)))
             elif it["kind"] == "none" or out[j]["kind"] == "none":
-                issues.append("Rail %d links to rail %d, but one of them has no mechanism." % (i + 1, j + 1))
+                issues.append("Rail %s links to rail %s, but one of them has no mechanism." % (lab(i), lab(j)))
             else:
                 d = centre_distance(it, out[j])
                 if d is None:
-                    issues.append("Rail %d (%s) can't mesh with rail %d (%s)."
-                                  % (i + 1, LABELS[it["kind"]], j + 1, LABELS[out[j]["kind"]]))
+                    issues.append("Rail %s (%s) can't mesh with rail %s (%s)."
+                                  % (lab(i), LABELS[it["kind"]], lab(j), LABELS[out[j]["kind"]]))
                 else:
                     dy = abs(it["y"] - out[j]["y"])
                     xp = place(j, seen + (i,))
                     if d < dy - 1e-9:
-                        issues.append("Rail %d can't reach rail %d: the centre distance is %.1f mm but the rails "
-                                      "are %.1f mm apart." % (i + 1, j + 1, d, dy))
+                        issues.append("Rail %s can't reach rail %s: the centre distance is %.1f mm but the rails "
+                                      "are %.1f mm apart." % (lab(i), lab(j), d, dy))
                     else:
                         side = 1.0 if L.get("side", 1) >= 0 else -1.0
+                        if it["side"]:          # a right nut's endstop is toward -X
+                            side = -side
                         it["offset"] = side * math.sqrt(max(0.0, d * d - dy * dy))
                         it["parent"] = j
                         it["distance"] = d
                         x = xp + it["offset"]
         placed[i] = x
         it["x"] = x
-        if x < q["x_min"] - 1e-6 or x > q["x_max"] + 1e-6:
-            issues.append("Rail %d's nut would be %.1f mm past the end of its travel."
-                          % (i + 1, max(q["x_min"] - x, x - q["x_max"])))
+        lo, hi = x_range(q, i)
+        if x < lo - 1e-6 or x > hi + 1e-6:
+            issues.append("Rail %s's nut would be %.1f mm past the end of its travel."
+                          % (lab(i), max(lo - x, x - hi)))
         return x
 
     for i in range(len(out)):
@@ -400,7 +439,7 @@ def layout(spec):
             adj[it["parent"]].append(it["index"])
     progs = {k_in: dict(kind="input")}
     if out[k_in]["kind"] == "geneva_wheel":
-        issues.append("Rail %d: a Geneva wheel can't be the input; turn its driver instead." % (k_in + 1))
+        issues.append("Rail %s: a Geneva wheel can't be the input; turn its driver instead." % lab(k_in))
         progs[k_in] = dict(kind="static")
     queue = [k_in] if progs[k_in]["kind"] == "input" else []
     while queue:
@@ -415,7 +454,7 @@ def layout(spec):
                 progs[c] = dict(kind="geneva", parent=p, phi=phi, a=gq["a"], C=gq["center_distance"],
                                 alpha=gq["alpha"], beta=gq["beta"])
             elif P["kind"] == "geneva_wheel":
-                issues.append("Rail %d: the Geneva wheel on rail %d can't drive it." % (c + 1, p + 1))
+                issues.append("Rail %s: the Geneva wheel on rail %s can't drive it." % (lab(c), lab(p)))
                 continue
             else:
                 n1 = P["mq"]["teeth"] if P["kind"] == "spur" else P["mq"]["gear_teeth"]
@@ -494,10 +533,15 @@ def knob_boxes(q):
     x_e0 = q["x_out1"]
     x_e1 = q["screw_length"] + q["journal"] + sr.ENDSTOP_FLOAT + sr.ENDSTOP_CAP
     out = []
+    Re = q["r_cap"]
+    xm2 = 2 * q["x_mid"]
     for i in range(q["count"]):
         y = sr.carrier_y(q, i)
         out.append((x_far, x_neck, y - R, y + R, R))
-        out.append((x_e0, x_e1, y - R, y + R, R))
+        out.append((x_e0, x_e1, y - Re, y + Re, Re))
+        if q["two_sided"]:          # the turned rail's knob and endstop
+            out.append((xm2 - x_neck, xm2 - x_far, y - R, y + R, R))
+            out.append((xm2 - x_e1, xm2 - x_e0, y - Re, y + Re, Re))
     return out
 
 
@@ -522,8 +566,9 @@ def collisions(q, rails, prims, knobs, xs=None):
                     if pair in linked and (geneva_pair or (ta == "gear" and tb == "gear")):
                         continue
                     if d < ra + rb + COLLIDE_GAP - 1e-9:
-                        msgs.append("Rail %d's %s hits rail %d's %s (%.1f mm short)."
-                                    % (i + 1, _part(ta), j + 1, _part(tb), ra + rb + COLLIDE_GAP - d))
+                        msgs.append("Rail %s's %s hits rail %s's %s (%.1f mm short)."
+                                    % (rail_label(q, i), _part(ta), rail_label(q, j), _part(tb),
+                                       ra + rb + COLLIDE_GAP - d))
                         break
                 else:
                     continue
@@ -538,7 +583,7 @@ def collisions(q, rails, prims, knobs, xs=None):
                 dx = max(x0 - xs[i], 0.0, xs[i] - x1)
                 dy = max(y0 - it["y"], 0.0, it["y"] - y1)
                 if math.hypot(dx, dy) < r + COLLIDE_GAP:
-                    msgs.append("Rail %d's %s hits a knob or endstop; move the nut in." % (i + 1, _part(tag)))
+                    msgs.append("Rail %s's %s hits a knob or endstop; move the nut in." % (rail_label(q, i), _part(tag)))
                     break
             else:
                 continue

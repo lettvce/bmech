@@ -252,6 +252,12 @@
         partway up its hub (to clear its driver's plate), so it needs a
         little support under the wheel. The tooth profile is the same
         involute bmech's spur gear generator makes in Blender.</li>
+    <li><strong>Two-sided.</strong> Tick <em>Two-Sided</em> and a second
+        rail, turned end for end, joins the first past an open middle. Each
+        row gets a knob and nut on both sides (1L, 1R, …), each moved by its
+        own knob, and both screws keep the same right-hand thread. The
+        endstops meet in the middle, so their caps are a little smaller
+        there to clear the outer walls.</li>
     <li><strong>Small parts.</strong> The smallest loose pieces are gone:
         no stop cap, and the endstop is as wide as the knob. Nuts, knobs and
         small gears can still fit a small-parts test cylinder, so this is for
@@ -288,6 +294,8 @@ const FIELDS = [
   { id: "thread_diameter", set: "rail", label: "Thread Diameter", unit: "mm", min: 6, max: 40, step: 0.5, hint: "Bigger threads grow the nut, knobs and spacing to fit." },
   { id: "thread_starts", set: "rail", label: "Thread Starts", unit: "", min: 1, max: 8, step: 1, hint: "More starts, fewer turns. Capped at a 20° lead angle." },
   { id: "module", set: "gear", label: "Gear Module", unit: "mm", min: 0.5, max: 6, step: 0.1, hint: "Tooth size, shared by every gear." },
+  { id: "two_sided", set: "rail", label: "Two-Sided", type: "checkbox", hint: "A second rail turned end for end past an open middle: every row gets a knob and nut on each side." },
+  { id: "center_gap", set: "rail", label: "Center Gap", unit: "mm", min: 0, max: 400, step: 1, onlyTwo: true, hint: "Between the two inner end walls; the endstops sit in it." },
   { id: "advanced", label: "Advanced", type: "checkbox", def: false },
 
   { group: "Screw & Nut", advanced: true },
@@ -350,7 +358,7 @@ const DEFAULT_STATE = {
 // ---------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------
-const worker = new Worker("worker.js?v=13");
+const worker = new Worker("worker.js?v=14");
 let reqId = 0;
 const waiting = new Map();
 worker.onmessage = (e) => {
@@ -447,6 +455,7 @@ function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
     if (s && Array.isArray(s.rails) && s.rails.length) {
+      if (s.rail && s.rail.two_sided && s.rails.length % 2) s.rails.push({ mech: "none", pos: 0.5 });
       // saved by an older page: retired mechanisms (the yoke holder) load as empty rails
       for (const r of s.rails) if (!r.mech || !(r.mech in MECH_LABEL)) { r.mech = "none"; r.link = null; }
       state = s;
@@ -455,8 +464,27 @@ function loadState() {
 }
 function saveState() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } }
 
+const two = () => !!state.rail.two_sided;
+// two-sided: rails come in pairs, 2k = row k's left nut, 2k + 1 = its right nut (rail_mechs.row_side)
+const rowsOf = () => (two() ? state.rails.length / 2 : state.rails.length);
 function spec() {
-  return { rail: { ...state.rail, count: state.rails.length }, gear: state.gear, rails: state.rails, input: state.input };
+  return { rail: { ...state.rail, count: rowsOf() }, gear: state.gear, rails: state.rails, input: state.input };
+}
+const lab = (i) => (info && info.rails[i] && info.rails[i].label) || (two() ? `${(i >> 1) + 1}${"LR"[i & 1]}` : `${i + 1}`);
+function setTwoSided(on) {
+  if (on === two()) return;
+  const remap = (r, f) => ({ ...r, link: r.link ? (f(r.link.rail) === null ? null : { ...r.link, rail: f(r.link.rail) }) : null });
+  if (on) {
+    state.rails = state.rails.flatMap((r) => [remap(r, (j) => 2 * j), { mech: "none", pos: 0.5 }]);
+    state.input *= 2;
+    selected *= 2;
+  } else {
+    state.rails = state.rails.filter((_, i) => i % 2 === 0).map((r) => remap(r, (j) => (j % 2 ? null : j / 2)));
+    state.input = state.input % 2 ? 0 : state.input / 2;
+    selected = selected >> 1;
+  }
+  state.rail.two_sided = on;
+  rebuild();
 }
 const fmt = (x, d = 1) => Number(x).toFixed(d);
 const $ = (id) => document.getElementById(id);
@@ -505,11 +533,16 @@ function renderScene() {
   world.add(bodyObj);
   for (const r of info.rails) {
     const handle = new THREE.Group();
-    handle.position.set(0, r.y, 0);
+    // the right side is the left one turned 180 degrees about Z (same thread hand): turn about X first
+    handle.rotation.order = "ZYX";
+    handle.position.set(r.side ? 2 * info.rail.x_mid : 0, r.y, 0);
+    handle.rotation.z = r.side ? Math.PI : 0;
     handle.add(meshOf(geos.handle, MATS.knob, r.index), meshOf(geos.screw, MATS.screw, r.index),
                meshOf(geos.endstop, MATS.knob, r.index));
     const nut = new THREE.Group();
-    nut.add(meshOf(geos.nut, MATS.nut, r.index));
+    const nutMesh = meshOf(geos.nut, MATS.nut, r.index);
+    nutMesh.rotation.z = r.side ? Math.PI : 0;      // only the nut turns round; the pivot keeps world angles
+    nut.add(nutMesh);
     const pivot = new THREE.Group();
     nut.add(pivot);
     let mechMesh = null;
@@ -536,7 +569,8 @@ function nutXs() {
     const r = info.rails[i];
     if (r.parent !== null && r.parent !== undefined && depth < 32) return (xs[i] = at(r.parent, depth + 1) + r.offset);
     const p = Math.min(1, Math.max(0, state.rails[i].pos ?? 0.5));
-    return (xs[i] = R.x_min + p * R.travel);
+    const x = R.x_min + p * R.travel;
+    return (xs[i] = r.side ? 2 * R.x_mid - x : x);
   };
   info.rails.forEach((_, i) => at(i));
   return xs;
@@ -568,7 +602,8 @@ function place() {
   const xs = nutXs(), R = info.rail;
   objs.forEach((o, i) => {
     o.nut.position.set(xs[i], info.rails[i].y, 0);
-    o.handle.rotation.x = -2 * Math.PI * (xs[i] - R.x_ref) / R.lead;
+    const local = info.rails[i].side ? 2 * R.x_mid - xs[i] : xs[i];      // in its own rail's frame
+    o.handle.rotation.x = -2 * Math.PI * (local - R.x_ref) / R.lead;
   });
   turn();
 }
@@ -579,9 +614,10 @@ function turn() {
 
 function railsWithIssues() {
   const bad = new Set();
-  for (const s of info ? info.issues : []) for (const m of s.matchAll(/Rails? (\d+)(?: and (\d+))?/g)) {
-    bad.add(+m[1] - 1);
-    if (m[2]) bad.add(+m[2] - 1);
+  const idx = (t) => info.rails.findIndex((r) => r.label === t);
+  for (const s of info ? info.issues : []) for (const m of s.matchAll(/[Rr]ails? (\d+[LR]?)(?: and (\d+[LR]?))?/g)) {
+    bad.add(idx(m[1]));
+    if (m[2]) bad.add(idx(m[2]));
   }
   return bad;
 }
@@ -631,9 +667,11 @@ function buildFieldsOnce() {
     field.id = "field-" + f.id;
     if (f.type === "checkbox") {
       field.className = "field checkbox-field";
-      field.innerHTML = `<label class="checkbox-label"><span>${f.label}</span><input type="checkbox" id="in-${f.id}"></label>`;
+      field.innerHTML = `<label class="checkbox-label"><span>${f.label}</span><input type="checkbox" id="in-${f.id}"></label>` +
+        (f.hint ? `<span class="hint">${f.hint}</span>` : "");
       el.appendChild(field);
-      $("in-" + f.id).addEventListener("change", updateFieldVisibility);
+      if (f.set) $("in-" + f.id).addEventListener("change", (e) => setTwoSided(e.target.checked));
+      else $("in-" + f.id).addEventListener("change", updateFieldVisibility);
       continue;
     }
     field.className = "field";
@@ -653,9 +691,12 @@ function buildFieldsOnce() {
 function updateFieldVisibility() {
   const adv = $("in-advanced").checked;
   for (const f of FIELDS) if (f.advanced && f.id) $("field-" + f.id).style.display = adv ? "" : "none";
+  for (const f of FIELDS) if (f.onlyTwo) $("field-" + f.id).style.display = two() ? "" : "none";
   $("fields").querySelectorAll(".group-label[data-advanced]").forEach((g) => { g.style.display = adv ? "" : "none"; });
 }
 function syncFields() {
+  $("in-two_sided").checked = two();
+  updateFieldVisibility();
   for (const f of FIELDS) {
     if (!f.id || f.type) continue;
     const el = $("in-" + f.id);
@@ -673,11 +714,13 @@ function renderChips() {
     chip.className = "chip" + (i === selected ? " sel" : "") + (bad.has(i) ? " err" : "");
     const ri = info && info.rails[i];
     const tag = r.mech === "spur" && ri && ri.teeth ? `${ri.teeth}T` : MECH_SHORT[r.mech || "none"];
-    chip.textContent = `${i + 1}: ${tag}${state.input === i ? " ⟳" : ""}`;
+    chip.textContent = `${lab(i)}: ${tag}${state.input === i ? " ⟳" : ""}`;
     chip.addEventListener("click", () => select(i));
     el.appendChild(chip);
   });
-  $("remove").disabled = state.rails.length <= 1;
+  $("remove").disabled = state.rails.length <= (two() ? 2 : 1);
+  $("add").textContent = two() ? "+ Add row" : "+ Add rail";
+  $("remove").textContent = two() ? "Remove last row" : "Remove last";
 }
 
 function renderRailFields() {
@@ -687,7 +730,7 @@ function renderRailFields() {
   const ri = info && info.rails[selected];
   const mdef = (defaults && defaults.mech[kind]) || {};
   const others = state.rails.map((_, j) => j).filter((j) => j !== selected);
-  let h = `<div class="title">Rail ${selected + 1}</div>`;
+  let h = `<div class="title">Rail ${lab(selected)}${two() ? (selected % 2 ? " (right side)" : " (left side)") : ""}</div>`;
   h += `<div class="field"><label for="rf-mech">Mechanism</label><select id="rf-mech">` +
     Object.keys(MECH_LABEL).map((k) => `<option value="${k}"${k === kind ? " selected" : ""}>${MECH_LABEL[k]}</option>`).join("") +
     `</select></div>`;
@@ -707,7 +750,7 @@ function renderRailFields() {
     const L = r.link;
     h += `<div class="field"><label for="rf-link">${kind === "geneva_wheel" ? "Driven by" : "Meshes with"}</label><select id="rf-link">` +
       `<option value="">— nothing (own knob)</option>` +
-      others.map((j) => `<option value="${j}"${L && L.rail === j ? " selected" : ""}>Rail ${j + 1} (${MECH_LABEL[state.rails[j].mech || "none"].toLowerCase()})</option>`).join("") +
+      others.map((j) => `<option value="${j}"${L && L.rail === j ? " selected" : ""}>Rail ${lab(j)} (${MECH_LABEL[state.rails[j].mech || "none"].toLowerCase()})</option>`).join("") +
       `</select>`;
     if (L) {
       h += `<div class="seg" style="margin-top:0.4rem"><button type="button" class="btn${L.side >= 0 ? " on" : ""}" id="rf-side-p">Endstop side</button>` +
@@ -796,10 +839,11 @@ function renderInfo() {
   } else if (ri.kind === "geneva_wheel") {
     rows.push(["Indexes", `1/${ri.slots} turn per driver turn`]);
   }
-  if (ri.distance) rows.push(["Centre distance to rail " + (ri.parent + 1), `${fmt(ri.distance, 2)} mm`]);
+  if (ri.distance) rows.push(["Centre distance to rail " + lab(ri.parent), `${fmt(ri.distance, 2)} mm`]);
   const s = ri.kind !== "none" ? speedOf(selected) : null;
-  if (s !== null && ri.prog.kind !== "input") rows.push([`Turns per turn of rail ${state.input + 1}`, `${fmt(Math.abs(s), 3)} ${s < 0 ? "↺" : "↻"}`]);
-  rows.push(["Nut position", `${fmt(nutXs()[selected])} mm of ${fmt(R.x_min)}–${fmt(R.x_max)}`]);
+  if (s !== null && ri.prog.kind !== "input") rows.push([`Turns per turn of rail ${lab(state.input)}`, `${fmt(Math.abs(s), 3)} ${s < 0 ? "↺" : "↻"}`]);
+  const [lo, hi] = ri.side ? [2 * R.x_mid - R.x_max, 2 * R.x_mid - R.x_min] : [R.x_min, R.x_max];
+  rows.push(["Nut position", `${fmt(nutXs()[selected])} mm of ${fmt(lo)}–${fmt(hi)}`]);
   rows.push(["Full travel", `${fmt(R.travel)} mm in ${fmt(R.turns)} turns`],
             ["Screw lead", `${fmt(R.lead, 2)} mm/turn (${R.thread_starts}-start, ${fmt(R.lead_angle)}°)`],
             ["Rail spacing", `${fmt(R.spacing, 2)} mm`],
@@ -877,7 +921,7 @@ function mechName(i) {
   const what = r.kind === "spur" ? `spur_m${info.gear.module}_${r.teeth}T`
     : r.kind === "geneva_driver" ? `geneva_driver_${r.slots}slot${r.toothed ? `_${r.gear_teeth}T` : ""}`
     : `geneva_wheel_${r.slots}slot`;
-  return `rail${i + 1}_${what}.stl`;
+  return `rail${lab(i)}_${what}.stl`;
 }
 $("dl-one").addEventListener("click", () => {
   const r = info.rails[selected];
@@ -888,22 +932,22 @@ $("dl-all").addEventListener("click", async () => {
   zip.file("body.stl", stl(meshes.body));
   for (const part of ["screw", "handle", "endstop", "nut"]) zip.file(`${part}_x${n}.stl`, stl(meshes[part]));
   info.rails.forEach((r, i) => { if (r.mesh) zip.file(mechName(i), stl(meshes[r.mesh])); });
-  saveBlob(await zip.generateAsync({ type: "blob" }), `shaft_rail_${n}_rails.zip`);
+  saveBlob(await zip.generateAsync({ type: "blob" }), two() ? `shaft_rail_two_sided_${n / 2}_rows.zip` : `shaft_rail_${n}_rails.zip`);
 });
 
 // ---------------------------------------------------------------------
 // Rails
 // ---------------------------------------------------------------------
 $("add").addEventListener("click", () => {
-  state.rails.push({ mech: "none", pos: 0.5 });
-  selected = state.rails.length - 1;
+  for (let k = two() ? 2 : 1; k > 0; k--) state.rails.push({ mech: "none", pos: 0.5 });
+  selected = state.rails.length - (two() ? 2 : 1);
   rebuild();
 });
 $("remove").addEventListener("click", () => {
-  if (state.rails.length <= 1) return;
-  const gone = state.rails.length - 1;
-  state.rails.pop();
-  for (const r of state.rails) if (r.link && r.link.rail === gone) r.link = null;
+  const per = two() ? 2 : 1;
+  if (state.rails.length <= per) return;
+  state.rails.splice(state.rails.length - per, per);
+  for (const r of state.rails) if (r.link && r.link.rail >= state.rails.length) r.link = null;
   if (state.input >= state.rails.length) state.input = 0;
   selected = Math.min(selected, state.rails.length - 1);
   rebuild();

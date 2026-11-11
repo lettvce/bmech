@@ -3,7 +3,8 @@ web_api.py - the page's entry point (runs in Pyodide; plain CPython for tests).
 
 build(spec_json) -> dict with the layout summary and every part as triangles:
     meshes[name] = (positions: bytes of float32 xyz, indices: bytes of uint32)
-Rail parts (body, screw, handle, endstop, nut) are shared by every carrier; mechanisms are one per rail.
+Rail parts (body, screw, handle, endstop, nut) are shared by every carrier; mechanisms are one per rail
+(per nut: a two-sided rail has two per row, see rail_mechs.row_side).
 Parts are cached by their inputs, so changing one rail's mechanism rebuilds only that mesh.
 """
 
@@ -99,7 +100,7 @@ def _pack(verts, faces):
 
 
 def _rail_key(q):
-    return json.dumps({k: q[k] for k in sr.DEFAULTS}, sort_keys=True)
+    return json.dumps({k: q[k] for k in list(sr.DEFAULTS) + list(sr.EXTRA_DEFAULTS)}, sort_keys=True)
 
 
 def build(spec_json, with_meshes=True):
@@ -122,7 +123,8 @@ def build(spec_json, with_meshes=True):
                             sort_keys=True)
             meshes[name] = _cached((it["kind"], rk, gk, mk), lambda i=i: _pack(*rm.build_mech(lay, i)))
         mq = it.get("mq") or {}
-        info = dict(index=i, kind=it["kind"], x=it["x"], y=it["y"], parent=it.get("parent"),
+        info = dict(index=i, kind=it["kind"], x=it["x"], y=it["y"], row=it["row"], side=it["side"],
+                    label=it["label"], parent=it.get("parent"),
                     offset=it.get("offset", 0.0), distance=it.get("distance"), prog=it["prog"],
                     prims=lay["prims"][i], mesh=name if it["kind"] != "none" else None)
         if it["kind"] == "spur":
@@ -138,11 +140,11 @@ def build(spec_json, with_meshes=True):
     summary = {k: q[k] for k in ("count", "spacing", "x_min", "x_max", "x_ref", "lead", "lead_angle", "travel",
                                  "turns", "body_length", "body_width", "body_height", "thread_pitch",
                                  "thread_starts", "knob_diameter", "z_top", "z_tip", "shaft_length",
-                                 "r_shaft", "segments", "x_out0", "x_out1")}
+                                 "r_shaft", "segments", "x_out0", "x_out1", "two_sided", "center_gap", "x_mid")}
     summary["rail_y"] = [sr.carrier_y(q, i) for i in range(q["count"])]
     return dict(rail=summary, gear=lay["gear"], hub=lay["hub"], rails=rails, notes=lay["notes"],
                 issues=lay["issues"], input=lay["input"], knobs=lay["knobs"], meshes=meshes,
-                defaults=dict(rail=sr.DEFAULTS, gear=rm.GEAR_DEFAULTS, mech=rm.MECH_DEFAULTS))
+                defaults=dict(rail=dict(sr.DEFAULTS, **sr.EXTRA_DEFAULTS), gear=rm.GEAR_DEFAULTS, mech=rm.MECH_DEFAULTS))
 
 
 def page_call(spec_json, with_meshes):
