@@ -129,6 +129,9 @@ def build(spec_json, with_meshes=True):
                     prims=lay["prims"][i], mesh=name if it["kind"] != "none" else None)
         if it["kind"] == "spur":
             info.update(teeth=mq["teeth"], thickness=mq["thickness"], tip=mq["ra"])
+        elif it["kind"] == "cluster":
+            info.update(teeth=mq["teeth"], thickness=mq["thickness"], tip=mq["ra"], teeth_top=mq["teeth_top"],
+                        thickness_top=mq["thickness_top"], tip_top=mq["ra_top"])
         elif it["kind"] in ("geneva_driver", "geneva_wheel"):
             info.update(slots=mq["slots"], center_distance=mq["center_distance"], dwell=mq["dwell"],
                         toothed=bool(mq["driver_gear"]), gear_teeth=mq.get("gear_teeth"),
@@ -136,6 +139,7 @@ def build(spec_json, with_meshes=True):
                         tip=mq["tip_r"] if it["kind"] == "geneva_wheel" else mq["plate_r"],
                         z_wheel=mq["z_wheel"], z_top=mq["z_top"], plate_thickness=mq["plate_thickness"],
                         wheel_thickness=mq["wheel_thickness"])
+        info.update(lift=it.get("lift", 0.0), mesh_layers=it.get("mesh_layers"))
         rails.append(info)
     summary = {k: q[k] for k in ("count", "spacing", "x_min", "x_max", "x_ref", "lead", "lead_angle", "travel",
                                  "turns", "body_length", "body_width", "body_height", "thread_pitch",

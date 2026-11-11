@@ -6,6 +6,7 @@ Every mechanism is one closed solid fused to a capped hub: the hub's bore runs o
 Gravity holds it on (the shafts stand vertical); there is no separate stop cap to lose.
 
     spur           involute spur gear (bmech profile, geneva.gear_outline)
+    cluster        two spur gears fused on one hub, a bottom and a top gear (2026-11-11)
     geneva_driver  Geneva crank: plate (plain disc or spur teeth), locking disc and pin
     geneva_wheel   the slotted wheel, raised on its hub to sit over its driver's plate
 
@@ -16,6 +17,12 @@ Layout: rails can link to another rail so their mechanisms mesh. A linked rail's
     x = x_parent + side * sqrt(d^2 - dy^2),    dy = rail gap x carrier spacing
 where d is the centre distance (spur pair: m (z1 + z2) / 2 + backlash; Geneva: C). layout() returns the
 rest positions, an angle program per rail (for animation), collision primitives and notes.
+
+Gear layers: a spur has one gear, a cluster two (bottom, top), a toothed Geneva driver one (its plate).
+A link names which of its own layers meshes ("layer") with which of the parent's ("their"; default the
+parent's top gear). A spur or cluster is lifted on its hub so the two layers line up:
+    lift = parent's lift + parent layer's z - own layer's z
+Geneva parts can't be lifted.
 
 Public API: DEFAULTS, MECH_DEFAULTS, hub(q), build_mech(q, gq, spec, ...), layout(spec), collisions(...)
 """
@@ -36,6 +43,7 @@ GEAR_DEFAULTS = dict(module=2.4, pressure_angle=20.0, backlash=0.25)    # chunky
 MECH_DEFAULTS = {
     "none": {},
     "spur": dict(teeth=16, thickness=5.0),
+    "cluster": dict(teeth=30, thickness=5.0, teeth_top=14, thickness_top=5.0),
     "geneva_driver": dict(slots=6, center_distance=40.0, pin_diameter=5.0, clearance=0.2,
                           plate_thickness=3.0, layer_gap=0.4, wheel_thickness=5.0,
                           toothed=False, gear_teeth=24, tip_round=1.0),
@@ -143,23 +151,107 @@ def spur_q(q, g, spec):
                 rd=rp - geneva.DEDENDUM * m), notes
 
 
+def cluster_q(q, g, spec):
+    """Clamped cluster: two gears on one hub, each clamped like a spur. The smaller one's tips stay
+    0.4 mm inside the larger one's root circle, so the step between them is a flat ring; both
+    thicknesses together fit the hub."""
+    h = hub(q)
+    m = g["module"]
+    lo, nn = spur_q(q, g, dict(teeth=spec.get("teeth", 30), thickness=spec.get("thickness", 5.0)))
+    hi, nt = spur_q(q, g, dict(teeth=spec.get("teeth_top", 14), thickness=spec.get("thickness_top", 5.0)))
+    notes = list(nn) + [(n + "_top", a, b) for n, a, b in nt]
+    zmin = max(geneva.MIN_TEETH, int(math.ceil(2 * (h["rh"] + 1.0) / m + 2 * geneva.DEDENDUM - 1e-9)))
+    dz = int(math.ceil(2 * (geneva.ADDENDUM + geneva.DEDENDUM) + 0.8 / m - 1e-9))
+    z1, z2 = lo["teeth"], hi["teeth"]
+    if abs(z1 - z2) < dz:
+        # move the top gear the short way past the bottom one, or the long way if that's under the minimum
+        down, up = z1 - dz, z1 + dz
+        z2n = up if (z2 >= z1 or down < zmin) and up <= 400 else down
+        notes.append(("teeth_top", z2, z2n))
+        hi, _n = spur_q(q, g, dict(teeth=z2n, thickness=hi["thickness"]))
+    tmax = h["room"] - 0.5
+    over = lo["thickness"] + hi["thickness"] - tmax
+    for d, name in ((hi, "thickness_top"), (lo, "thickness")):
+        if over > 1e-9:
+            v = max(0.6, d["thickness"] - over)
+            notes.append((name, d["thickness"], v))
+            over -= d["thickness"] - v
+            d["thickness"] = v
+    return dict(kind="cluster", teeth=lo["teeth"], thickness=lo["thickness"], rp=lo["rp"], ra=lo["ra"], rd=lo["rd"],
+                teeth_top=hi["teeth"], thickness_top=hi["thickness"], rp_top=hi["rp"], ra_top=hi["ra"],
+                rd_top=hi["rd"]), notes
+
+
+def gear_layers(it):
+    """[(teeth, z0, z1, tip radius)] of a mechanism's gear layers, z from its own base (before lift)."""
+    k, mq = it["kind"], it.get("mq") or {}
+    if k == "spur":
+        return [(mq["teeth"], 0.0, mq["thickness"], mq["ra"])]
+    if k == "cluster":
+        t = mq["thickness"]
+        return [(mq["teeth"], 0.0, t, mq["ra"]), (mq["teeth_top"], t, t + mq["thickness_top"], mq["ra_top"])]
+    if k == "geneva_driver" and mq.get("driver_gear"):
+        return [(mq["gear_teeth"], 0.0, mq["plate_thickness"], mq["plate_r"])]
+    return []
+
+
+LIFTABLE = ("spur", "cluster")
+
+
 def build_spur(q, g, sq):
+    return build_gear_stack(q, g, [(sq["teeth"], sq["thickness"])], sq.get("lift", 0.0))
+
+
+def build_cluster(q, g, cq):
+    return build_gear_stack(q, g, [(cq["teeth"], cq["thickness"]), (cq["teeth_top"], cq["thickness_top"])],
+                            cq.get("lift", 0.0))
+
+
+def build_gear_stack(q, g, stack, lift=0.0):
+    """Gears [(teeth, thickness)] stacked from the hub bottom + lift, fused to the hub. Below a lifted
+    stack the hub runs down to its bottom; between two gears the step is a flat ring: the larger gear's
+    ring in to a circle, then that circle to the smaller outline."""
     h, segs = hub(q), q["segments"]
-    m, N = g["module"], sq["teeth"]
-    kb = _kb(N, segs)
-    out = geneva.gear_outline(m, N, g["pressure_angle"], segs)
-    U = len(out) // N
+    m, pa = g["module"], g["pressure_angle"]
     B = _Build()
-    zb, z1 = h["zb"], h["zb"] + sq["thickness"]
-    ob, hb_ = B.ring(out, U, N, h["rh"], kb, zb, False)
-    ot, ht = B.ring(out, U, N, h["rh"], kb, z1, True)
-    B.wall(ob, ot)
-    B.face(hb_, [B.bore(h, segs, zb)], False)          # annulus under the hub, between rh and rb
-    # the hub above the gear: its bottom loop is the ring's inner loop at z1
-    c = _circle(h["rh"], N * kb, -math.pi / N)
-    top = B.loop(c, h["z_top"])
-    B.wall(ht, top)
-    B.ngon(top, True)
+    outs = []
+    for N, t in stack:
+        out = geneva.gear_outline(m, N, pa, segs)
+        outs.append((out, len(out) // N, N, _kb(N, segs), t))
+    z = h["zb"] + lift
+    out, U, N, kb, t = outs[0]
+    ob, ib = B.ring(out, U, N, h["rh"], kb, z, False)
+    bore0 = B.bore(h, segs, h["zb"])
+    if lift > 1e-9:
+        lo = B.loop(_circle(h["rh"], N * kb, -math.pi / N), h["zb"])
+        B.wall(lo, ib)
+        B.face(lo, [bore0], False)
+    else:
+        B.face(ib, [bore0], False)
+    for k, (out, U, N, kb, t) in enumerate(outs):
+        z1 = z + t
+        if k == len(outs) - 1:
+            ot, it_ = B.ring(out, U, N, h["rh"], kb, z1, True)
+            B.wall(ob, ot)
+            top = B.loop(_circle(h["rh"], N * kb, -math.pi / N), h["z_top"])
+            B.wall(it_, top)
+            B.ngon(top, True)
+            break
+        nout, nU, nN, nkb, _t = outs[k + 1]
+        rs = m * min(N, nN) / 2 + geneva.ADDENDUM * m           # smaller gear's tips
+        rl = m * max(N, nN) / 2 - geneva.DEDENDUM * m           # larger gear's roots
+        r_mid = 0.5 * (rs + rl)
+        if N > nN:          # step faces up: this gear's ring in to r_mid, then r_mid to the next outline
+            ot, mid = B.ring(out, U, N, r_mid, kb, z1, True)
+            nb = B.loop(nout, z1)
+            B.face(mid, [nb], True)
+        else:               # step faces down under the larger next gear
+            ot = B.loop(out, z1)
+            nb, mid = B.ring(nout, nU, nN, r_mid, nkb, z1, False)
+            B.face(mid, [ot], False)
+        B.wall(ob, ot)
+        ob = nb
+        z = z1
     return B.done()
 
 
@@ -328,7 +420,8 @@ def layout(spec):
     issues = []
     h = hub(q)
     # shared pressure angle: low enough for the fewest teeth in use
-    teeth = [int(r.get("teeth", MECH_DEFAULTS["spur"]["teeth"])) for r in rs if r.get("mech") == "spur"]
+    teeth = [int(r.get("teeth", MECH_DEFAULTS["spur"]["teeth"])) for r in rs if r.get("mech") in ("spur", "cluster")]
+    teeth += [int(r.get("teeth_top", MECH_DEFAULTS["cluster"]["teeth_top"])) for r in rs if r.get("mech") == "cluster"]
     pa = float(g["pressure_angle"])
     pa_c = min(max(pa, 10.0), 30.0)
     if teeth:
@@ -355,6 +448,9 @@ def layout(spec):
         if kind == "spur":
             item["mq"], nn = spur_q(q, g, ms)
             notes += [("rail %s" % lab(i), a, b, c) for a, b, c in nn]
+        elif kind == "cluster":
+            item["mq"], nn = cluster_q(q, g, ms)
+            notes += [("rail %s" % lab(i), a, b, c) for a, b, c in nn]
         elif kind == "geneva_driver":
             item["mq"], nn = geneva_q(q, g, ms)
             notes += [("rail %s" % lab(i), a, b, c) for a, b, c in nn]
@@ -371,25 +467,33 @@ def layout(spec):
                 it["mq"] = drv["mq"]
 
     # placement: parents first; a link cycle or a bad link leaves the rail on its own slider
-    def centre_distance(a, b):
+    def mesh_layers(it, par, L):
+        """(own layer, parent's layer) indices for a link, clamped to what each has."""
+        la, lb = gear_layers(it), gear_layers(par)
+        mine = int(L.get("layer", 0) or 0)
+        their = L.get("their")
+        their = (len(lb) - 1) if their is None else int(their)       # default: the parent's top gear
+        return min(max(mine, 0), max(len(la) - 1, 0)), min(max(their, 0), max(len(lb) - 1, 0))
+
+    def centre_distance(a, b, L):
         ka, kb = a["kind"], b["kind"]
         pair = {ka, kb}
         if pair == {"geneva_driver", "geneva_wheel"}:
             return a["mq"]["center_distance"] if ka == "geneva_driver" else b["mq"]["center_distance"]
-        za = a["mq"]["teeth"] if ka == "spur" else (a["mq"]["gear_teeth"] if ka == "geneva_driver"
-                                                    and a["mq"]["driver_gear"] else None)
-        zb_ = b["mq"]["teeth"] if kb == "spur" else (b["mq"]["gear_teeth"] if kb == "geneva_driver"
-                                                     and b["mq"]["driver_gear"] else None)
-        if za is None or zb_ is None or "geneva_wheel" in pair or pair == {"geneva_driver"}:
+        la, lb = gear_layers(a), gear_layers(b)
+        if not la or not lb or "geneva_wheel" in pair or pair == {"geneva_driver"}:
             return None
-        return g["module"] * (za + zb_) / 2 + g["backlash"]
+        mi, ti = mesh_layers(a, b, L)
+        return g["module"] * (la[mi][0] + lb[ti][0]) / 2 + g["backlash"]
 
     placed = {}
+    room = h["room"] - 0.5
 
     def place(i, seen=()):
         if i in placed:
             return placed[i]
         it = out[i]
+        it["lift"] = 0.0
         x = rail_x(q, i, min(max(it["pos"], 0.0), 1.0))
         L = it["link"]
         it["parent"] = None
@@ -400,7 +504,7 @@ def layout(spec):
             elif it["kind"] == "none" or out[j]["kind"] == "none":
                 issues.append("Rail %s links to rail %s, but one of them has no mechanism." % (lab(i), lab(j)))
             else:
-                d = centre_distance(it, out[j])
+                d = centre_distance(it, out[j], L)
                 if d is None:
                     issues.append("Rail %s (%s) can't mesh with rail %s (%s)."
                                   % (lab(i), LABELS[it["kind"]], lab(j), LABELS[out[j]["kind"]]))
@@ -418,8 +522,28 @@ def layout(spec):
                         it["parent"] = j
                         it["distance"] = d
                         x = xp + it["offset"]
+                        la, lb = gear_layers(it), gear_layers(out[j])
+                        if la and lb:
+                            mi, ti = mesh_layers(it, out[j], L)
+                            it["mesh_layers"] = (mi, ti)
+                            it["mesh_teeth"] = (la[mi][0], lb[ti][0])
+                            lift = out[j]["lift"] + lb[ti][1] - la[mi][1]
+                            top = lift + la[-1][2]
+                            if abs(lift) > 1e-9 and it["kind"] not in LIFTABLE:
+                                issues.append("Rail %s's %s can't be raised on its hub to meet rail %s's %s gear."
+                                              % (lab(i), LABELS[it["kind"]], lab(j),
+                                                 "top" if ti else "bottom"))
+                            elif lift < -1e-9 or top > room + 1e-9:
+                                issues.append("Rail %s's gear would sit %.1f mm %s its hub to meet rail %s; %s."
+                                              % (lab(i), -lift if lift < 0 else top - room,
+                                                 "below" if lift < 0 else "above", lab(j),
+                                                 "mesh another layer" if lift < 0 else "lengthen the shafts"))
+                            else:
+                                it["lift"] = lift
         placed[i] = x
         it["x"] = x
+        if it["kind"] in LIFTABLE:
+            it["mq"] = dict(it["mq"], lift=it["lift"])
         lo, hi = x_range(q, i)
         if x < lo - 1e-6 or x > hi + 1e-6:
             issues.append("Rail %s's nut would be %.1f mm past the end of its travel."
@@ -457,8 +581,11 @@ def layout(spec):
                 issues.append("Rail %s: the Geneva wheel on rail %s can't drive it." % (lab(c), lab(p)))
                 continue
             else:
-                n1 = P["mq"]["teeth"] if P["kind"] == "spur" else P["mq"]["gear_teeth"]
-                n2 = C["mq"]["teeth"] if C["kind"] == "spur" else C["mq"]["gear_teeth"]
+                # the layers that mesh: stored on whichever of the two is the linked child
+                if C.get("parent") == p:
+                    n2, n1 = C["mesh_teeth"]
+                else:
+                    n1, n2 = P["mesh_teeth"]
                 # bmech gear_train phase rule, evaluated at parent angle 0
                 ph = phi + math.pi - math.pi / n2 + (phi % (2 * math.pi / n1)) * n1 / n2
                 progs[c] = dict(kind="gear", parent=p, ratio=n1 / n2, phase=ph)
@@ -473,7 +600,8 @@ def layout(spec):
                 prims=prims, knobs=knobs)
 
 
-LABELS = dict(none="nothing", spur="spur gear", geneva_driver="Geneva driver", geneva_wheel="Geneva wheel")
+LABELS = dict(none="nothing", spur="spur gear", cluster="cluster gear", geneva_driver="Geneva driver",
+              geneva_wheel="Geneva wheel")
 
 
 # ── Geneva / gear angle (mirrors the JS animation) ───────────────────────────
@@ -506,6 +634,9 @@ def _depth(lay, i):
 
 # ── Collision primitives (plan circles in z bands) ───────────────────────────
 
+GEAR_TAGS = ("gear", "gear_top")      # collision tags of a mechanism's gear layers, bottom up
+
+
 def primitives(q, it):
     """[(tag, r, z0, z1)] about the rail's shaft axis (nut frame z)."""
     h = hub(q)
@@ -515,8 +646,10 @@ def primitives(q, it):
     out = [("hub", h["rh"], q["z_top"], h["z_top"])]
     mq = it["mq"]
     zb = h["zb"]
-    if k == "spur":
-        out.append(("gear", mq["ra"], zb, zb + mq["thickness"]))
+    if k in LIFTABLE:
+        zl = zb + it.get("lift", 0.0)
+        for n, (_z, z0, z1, ra) in enumerate(gear_layers(it)):
+            out.append((GEAR_TAGS[n], ra, zl + z0, zl + z1))
     elif k == "geneva_driver":
         out.append(("gear" if mq["driver_gear"] else "plate", mq["plate_r"], zb, zb + mq["plate_thickness"]))
         out.append(("crank", mq["a"] + mq["pr"], zb + mq["plate_thickness"], zb + mq["z_top"]))
@@ -551,9 +684,12 @@ def collisions(q, rails, prims, knobs, xs=None):
     xs = xs or [it["x"] for it in rails]
     msgs = []
     linked = set()
+    meshing = set()         # (rail, tag) pairs whose plan circles are meant to overlap their mate's
     for it in rails:
         if it.get("parent") is not None:
             linked.add(frozenset((it["index"], it["parent"])))
+            mi, ti = it.get("mesh_layers", (0, 0))
+            meshing.add((it["index"], it["parent"], GEAR_TAGS[mi], GEAR_TAGS[ti]))
     for i in range(len(rails)):
         for j in range(i + 1, len(rails)):
             pair = frozenset((i, j))
@@ -563,7 +699,7 @@ def collisions(q, rails, prims, knobs, xs=None):
                 for tb, rb, b0, b1 in prims[j]:
                     if min(a1, b1) - max(a0, b0) <= 1e-6:
                         continue
-                    if pair in linked and (geneva_pair or (ta == "gear" and tb == "gear")):
+                    if pair in linked and (geneva_pair or (i, j, ta, tb) in meshing or (j, i, tb, ta) in meshing):
                         continue
                     if d < ra + rb + COLLIDE_GAP - 1e-9:
                         msgs.append("Rail %s's %s hits rail %s's %s (%.1f mm short)."
@@ -592,7 +728,7 @@ def collisions(q, rails, prims, knobs, xs=None):
 
 
 def _part(tag):
-    return dict(shaft="shaft", hub="hub", gear="gear", plate="crank plate", crank="pin and locking disc",
+    return dict(shaft="shaft", hub="hub", gear="gear", gear_top="top gear", plate="crank plate", crank="pin and locking disc",
                 wheel="wheel").get(tag, tag)
 
 
@@ -603,6 +739,8 @@ def build_mech(lay, i):
     q, g = lay["q"], lay["gear"]
     if it["kind"] == "spur":
         return build_spur(q, g, it["mq"])
+    if it["kind"] == "cluster":
+        return build_cluster(q, g, it["mq"])
     if it["kind"] == "geneva_driver":
         return build_geneva_driver(q, g, it["mq"])
     if it["kind"] == "geneva_wheel":

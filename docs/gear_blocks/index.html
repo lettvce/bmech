@@ -252,6 +252,13 @@
         partway up its hub (to clear its driver's plate), so it needs a
         little support under the wheel. The tooth profile is the same
         involute bmech's spur gear generator makes in Blender.</li>
+    <li><strong>Cluster gears.</strong> Two gears fused on one hub, a bottom
+        and a top gear, for big reductions in a short space. A gear linked to
+        a cluster meets its top gear by default (switch to the bottom gear
+        under the link) and rides up its own hub to that height. A gear on
+        the top gear has to keep its hub clear of the big bottom gear, so it
+        needs enough teeth; the builder flags it if not. Print a cluster big
+        gear down.</li>
     <li><strong>Two-sided.</strong> Tick <em>Two-Sided</em> and a second
         rail, turned end for end, joins the first past an open middle. Each
         row gets a knob and nut on both sides (1L, 1R, …), each moved by its
@@ -326,6 +333,12 @@ const MECH_FIELDS = {
     { id: "teeth", label: "Teeth", unit: "T", min: 8, max: 200, step: 1 },
     { id: "thickness", label: "Gear Thickness", unit: "mm", min: 0.6, max: 60, step: 0.5 },
   ],
+  cluster: [
+    { id: "teeth", label: "Bottom Teeth", unit: "T", min: 8, max: 200, step: 1 },
+    { id: "thickness", label: "Bottom Thickness", unit: "mm", min: 0.6, max: 60, step: 0.5 },
+    { id: "teeth_top", label: "Top Teeth", unit: "T", min: 8, max: 200, step: 1, hint: "Kept at least 5 teeth from the bottom gear (for module 2.4), so the step between them is flat." },
+    { id: "thickness_top", label: "Top Thickness", unit: "mm", min: 0.6, max: 60, step: 0.5 },
+  ],
   geneva_driver: [
     { id: "slots", label: "Wheel Slots", unit: "", min: 3, max: 24, step: 1 },
     { id: "center_distance", label: "Centre Distance", unit: "mm", min: 10, max: 200, step: 0.5, hint: "Driver to wheel; at least the rail spacing to reach the next rail." },
@@ -341,8 +354,8 @@ const MECH_FIELDS = {
   geneva_wheel: [],
   none: [],
 };
-const MECH_LABEL = { none: "Nothing", spur: "Spur gear", geneva_driver: "Geneva driver", geneva_wheel: "Geneva wheel" };
-const MECH_SHORT = { none: "—", spur: "gear", geneva_driver: "driver", geneva_wheel: "wheel" };
+const MECH_LABEL = { none: "Nothing", spur: "Spur gear", cluster: "Cluster gear", geneva_driver: "Geneva driver", geneva_wheel: "Geneva wheel" };
+const MECH_SHORT = { none: "—", spur: "gear", cluster: "cluster", geneva_driver: "driver", geneva_wheel: "wheel" };
 
 const STORE_KEY = "shaft_rail_v1";
 const DEFAULT_STATE = {
@@ -358,7 +371,7 @@ const DEFAULT_STATE = {
 // ---------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------
-const worker = new Worker("worker.js?v=14");
+const worker = new Worker("worker.js?v=15");
 let reqId = 0;
 const waiting = new Map();
 worker.onmessage = (e) => {
@@ -713,7 +726,8 @@ function renderChips() {
     chip.type = "button";
     chip.className = "chip" + (i === selected ? " sel" : "") + (bad.has(i) ? " err" : "");
     const ri = info && info.rails[i];
-    const tag = r.mech === "spur" && ri && ri.teeth ? `${ri.teeth}T` : MECH_SHORT[r.mech || "none"];
+    const tag = r.mech === "spur" && ri && ri.teeth ? `${ri.teeth}T`
+      : r.mech === "cluster" && ri && ri.teeth_top ? `${ri.teeth}/${ri.teeth_top}T` : MECH_SHORT[r.mech || "none"];
     chip.textContent = `${lab(i)}: ${tag}${state.input === i ? " ⟳" : ""}`;
     chip.addEventListener("click", () => select(i));
     el.appendChild(chip);
@@ -755,6 +769,18 @@ function renderRailFields() {
     if (L) {
       h += `<div class="seg" style="margin-top:0.4rem"><button type="button" class="btn${L.side >= 0 ? " on" : ""}" id="rf-side-p">Endstop side</button>` +
         `<button type="button" class="btn${L.side < 0 ? " on" : ""}" id="rf-side-n">Knob side</button></div>`;
+      // cluster gears: which of the two gears meet (the parent's top gear unless told otherwise)
+      const parentCluster = state.rails[L.rail] && state.rails[L.rail].mech === "cluster";
+      if (parentCluster) {
+        const top = L.their === undefined || L.their === null || L.their === 1;
+        h += `<div class="seg" style="margin-top:0.4rem"><button type="button" class="btn${!top ? " on" : ""}" id="rf-their-0">Its bottom gear</button>` +
+          `<button type="button" class="btn${top ? " on" : ""}" id="rf-their-1">Its top gear</button></div>`;
+      }
+      if (kind === "cluster" && state.rails[L.rail] && ["spur", "cluster", "geneva_driver"].includes(state.rails[L.rail].mech)) {
+        const mine = L.layer === 1;
+        h += `<div class="seg" style="margin-top:0.4rem"><button type="button" class="btn${!mine ? " on" : ""}" id="rf-layer-0">With my bottom gear</button>` +
+          `<button type="button" class="btn${mine ? " on" : ""}" id="rf-layer-1">With my top gear</button></div>`;
+      }
     }
     h += `</div>`;
   }
@@ -789,9 +815,13 @@ function renderRailFields() {
     }
   }
   if ($("rf-link")) $("rf-link").addEventListener("change", (e) => {
-    r.link = e.target.value === "" ? null : { rail: +e.target.value, side: (r.link && r.link.side) || 1 };
+    r.link = e.target.value === "" ? null : { rail: +e.target.value, side: (r.link && r.link.side) || 1 };      // layers back to default
     rebuild();
   });
+  for (const k of [0, 1]) {
+    if ($("rf-their-" + k)) $("rf-their-" + k).addEventListener("click", () => { r.link.their = k; rebuild(); });
+    if ($("rf-layer-" + k)) $("rf-layer-" + k).addEventListener("click", () => { r.link.layer = k; rebuild(); });
+  }
   if ($("rf-side-p")) {
     $("rf-side-p").addEventListener("click", () => { r.link.side = 1; rebuild(); });
     $("rf-side-n").addEventListener("click", () => { r.link.side = -1; rebuild(); });
@@ -832,6 +862,9 @@ function renderInfo() {
   const rows = [];
   if (ri.kind === "spur") {
     rows.push(["Teeth", `${ri.teeth}`], ["Tip diameter", `${fmt(2 * ri.tip)} mm`]);
+  } else if (ri.kind === "cluster") {
+    rows.push(["Teeth (bottom / top)", `${ri.teeth} / ${ri.teeth_top}`],
+              ["Tip diameters", `${fmt(2 * ri.tip)} / ${fmt(2 * ri.tip_top)} mm`]);
   } else if (ri.kind === "geneva_driver") {
     rows.push(["Wheel slots", `${ri.slots}`], ["Centre distance", `${fmt(ri.center_distance, 2)} mm`],
               ["Wheel locked", `${fmt(100 * ri.dwell, 0)}% of each turn`]);
@@ -840,6 +873,7 @@ function renderInfo() {
     rows.push(["Indexes", `1/${ri.slots} turn per driver turn`]);
   }
   if (ri.distance) rows.push(["Centre distance to rail " + lab(ri.parent), `${fmt(ri.distance, 2)} mm`]);
+  if (ri.lift > 1e-9) rows.push(["Raised on its hub", `${fmt(ri.lift)} mm`]);
   const s = ri.kind !== "none" ? speedOf(selected) : null;
   if (s !== null && ri.prog.kind !== "input") rows.push([`Turns per turn of rail ${lab(state.input)}`, `${fmt(Math.abs(s), 3)} ${s < 0 ? "↺" : "↻"}`]);
   const [lo, hi] = ri.side ? [2 * R.x_mid - R.x_max, 2 * R.x_mid - R.x_min] : [R.x_min, R.x_max];
@@ -918,7 +952,8 @@ function saveBlob(blob, name) {
 }
 function mechName(i) {
   const r = info.rails[i];
-  const what = r.kind === "spur" ? `spur_m${info.gear.module}_${r.teeth}T`
+  const what = r.kind === "spur" ? `spur_m${info.gear.module}_${r.teeth}T${r.lift > 1e-9 ? `_raised${fmt(r.lift)}` : ""}`
+    : r.kind === "cluster" ? `cluster_m${info.gear.module}_${r.teeth}-${r.teeth_top}T${r.lift > 1e-9 ? `_raised${fmt(r.lift)}` : ""}`
     : r.kind === "geneva_driver" ? `geneva_driver_${r.slots}slot${r.toothed ? `_${r.gear_teeth}T` : ""}`
     : `geneva_wheel_${r.slots}slot`;
   return `rail${lab(i)}_${what}.stl`;
