@@ -268,6 +268,15 @@
         own knob, and both screws keep the same right-hand thread. The
         endstops meet in the middle, so their caps are a little smaller
         there to clear the outer walls.</li>
+    <li><strong>Scotch yoke.</strong> Needs <em>Two-Sided</em>. Put a yoke
+        on one nut of a row and it takes the other nut's gear, which gets a
+        pin on its flat top. The holder drops over its nut's shaft with two
+        legs either side of the nut so it can't turn, and a dovetail channel
+        on top. The yoke is a separate flat part: slide its bar into the
+        channel and its slot over the pin. Turn the gear and the yoke slides
+        back and forth, twice the pin radius each way round; the end of the
+        bar past the holder is the output. <em>Length</em> sets how far the
+        holder sits from the gear, so its nut follows the gear's.</li>
     <li><strong>Small parts.</strong> The smallest loose pieces are gone:
         no stop cap, and the endstop is as wide as the knob. Nuts, knobs and
         small gears can still fit a small-parts test cylinder, so this is for
@@ -334,7 +343,10 @@ const FIELDS = [
 const MECH_FIELDS = {
   spur: [
     { id: "teeth", label: "Teeth", unit: "T", min: 8, max: 200, step: 1 },
-    { id: "thickness", label: "Gear Thickness", unit: "mm", min: 0.6, max: 60, step: 0.5 },
+    { id: "thickness", label: "Gear Thickness", unit: "mm", min: 0.6, max: 60, step: 0.5, unless: "pin" },
+    { id: "pin", label: "Pin on top (for a yoke)", type: "checkbox" },
+    { id: "pin_radius", label: "Pin Radius", unit: "mm", min: 0, max: 100, step: 0.5, onlyIf: "pin", hint: "Centre to pin; the yoke's stroke is twice this. Kept inside the root circle." },
+    { id: "pin_diameter", label: "Pin Diameter", unit: "mm", min: 1, max: 30, step: 0.5, onlyIf: "pin" },
   ],
   cluster: [
     { id: "teeth", label: "Bottom Teeth", unit: "T", min: 8, max: 200, step: 1 },
@@ -354,10 +366,17 @@ const MECH_FIELDS = {
     { id: "tip_round", label: "Slot Entry Rounding", unit: "mm", min: 0, max: 3, step: 0.1, hint: "Rounds the wheel's sharp slot tips. 0 = sharp; capped to what fits." },
   ],
   geneva_wheel: [],
+  yoke: [
+    { id: "length", label: "Length", unit: "mm", min: 1, max: 1000, step: 1, hint: "Pin gear centre to holder centre; sets where the holder's nut sits." },
+    { id: "tail", label: "Tail", unit: "mm", min: 0, max: 200, step: 1, hint: "Bar left past the holder at the far end of the stroke: the output end." },
+    { id: "thickness", label: "Yoke Thickness", unit: "mm", min: 2, max: 12, step: 0.5 },
+    { id: "fit", label: "Dovetail Clearance", unit: "mm", min: 0.05, max: 0.8, step: 0.05, hint: "Bar to channel, per side." },
+    { id: "slot_clearance", label: "Slot Clearance", unit: "mm", min: 0.05, max: 0.8, step: 0.05, hint: "Pin to slot, per side." },
+  ],
   none: [],
 };
-const MECH_LABEL = { none: "Nothing", spur: "Spur gear", cluster: "Cluster gear", geneva_driver: "Geneva driver", geneva_wheel: "Geneva wheel" };
-const MECH_SHORT = { none: "—", spur: "gear", cluster: "cluster", geneva_driver: "driver", geneva_wheel: "wheel" };
+const MECH_LABEL = { none: "Nothing", spur: "Spur gear", cluster: "Cluster gear", geneva_driver: "Geneva driver", geneva_wheel: "Geneva wheel", yoke: "Scotch yoke" };
+const MECH_SHORT = { none: "—", spur: "gear", cluster: "cluster", geneva_driver: "driver", geneva_wheel: "wheel", yoke: "yoke" };
 
 const STORE_KEY = "shaft_rail_v1";
 const DEFAULT_STATE = {
@@ -373,7 +392,7 @@ const DEFAULT_STATE = {
 // ---------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------
-const worker = new Worker("worker.js?v=16");
+const worker = new Worker("worker.js?v=17");
 let reqId = 0;
 const waiting = new Map();
 worker.onmessage = (e) => {
@@ -566,7 +585,12 @@ function renderScene() {
       pivot.add(mechMesh);
     }
     world.add(handle, nut);
-    objs.push({ handle, nut, pivot, mechMesh });
+    let yokeMesh = null;
+    if (r.yoke && geos[r.yoke]) {
+      yokeMesh = meshOf(geos[r.yoke], MATS.mech, r.index);
+      world.add(yokeMesh);
+    }
+    objs.push({ handle, nut, pivot, mechMesh, yokeMesh });
   }
   const span = Math.max(info.rail.body_length, info.rail.body_width) * 3;
   ground.position.set(0, -info.rail.body_height + info.rail.z_top - 0.05, 0);
@@ -625,6 +649,17 @@ function place() {
 function turn() {
   const an = mechAngles();
   objs.forEach((o, i) => { o.pivot.rotation.z = an[i]; });
+  // a yoke's slot follows its pin: x = pin gear x + pin radius cos(pin gear angle)  (rail_mechs.yoke_x)
+  let xs = null;
+  objs.forEach((o, i) => {
+    if (!o.yokeMesh) return;
+    const r = info.rails[i];
+    if (r.parent === null || r.parent === undefined) { o.yokeMesh.visible = false; return; }
+    xs = xs || nutXs();
+    o.yokeMesh.visible = true;
+    o.yokeMesh.position.set(xs[r.parent] + r.pin_radius * Math.cos(an[r.parent]), r.y, 0);
+    o.yokeMesh.rotation.z = r.dir < 0 ? Math.PI : 0;
+  });
 }
 
 function railsWithIssues() {
@@ -640,6 +675,7 @@ function colorRails() {
   const bad = railsWithIssues();
   objs.forEach((o, i) => {
     if (o.mechMesh) o.mechMesh.material = bad.has(i) ? MATS.err : i === selected ? MATS.sel : MATS.mech;
+    if (o.yokeMesh) o.yokeMesh.material = o.mechMesh.material;
     o.nut.children[0].material = i === selected ? MATS.sel : MATS.nut;
   });
 }
@@ -728,7 +764,7 @@ function renderChips() {
     chip.type = "button";
     chip.className = "chip" + (i === selected ? " sel" : "") + (bad.has(i) ? " err" : "");
     const ri = info && info.rails[i];
-    const tag = r.mech === "spur" && ri && ri.teeth ? `${ri.teeth}T`
+    const tag = r.mech === "spur" && ri && ri.teeth ? `${ri.teeth}T${ri.pin ? " pin" : ""}`
       : r.mech === "cluster" && ri && ri.teeth_top ? `${ri.teeth}/${ri.teeth_top}T` : MECH_SHORT[r.mech || "none"];
     chip.textContent = `${lab(i)}: ${tag}${state.input === i ? " ⟳" : ""}`;
     chip.addEventListener("click", () => select(i));
@@ -752,6 +788,7 @@ function renderRailFields() {
     `</select></div>`;
   for (const f of MECH_FIELDS[kind]) {
     if (f.onlyIf && !(r[f.onlyIf] ?? mdef[f.onlyIf])) continue;
+    if (f.unless && (r[f.unless] ?? mdef[f.unless])) continue;
     const v = r[f.id] ?? mdef[f.id];
     if (f.type === "checkbox") {
       h += `<div class="field checkbox-field"><label class="checkbox-label"><span>${f.label}</span>` +
@@ -764,11 +801,12 @@ function renderRailFields() {
   }
   if (kind !== "none") {
     const L = r.link;
-    h += `<div class="field"><label for="rf-link">${kind === "geneva_wheel" ? "Driven by" : "Meshes with"}</label><select id="rf-link">` +
+    h += `<div class="field"><label for="rf-link">${kind === "geneva_wheel" ? "Driven by" : kind === "yoke" ? "Pin gear" : "Meshes with"}</label><select id="rf-link">` +
       `<option value="">— nothing (own knob)</option>` +
       others.map((j) => `<option value="${j}"${L && L.rail === j ? " selected" : ""}>Rail ${lab(j)} (${MECH_LABEL[state.rails[j].mech || "none"].toLowerCase()})</option>`).join("") +
       `</select>`;
-    if (L) {
+    if (kind === "yoke") h += `<span class="hint">The other nut of this row, with a pin gear. Needs Two-Sided.</span>`;
+    if (L && kind !== "yoke") {
       h += `<div class="seg" style="margin-top:0.4rem"><button type="button" class="btn${L.side >= 0 ? " on" : ""}" id="rf-side-p">Endstop side</button>` +
         `<button type="button" class="btn${L.side < 0 ? " on" : ""}" id="rf-side-n">Knob side</button></div>`;
       // cluster gears: which of the two gears meet (the parent's top gear unless told otherwise)
@@ -790,7 +828,7 @@ function renderRailFields() {
     h += `<div class="field"><label for="rf-pos">Nut Position <span class="unit-suffix" id="rf-pos-val"></span></label>` +
       `<input type="range" id="rf-pos" min="0" max="1" step="0.001" value="${r.pos ?? 0.5}"></div>`;
   }
-  if (kind !== "none" && kind !== "geneva_wheel") {
+  if (kind !== "none" && kind !== "geneva_wheel" && kind !== "yoke") {
     h += `<div class="btn-row"><button type="button" class="btn${state.input === selected ? " on" : ""}" id="rf-input">` +
       `${state.input === selected ? "This rail drives the train" : "Drive the train from this rail"}</button></div>`;
   }
@@ -799,6 +837,14 @@ function renderRailFields() {
   $("rf-mech").addEventListener("change", (e) => {
     const k = e.target.value;
     const keep = { mech: k, pos: r.pos ?? 0.5, link: k === "none" ? null : r.link };
+    // a yoke takes the pin of the other nut of its row: link it there, and give that gear its pin
+    if (k === "yoke" && two()) {
+      const j = selected ^ 1, o = state.rails[j];
+      keep.link = { rail: j, side: 1 };
+      if (!o.mech || o.mech === "none") state.rails[j] = { mech: "spur", teeth: 16, pin: true, pos: o.pos ?? 0.9 };
+      else if (o.mech === "spur") o.pin = true;
+      if (state.input === selected) state.input = j;
+    }
     state.rails[selected] = keep;
     rebuild();
   });
@@ -864,6 +910,12 @@ function renderInfo() {
   const rows = [];
   if (ri.kind === "spur") {
     rows.push(["Teeth", `${ri.teeth}`], ["Tip diameter", `${fmt(2 * ri.tip)} mm`]);
+    if (ri.pin) rows.push(["Pin", `⌀${fmt(ri.pin_diameter)} mm at ${fmt(ri.pin_radius)} mm (stroke ${fmt(2 * ri.pin_radius)} mm)`],
+                          ["Print", "as it sits, pin up"]);
+  } else if (ri.kind === "yoke") {
+    rows.push(["Stroke", `${fmt(ri.stroke)} mm`], ["Pin gear to holder", `${fmt(ri.length)} mm`],
+              ["Yoke", `${fmt(ri.yoke_length)} × ${fmt(ri.yoke_width)} × ${fmt(ri.thickness)} mm, prints flat`],
+              ["Holder", "prints upright on its legs; slide the yoke in from the end"]);
   } else if (ri.kind === "cluster") {
     rows.push(["Teeth (bottom / top)", `${ri.teeth} / ${ri.teeth_top}`],
               ["Tip diameters", `${fmt(2 * ri.tip)} / ${fmt(2 * ri.tip_top)} mm`],
@@ -876,7 +928,7 @@ function renderInfo() {
   } else if (ri.kind === "geneva_wheel") {
     rows.push(["Indexes", `1/${ri.slots} turn per driver turn`]);
   }
-  if (ri.distance) rows.push(["Centre distance to rail " + lab(ri.parent), `${fmt(ri.distance, 2)} mm`]);
+  if (ri.distance && ri.kind !== "yoke") rows.push(["Centre distance to rail " + lab(ri.parent), `${fmt(ri.distance, 2)} mm`]);
   if (ri.lift > 1e-9) rows.push(["Raised on its hub", `${fmt(ri.lift)} mm`]);
   const s = ri.kind !== "none" ? speedOf(selected) : null;
   if (s !== null && ri.prog.kind !== "input") rows.push([`Turns per turn of rail ${lab(state.input)}`, `${fmt(Math.abs(s), 3)} ${s < 0 ? "↺" : "↻"}`]);
@@ -956,21 +1008,31 @@ function saveBlob(blob, name) {
 }
 function mechName(i) {
   const r = info.rails[i];
-  const what = r.kind === "spur" ? `spur_m${info.gear.module}_${r.teeth}T${r.lift > 1e-9 ? `_raised${fmt(r.lift)}` : ""}`
+  const what = r.kind === "spur" ? `spur_m${info.gear.module}_${r.teeth}T${r.pin ? `_pin${fmt(r.pin_radius)}` : ""}${r.lift > 1e-9 ? `_raised${fmt(r.lift)}` : ""}`
+    : r.kind === "yoke" ? `yoke_holder`
     : r.kind === "cluster" ? `cluster_m${info.gear.module}_${r.teeth}-${r.teeth_top}T${r.lift > 1e-9 ? `_raised${fmt(r.lift)}` : ""}`
     : r.kind === "geneva_driver" ? `geneva_driver_${r.slots}slot${r.toothed ? `_${r.gear_teeth}T` : ""}`
     : `geneva_wheel_${r.slots}slot`;
   return `rail${lab(i)}_${what}.stl`;
 }
-$("dl-one").addEventListener("click", () => {
+const yokeName = (i) => `rail${lab(i)}_yoke_stroke${fmt(info.rails[i].stroke)}_L${fmt(info.rails[i].length)}.stl`;
+$("dl-one").addEventListener("click", async () => {
   const r = info.rails[selected];
-  if (r.mesh) saveBlob(new Blob([stl(meshes[r.mesh])], { type: "model/stl" }), mechName(selected));
+  if (r.yoke && meshes[r.yoke] && window.JSZip) {        // holder + yoke: two parts, one zip
+    const zip = new window.JSZip();
+    zip.file(mechName(selected), stl(meshes[r.mesh]));
+    zip.file(yokeName(selected), stl(meshes[r.yoke]));
+    saveBlob(await zip.generateAsync({ type: "blob" }), `rail${lab(selected)}_scotch_yoke.zip`);
+  } else if (r.mesh) saveBlob(new Blob([stl(meshes[r.mesh])], { type: "model/stl" }), mechName(selected));
 });
 $("dl-all").addEventListener("click", async () => {
   const zip = new window.JSZip(), n = info.rails.length;
   zip.file("body.stl", stl(meshes.body));
   for (const part of ["screw", "handle", "endstop", "nut"]) zip.file(`${part}_x${n}.stl`, stl(meshes[part]));
-  info.rails.forEach((r, i) => { if (r.mesh) zip.file(mechName(i), stl(meshes[r.mesh])); });
+  info.rails.forEach((r, i) => {
+    if (r.mesh) zip.file(mechName(i), stl(meshes[r.mesh]));
+    if (r.yoke && meshes[r.yoke]) zip.file(yokeName(i), stl(meshes[r.yoke]));
+  });
   saveBlob(await zip.generateAsync({ type: "blob" }), two() ? `shaft_rail_two_sided_${n / 2}_rows.zip` : `shaft_rail_${n}_rails.zip`);
 });
 

@@ -2,7 +2,7 @@
 // Pyodide, off the main thread. Messages:  {id, cmd: "build" | "info", spec}  ->  {id, info, meshes}
 // where meshes[name] = {pos: Float32Array, idx: Uint32Array, tris}. Bump PY_VERSION whenever the
 // py/ files change: GitHub Pages lets browsers cache them for 10 minutes.
-const PY_VERSION = 16;
+const PY_VERSION = 17;
 const PY_FILES = ["shaft_rail.py", "mesh2d.py", "geneva.py", "rail_mechs.py", "web_api.py"];
 
 importScripts("https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js");

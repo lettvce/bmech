@@ -122,6 +122,8 @@ def build(spec_json, with_meshes=True):
             mk = json.dumps({k: v for k, v in it["mq"].items() if isinstance(v, (int, float, bool, str))},
                             sort_keys=True)
             meshes[name] = _cached((it["kind"], rk, gk, mk), lambda i=i: _pack(*rm.build_mech(lay, i)))
+            if it["kind"] == "yoke":
+                meshes["yoke_%d" % i] = _cached(("yoke_part", rk, gk, mk), lambda i=i: _pack(*rm.build_yoke_part(lay, i)))
         mq = it.get("mq") or {}
         info = dict(index=i, kind=it["kind"], x=it["x"], y=it["y"], row=it["row"], side=it["side"],
                     label=it["label"], parent=it.get("parent"),
@@ -139,6 +141,14 @@ def build(spec_json, with_meshes=True):
                         tip=mq["tip_r"] if it["kind"] == "geneva_wheel" else mq["plate_r"],
                         z_wheel=mq["z_wheel"], z_top=mq["z_top"], plate_thickness=mq["plate_thickness"],
                         wheel_thickness=mq["wheel_thickness"])
+        if it["kind"] == "spur" and mq.get("pin"):
+            info.update(pin=True, pin_radius=mq["pin_radius"], pin_diameter=mq["pin_diameter"])
+        elif it["kind"] == "yoke":
+            sx, sy, fx, fy = rm.yoke_frame(mq)
+            info.update(yoke="yoke_%d" % i if with_meshes else None, length=mq["length"], dir=mq["dir"],
+                        pin_radius=mq["pin_radius"], stroke=2 * mq["pin_radius"], thickness=mq["thickness"],
+                        yoke_length=2 * fx + mq["length"] + mq["X"] + mq["pin_radius"] + mq["tail"] - fx,
+                        yoke_width=2 * fy)
         info.update(lift=it.get("lift", 0.0), mesh_layers=it.get("mesh_layers"))
         rails.append(info)
     summary = {k: q[k] for k in ("count", "spacing", "x_min", "x_max", "x_ref", "lead", "lead_angle", "travel",
