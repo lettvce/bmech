@@ -141,6 +141,8 @@ def build(spec_json, with_meshes=True):
                         tip=mq["tip_r"] if it["kind"] == "geneva_wheel" else mq["plate_r"],
                         z_wheel=mq["z_wheel"], z_top=mq["z_top"], plate_thickness=mq["plate_thickness"],
                         wheel_thickness=mq["wheel_thickness"])
+        if it["kind"] == "spur" and mq.get("full"):
+            info.update(full=True)
         if it["kind"] == "spur" and mq.get("pin"):
             info.update(pin=True, pin_radius=mq["pin_radius"], pin_diameter=mq["pin_diameter"])
         elif it["kind"] == "yoke":

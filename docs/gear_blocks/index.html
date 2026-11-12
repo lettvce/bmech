@@ -261,7 +261,10 @@
         cluster meets its top gear by default (switch to the bottom gear
         under the link) and rides up its own hub to that height. A gear on
         the top gear has to keep its hub clear of a bigger bottom gear, so
-        it needs enough teeth; the builder flags it if not.</li>
+        it needs enough teeth; the builder flags it if not. Or tick
+        <em>Full height</em> on that gear: its teeth run the hub's whole
+        height with a flat top, so it meets the top gear of a top-heavy
+        cluster right where it is, with nothing raised.</li>
     <li><strong>Two-sided.</strong> Tick <em>Two-Sided</em> and a second
         rail, turned end for end, joins the first past an open middle. Each
         row gets a knob and nut on both sides (1L, 1R, …), each moved by its
@@ -343,7 +346,8 @@ const FIELDS = [
 const MECH_FIELDS = {
   spur: [
     { id: "teeth", label: "Teeth", unit: "T", min: 8, max: 200, step: 1 },
-    { id: "thickness", label: "Gear Thickness", unit: "mm", min: 0.6, max: 60, step: 0.5, unless: "pin" },
+    { id: "thickness", label: "Gear Thickness", unit: "mm", min: 0.6, max: 60, step: 0.5, unless: ["pin", "full_height"] },
+    { id: "full_height", label: "Full height", type: "checkbox", hint: "Teeth up the whole hub with a flat top, like the Geneva wheel. Meets either gear of a cluster without being raised." },
     { id: "pin", label: "Pin on top (for a yoke)", type: "checkbox" },
     { id: "pin_radius", label: "Pin Radius", unit: "mm", min: 0, max: 100, step: 0.5, onlyIf: "pin", hint: "Centre to pin; the yoke's stroke is twice this. Kept inside the root circle." },
     { id: "pin_diameter", label: "Pin Diameter", unit: "mm", min: 1, max: 30, step: 0.5, onlyIf: "pin" },
@@ -392,7 +396,7 @@ const DEFAULT_STATE = {
 // ---------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------
-const worker = new Worker("worker.js?v=17");
+const worker = new Worker("worker.js?v=18");
 let reqId = 0;
 const waiting = new Map();
 worker.onmessage = (e) => {
@@ -764,7 +768,7 @@ function renderChips() {
     chip.type = "button";
     chip.className = "chip" + (i === selected ? " sel" : "") + (bad.has(i) ? " err" : "");
     const ri = info && info.rails[i];
-    const tag = r.mech === "spur" && ri && ri.teeth ? `${ri.teeth}T${ri.pin ? " pin" : ""}`
+    const tag = r.mech === "spur" && ri && ri.teeth ? `${ri.teeth}T${ri.full ? " full" : ""}${ri.pin ? " pin" : ""}`
       : r.mech === "cluster" && ri && ri.teeth_top ? `${ri.teeth}/${ri.teeth_top}T` : MECH_SHORT[r.mech || "none"];
     chip.textContent = `${lab(i)}: ${tag}${state.input === i ? " ⟳" : ""}`;
     chip.addEventListener("click", () => select(i));
@@ -788,11 +792,12 @@ function renderRailFields() {
     `</select></div>`;
   for (const f of MECH_FIELDS[kind]) {
     if (f.onlyIf && !(r[f.onlyIf] ?? mdef[f.onlyIf])) continue;
-    if (f.unless && (r[f.unless] ?? mdef[f.unless])) continue;
+    if (f.unless && [].concat(f.unless).some((k) => r[k] ?? mdef[k])) continue;
     const v = r[f.id] ?? mdef[f.id];
     if (f.type === "checkbox") {
       h += `<div class="field checkbox-field"><label class="checkbox-label"><span>${f.label}</span>` +
-        `<input type="checkbox" id="rf-${f.id}"${v ? " checked" : ""}></label></div>`;
+        `<input type="checkbox" id="rf-${f.id}"${v ? " checked" : ""}></label>` +
+        (f.hint ? `<span class="hint">${f.hint}</span>` : "") + `</div>`;
     } else {
       h += `<div class="field"><label for="rf-${f.id}">${f.label} <span class="unit-suffix">${f.unit}</span></label>` +
         `<input type="number" id="rf-${f.id}" min="${f.min}" max="${f.max}" step="${f.step}" value="${v ?? ""}">` +
@@ -910,6 +915,7 @@ function renderInfo() {
   const rows = [];
   if (ri.kind === "spur") {
     rows.push(["Teeth", `${ri.teeth}`], ["Tip diameter", `${fmt(2 * ri.tip)} mm`]);
+    if (ri.full) rows.push(["Gear thickness", `${fmt(ri.thickness)} mm (the hub's whole height)`]);
     if (ri.pin) rows.push(["Pin", `⌀${fmt(ri.pin_diameter)} mm at ${fmt(ri.pin_radius)} mm (stroke ${fmt(2 * ri.pin_radius)} mm)`],
                           ["Print", "as it sits, pin up"]);
   } else if (ri.kind === "yoke") {
@@ -1008,7 +1014,7 @@ function saveBlob(blob, name) {
 }
 function mechName(i) {
   const r = info.rails[i];
-  const what = r.kind === "spur" ? `spur_m${info.gear.module}_${r.teeth}T${r.pin ? `_pin${fmt(r.pin_radius)}` : ""}${r.lift > 1e-9 ? `_raised${fmt(r.lift)}` : ""}`
+  const what = r.kind === "spur" ? `spur_m${info.gear.module}_${r.teeth}T${r.full ? "_full" : ""}${r.pin ? `_pin${fmt(r.pin_radius)}` : ""}${r.lift > 1e-9 ? `_raised${fmt(r.lift)}` : ""}`
     : r.kind === "yoke" ? `yoke_holder`
     : r.kind === "cluster" ? `cluster_m${info.gear.module}_${r.teeth}-${r.teeth_top}T${r.lift > 1e-9 ? `_raised${fmt(r.lift)}` : ""}`
     : r.kind === "geneva_driver" ? `geneva_driver_${r.slots}slot${r.toothed ? `_${r.gear_teeth}T` : ""}`

@@ -6,6 +6,9 @@ Every mechanism is one closed solid fused to a capped hub: the hub's bore runs o
 Gravity holds it on (the shafts stand vertical); there is no separate stop cap to lose.
 
     spur           involute spur gear (bmech profile, geneva.gear_outline)
+    spur (full)    full_height=True: the teeth run the hub's whole height with a flat top, like the Geneva wheel,
+                   and the gear is never lifted, so it meets either gear of a cluster where that gear already is
+                   (2026-11-12, for meshing the top of a top-heavy cluster)
     cluster        two spur gears fused on one hub, a bottom and a top gear (2026-11-11); the top gear runs up
                    to the hub's top, so the top is one flat face: print the bigger gear down, either way up
     geneva_driver  Geneva crank: plate (plain disc or spur teeth), locking disc and pin
@@ -50,7 +53,7 @@ CLUSTER_MIN_TOP = 2.0   # a cluster's top gear, at least this thick (it runs fro
 GEAR_DEFAULTS = dict(module=2.4, pressure_angle=20.0, backlash=0.25)    # chunky teeth, still many ratios
 MECH_DEFAULTS = {
     "none": {},
-    "spur": dict(teeth=16, thickness=5.0, pin=False, pin_radius=8.0, pin_diameter=5.0),
+    "spur": dict(teeth=16, thickness=5.0, full_height=False, pin=False, pin_radius=8.0, pin_diameter=5.0),
     "cluster": dict(teeth=30, thickness=5.0, teeth_top=14),       # the top gear fills up to the hub top
     "geneva_driver": dict(slots=6, center_distance=40.0, pin_diameter=5.0, clearance=0.2,
                           plate_thickness=3.0, layer_gap=0.4, wheel_thickness=5.0,
@@ -170,7 +173,13 @@ def spur_q(q, g, spec):
         t = min(max(t, 0.6), tmax)
     rp = m * z / 2
     sq = dict(kind="spur", teeth=z, thickness=t, rp=rp, ra=rp + geneva.ADDENDUM * m,
-              rd=rp - geneva.DEDENDUM * m, pin=bool(spec.get("pin", False)))
+              rd=rp - geneva.DEDENDUM * m, pin=bool(spec.get("pin", False)),
+              full=bool(spec.get("full_height", False)))
+    if sq["full"]:
+        # full height (2026-11-12): teeth from the hub bottom to the hub top, flat top like the Geneva wheel;
+        # never lifted, so it meets any layer of its partner where that layer already is
+        sq["thickness"] = h["z_top"] - h["zb"]
+        notes = [n for n in notes if n[0] != "thickness"]
     if sq["pin"]:
         # flat-topped: the gear runs to the hub top (layout() redoes this for a raised gear), the pin
         # stands on that face inside the root circle; its top is set by the yoke it drives
@@ -236,7 +245,14 @@ def gear_layers(it):
 LIFTABLE = ("spur", "cluster")
 
 
+def is_full(it):
+    """A full-height spur: its one gear layer runs the hub's whole height."""
+    return it["kind"] == "spur" and bool((it.get("mq") or {}).get("full"))
+
+
 def build_spur(q, g, sq):
+    if sq.get("full") and not sq.get("pin"):
+        return build_gear_stack(q, g, [(sq["teeth"], sq["thickness"])], 0.0, flat_top=True)
     if sq.get("pin"):
         return build_gear_stack(q, g, [(sq["teeth"], sq["thickness"])], sq.get("lift", 0.0), flat_top=True,
                                 pin=(sq["pin_radius"], sq["pin_diameter"], sq["pin_top"]))
@@ -729,9 +745,11 @@ def layout(spec):
                             it["mesh_layers"] = (mi, ti)
                             it["mesh_teeth"] = (la[mi][0], lb[ti][0])
                             lift = out[j]["lift"] + lb[ti][1] - la[mi][1]
+                            if is_full(it) or is_full(out[j]):
+                                lift = 0.0          # a full-height gear spans every layer: nothing moves up
                             if it["kind"] == "cluster":     # its top gear runs to the hub top, keeping CLUSTER_MIN_TOP
                                 top, limit = lift + la[0][2] + CLUSTER_MIN_TOP, h["z_top"] - h["zb"]
-                            elif it["mq"].get("pin"):         # flat-topped pin gear: some gear left under the top
+                            elif it["mq"].get("pin") or it["mq"].get("full"):   # flat-topped: some gear under the top
                                 top, limit = lift + PIN_FLAT_MIN, h["z_top"] - h["zb"]
                             else:
                                 top, limit = lift + la[-1][2], room
@@ -752,7 +770,7 @@ def layout(spec):
             it["mq"] = dict(it["mq"], lift=it["lift"])
         if it["kind"] == "cluster":
             it["mq"]["thickness_top"] = h["z_top"] - h["zb"] - it["lift"] - it["mq"]["thickness"]
-        if it["kind"] == "spur" and it["mq"].get("pin"):
+        if it["kind"] == "spur" and (it["mq"].get("pin") or it["mq"].get("full")):
             it["mq"]["thickness"] = h["z_top"] - h["zb"] - it["lift"]
         lo, hi = x_range(q, i)
         if x < lo - 1e-6 or x > hi + 1e-6:
